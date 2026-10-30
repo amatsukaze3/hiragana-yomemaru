@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+/*
+ * カードの文字：UDデジタル教科書体 NK-B
+ *  - Windows 10/11 には標準で入っているので local() でそのまま使います。
+ *  - iPad などフォントが無い端末は、設定画面からフォントファイルを登録すると
+ *    "YomemaruCardUser" として読み込まれ、最優先で使われます（src/lib/font.ts）。
+ *  - どちらも無いときは教科書体に近い Klee One で表示します。
+ */
+@font-face {
+  font-family: "YomemaruNKB";
+  src:
+    local("UD Digi Kyokasho NK-B"),
+    local("UDDigiKyokashoNK-B"),
+    local("UD デジタル 教科書体 NK-B"),
+    local("UDデジタル教科書体 NK-B");
+  font-display: block;
+}
+
+@theme {
+  --font-ui: "BIZ UDPMincho", "BIZ UDMincho", serif;
+  --font-card: "YomemaruCardUser", "YomemaruNKB", "UD Digi Kyokasho NK-B", "Klee One", "BIZ UDMincho", serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #fafaf9; /* stone-50 */
+  color: #44403c; /* stone-700 */
+  font-family: var(--font-ui);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+}
+
+/* タブレットでの画面スクロール・ダブルタップ拡大を防ぐ */
+.no-touch-scroll {
+  touch-action: none;
+}
+
+.font-card {
+  font-family: var(--font-card);
+  font-weight: 600;
+  font-feature-settings: normal;
+}
+
+button:focus-visible {
+  outline: 3px solid #f59e0b;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
