@@ -37,5 +37,6 @@ export function useVoiceJudge(target: Kana | null, onPass: (src: PassSource) => 
   const stop = useCallback(() => engine.current!.stop(), [])
   const hold = useCallback((ms: number) => engine.current!.hold(ms), [])
 
-  return { status, asr, start, stop, hold, frame }
+  const lastError = () => engine.current!.lastError
+  return { status, asr, start, stop, hold, frame, lastError }
 }

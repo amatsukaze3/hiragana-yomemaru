@@ -8,10 +8,10 @@
  * 子どもの短い単母音は音声認識だけだと無視されやすいので、②を並行して動かします。
  */
 import type { Kana } from '../data/kana'
-import { getAudioContext } from './audio'
+import { getAudioContext, setMicActive } from './audio'
 
 export type PassSource = 'asr' | 'formant'
-export type MicStatus = 'idle' | 'starting' | 'listening' | 'denied' | 'unsupported'
+export type MicStatus = 'idle' | 'starting' | 'listening' | 'denied' | 'unsupported' | 'error'
 
 export interface Bands {
   low: number // 220-480Hz
@@ -124,6 +124,8 @@ export class HybridVoiceJudge {
   onPass: ((source: PassSource) => void) | null = null
   onFrame: ((f: FrameInfo) => void) | null = null
   onStatus: ((s: MicStatus, asr: boolean) => void) | null = null
+  /** うまくいかなかったときの理由（保護者向けの説明に使う） */
+  lastError = ''
 
   static supported() {
     return !!navigator.mediaDevices?.getUserMedia
@@ -136,13 +138,19 @@ export class HybridVoiceJudge {
       return 'unsupported'
     }
     this.onStatus?.('starting', false)
+    this.lastError = ''
+    setMicActive(true)
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true },
       })
-    } catch {
-      this.onStatus?.('denied', false)
-      return 'denied'
+    } catch (e) {
+      setMicActive(false)
+      const name = (e as { name?: string })?.name ?? 'Error'
+      this.lastError = name
+      const st: MicStatus = name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : name === 'NotFoundError' ? 'unsupported' : 'error'
+      this.onStatus?.(st, false)
+      return st
     }
     const ctx = getAudioContext()
     if (ctx.state === 'suspended') await ctx.resume().catch(() => {})
@@ -174,8 +182,10 @@ export class HybridVoiceJudge {
     this.recog = null
     this.asrAlive = false
     this.source?.disconnect()
+    const had = !!this.stream
     this.stream?.getTracks().forEach((t) => t.stop())
     this.stream = null
+    if (had) setMicActive(false)
     this.onStatus?.('idle', false)
   }
 
@@ -256,6 +266,10 @@ export class HybridVoiceJudge {
   }
 
   private startAsr() {
+    // iPhone/iPad では音声認識がマイクを取りあい、周波数解析の入力が止まることがあるので使わない
+    const ua = navigator.userAgent
+    const ios = /iPhone|iPad|iPod/.test(ua) || (ua.includes('Macintosh') && navigator.maxTouchPoints > 1)
+    if (ios) return
     const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor }
     const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition
     if (!Ctor) return

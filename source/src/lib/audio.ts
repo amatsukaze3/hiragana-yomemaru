@@ -86,7 +86,25 @@ export function installUnlockListener() {
 }
 
 /** iPad/iPhone：消音スイッチがオンでも声が出るようにする（Safari 16.4+） */
+let micActive = false
+
+/**
+ * iPhone/iPad（Safari・Chrome とも中身は WebKit）の音の使い方を切りかえる。
+ * 'playback' は消音スイッチがオンでも鳴るが、マイクが止まってしまうので、
+ * マイクを使っている間は 'play-and-record' にする。
+ */
+export function setMicActive(on: boolean) {
+  micActive = on
+  try {
+    const nav = navigator as unknown as { audioSession?: { type: string } }
+    if (nav.audioSession) nav.audioSession.type = on ? 'play-and-record' : 'playback'
+  } catch {
+    /* noop */
+  }
+}
+
 function setPlaybackSession() {
+  if (micActive) return
   try {
     const nav = navigator as unknown as { audioSession?: { type: string } }
     if (nav.audioSession) nav.audioSession.type = 'playback'
