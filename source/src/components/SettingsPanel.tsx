@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ImagePlus, RotateCcw, Type, X } from 'lucide-react'
-import { KANA, KANA_INFO, type Kana } from '../data/kana'
+import { KANA_INFO, ROWS, type Kana } from '../data/kana'
 import { useCards } from '../lib/cards'
 import { clearUserFont, detectFontStatus, registerUserFont, userFontName, type FontStatus } from '../lib/font'
 import { lsGet, lsSet } from '../lib/storage'
@@ -60,7 +60,7 @@ export function SettingsPanel({ open, onClose, meter, setMeter }: { open: boolea
             </p>
 
             <ul className="flex flex-col gap-3">
-              {KANA.map((k) => {
+              {ROWS.flatMap((r) => r.kana).map((k) => {
                 const a = art[k]
                 return (
                   <li key={k} className="flex items-center gap-3 rounded-2xl border-2 border-amber-100 bg-white p-3">

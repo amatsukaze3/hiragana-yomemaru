@@ -6,7 +6,7 @@ import { Confetti, Hanamaru, Modal } from '../components/Celebrate'
 import { MicBadge } from '../components/MicStatus'
 import { Mascot } from '../components/Mascot'
 import { TraceCanvas } from '../components/TraceCanvas'
-import { KANA, KANA_INFO, smartShuffle, type Kana } from '../data/kana'
+import { KANA_INFO, smartShuffle, type Kana, type Row } from '../data/kana'
 import { playChime, sayVoice, speak } from '../lib/audio'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
 
@@ -18,16 +18,18 @@ const STEPS = [
   { title: 'ばらばらに よむ', guide: 'でてきた もじを よんでみよう' },
 ]
 
-export function Learn({ onHome }: { onHome: () => void }) {
+export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
+  const N = row.kana.length
+  const LAST = N - 1
   const [step, setStep] = useState(0)
   const [idx, setIdx] = useState(0)
   const [traceReset, setTraceReset] = useState(0)
   const [answered, setAnswered] = useState(false)
-  const [order, setOrder] = useState<Kana[]>(() => smartShuffle(5, 'お'))
+  const [order, setOrder] = useState<Kana[]>(() => smartShuffle(N, row.kana, row.kana[LAST]))
   const [burst, setBurst] = useState(0)
   const [hanamaru, setHanamaru] = useState(false)
 
-  const char: Kana = step === 4 ? order[Math.min(idx, 4)] : KANA[idx]
+  const char: Kana = step === 4 ? order[Math.min(idx, LAST)] : row.kana[Math.min(idx, LAST)]
   const info = KANA_INFO[char]
 
   // ステップ1・3：表示したら自動で読み上げる（ステップ4は鳴らさない）
@@ -42,13 +44,13 @@ export function Learn({ onHome }: { onHome: () => void }) {
   const voiceTarget = step === 4 && !hanamaru ? char : null
 
   const advance5 = useCallback(() => {
-    if (idx >= 4) {
+    if (idx >= LAST) {
       setHanamaru(true)
       window.setTimeout(() => sayVoice('pass5'), 500)
     } else {
       setIdx((i) => i + 1)
     }
-  }, [idx])
+  }, [idx, LAST])
 
   const busy = useRef(false)
   const passOne = () => {
@@ -74,22 +76,22 @@ export function Learn({ onHome }: { onHome: () => void }) {
     setStep(s)
     setIdx(i)
     setTraceReset((r) => r + 1)
-    if (s === 4) setOrder(smartShuffle(5, 'お'))
+    if (s === 4) setOrder(smartShuffle(N, row.kana, row.kana[LAST]))
   }
 
   const next = () => {
-    if (step < 4 && idx < 4) setIdx(idx + 1)
+    if (step < 4 && idx < LAST) setIdx(idx + 1)
     else if (step < 4) goStep(step + 1)
   }
   const prev = () => {
-    if (step === 4) goStep(3, 4)
+    if (step === 4) goStep(3, LAST)
     else if (idx > 0) setIdx(idx - 1)
-    else if (step > 0) goStep(step - 1, 4)
+    else if (step > 0) goStep(step - 1, LAST)
   }
 
   const restart5 = () => {
     setHanamaru(false)
-    setOrder(smartShuffle(5, order[4]))
+    setOrder(smartShuffle(N, row.kana, order[LAST]))
     setIdx(0)
   }
 
@@ -100,6 +102,7 @@ export function Learn({ onHome }: { onHome: () => void }) {
         <button type="button" onClick={onHome} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-amber-200 bg-white text-stone-600" aria-label="ホームへ">
           <House size={24} />
         </button>
+        <span className="font-card shrink-0 rounded-full bg-amber-100 px-3 py-1.5 text-lg text-amber-900">{row.name}</span>
         <ol className="grid min-w-0 flex-1 grid-cols-5 gap-1.5">
           {STEPS.map((s, i) => (
             <li key={s.title}>
@@ -117,8 +120,8 @@ export function Learn({ onHome }: { onHome: () => void }) {
           <span className="text-orange-500">ステップ{step + 1}</span>　{STEPS[step].title}
         </h2>
         <p className="text-base text-stone-500 sm:text-lg">{STEPS[step].guide}</p>
-        <div className="mt-1 flex gap-2" aria-label={`${idx + 1} / 5`}>
-          {Array.from({ length: 5 }, (_, i) => (
+        <div className="mt-1 flex gap-2" aria-label={`${idx + 1} / ${N}`}>
+          {Array.from({ length: N }, (_, i) => (
             <span key={i} className={`h-2.5 w-2.5 rounded-full ${i < idx ? 'bg-orange-400' : i === idx ? 'bg-amber-500 ring-4 ring-amber-200' : 'bg-stone-200'}`} />
           ))}
         </div>
@@ -183,7 +186,7 @@ export function Learn({ onHome }: { onHome: () => void }) {
       <Modal open={hanamaru}>
         <Hanamaru />
         <p className="text-3xl font-bold text-stone-800">ごうかく！</p>
-        <p className="text-lg text-stone-600">あ・い・う・え・お が よめたね</p>
+        <p className="text-lg text-stone-600">{row.kana.join('・')} が よめたね</p>
         <Mascot size={90} mood="cheer" />
         <div className="flex flex-wrap justify-center gap-3">
           <ActionButton label="もういちど" onClick={restart5} />

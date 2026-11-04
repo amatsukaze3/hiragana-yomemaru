@@ -3,19 +3,14 @@
  * ネイティブ音声読み上げ（speechSynthesis）、ピンポン♫チャイム。
  */
 
-import vA from '../assets/voice/a.mp3'
-import vI from '../assets/voice/i.mp3'
-import vU from '../assets/voice/u.mp3'
-import vE from '../assets/voice/e.mp3'
-import vO from '../assets/voice/o.mp3'
-import vPass5 from '../assets/voice/pass5.mp3'
-import vClear10 from '../assets/voice/clear10.mp3'
+import { KANA_INFO } from '../data/kana'
 
 /** ずんだもんの声（VOICEVOX:ずんだもん で作成した音声ファイル） */
-const CLIPS: Record<string, string> = {
-  あ: vA, い: vI, う: vU, え: vE, お: vO,
-  pass5: vPass5, clear10: vClear10,
-}
+const FILES = import.meta.glob('../assets/voice/*.mp3', { eager: true, import: 'default' }) as Record<string, string>
+const byName: Record<string, string> = {}
+for (const [path, url] of Object.entries(FILES)) byName[path.split('/').pop()!.replace('.mp3', '')] = url
+const CLIPS: Record<string, string> = { pass5: byName.pass5, clear10: byName.clear10 }
+for (const info of Object.values(KANA_INFO)) if (byName[info.romaji]) CLIPS[info.char] = byName[info.romaji]
 export type ClipName = 'pass5' | 'clear10'
 
 let ctx: AudioContext | null = null

@@ -5,7 +5,7 @@ import { Card } from '../components/Card'
 import { Confetti, Hanamaru, Modal } from '../components/Celebrate'
 import { BandMeter, MicBadge } from '../components/MicStatus'
 import { Mascot } from '../components/Mascot'
-import { smartShuffle, type Kana } from '../data/kana'
+import { smartShuffle, type Kana, type Row } from '../data/kana'
 import { playChime, sayVoice } from '../lib/audio'
 import { lsGet, lsSet } from '../lib/storage'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
@@ -13,10 +13,10 @@ import type { PassSource } from '../lib/voice'
 import { ActionButton } from './Learn'
 
 const TOTAL = 10
-const BEST_KEY = 'yomemaru:best'
+const bestKey = (rowId: string) => (rowId === 'a' ? 'yomemaru:best' : `yomemaru:best:${rowId}`)
 
-export function getBest(): number | null {
-  const v = Number(lsGet(BEST_KEY))
+export function getBest(rowId: string): number | null {
+  const v = Number(lsGet(bestKey(rowId)))
   return Number.isFinite(v) && v > 0 ? v : null
 }
 
@@ -29,9 +29,9 @@ export function formatTime(ms: number) {
 
 type Phase = 'ready' | 'playing' | 'finished'
 
-export function Challenge({ onHome, meter }: { onHome: () => void; meter: boolean }) {
+export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void; meter: boolean }) {
   const [phase, setPhase] = useState<Phase>('ready')
-  const [questions, setQuestions] = useState<Kana[]>(() => smartShuffle(TOTAL))
+  const [questions, setQuestions] = useState<Kana[]>(() => smartShuffle(TOTAL, row.kana))
   const [idx, setIdx] = useState(0)
   const [burst, setBurst] = useState(0)
   const [flash, setFlash] = useState(0)
@@ -54,11 +54,11 @@ export function Challenge({ onHome, meter }: { onHome: () => void; meter: boolea
     setFlash((f) => f + 1)
     if (idx + 1 >= TOTAL) {
       const time = performance.now() - startAt.current
-      const prev = getBest()
+      const prev = getBest(row.id)
       // マイクを使わずに「できた」で進めた回は、最高記録には入れない
       const counts = manualCount.current === 0
       const record = counts && (prev === null || time < prev)
-      if (record) lsSet(BEST_KEY, String(Math.round(time)))
+      if (record) lsSet(bestKey(row.id), String(Math.round(time)))
       window.setTimeout(() => {
         setResult({ time, best: record ? time : prev, record, manual: manualCount.current })
         setPhase('finished')
@@ -77,7 +77,7 @@ export function Challenge({ onHome, meter }: { onHome: () => void; meter: boolea
   const voice = useVoiceJudge(target, (src) => correct(src))
 
   const start = async () => {
-    setQuestions(smartShuffle(TOTAL, questions[TOTAL - 1]))
+    setQuestions(smartShuffle(TOTAL, row.kana, questions[TOTAL - 1]))
     setIdx(0)
     setResult(null)
     manualCount.current = 0
@@ -95,7 +95,7 @@ export function Challenge({ onHome, meter }: { onHome: () => void; meter: boolea
         <button type="button" onClick={onHome} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-amber-200 bg-white text-stone-600" aria-label="ホームへ">
           <House size={24} />
         </button>
-        <h2 className="min-w-0 flex-1 truncate text-xl font-bold text-stone-800 sm:text-2xl">② チャレンジ おんどく</h2>
+        <h2 className="min-w-0 flex-1 truncate text-xl font-bold text-stone-800 sm:text-2xl">② チャレンジ おんどく（{row.name}）</h2>
         {phase === 'playing' && <Stopwatch startAt={startAt.current} />}
       </header>
 
@@ -108,9 +108,9 @@ export function Challenge({ onHome, meter }: { onHome: () => void; meter: boolea
             マイクに むかって よもう！
           </p>
           <p className="text-lg text-stone-500">ぜんぶで {TOTAL}もん。はやく よめるかな？</p>
-          {getBest() && (
+          {getBest(row.id) && (
             <p className="flex items-center gap-2 rounded-full bg-amber-100 px-4 py-1.5 text-lg text-amber-800">
-              <Trophy size={20} /> さいこう きろく {formatTime(getBest()!)}
+              <Trophy size={20} /> さいこう きろく {formatTime(getBest(row.id)!)}
             </p>
           )}
           <ActionButton icon={<Play />} label="スタート" onClick={() => void start()} strong />

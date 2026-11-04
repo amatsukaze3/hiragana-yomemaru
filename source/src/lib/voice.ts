@@ -7,7 +7,7 @@
  *
  * 子どもの短い単母音は音声認識だけだと無視されやすいので、②を並行して動かします。
  */
-import type { Kana } from '../data/kana'
+import { KANA_INFO, type Kana, type Vowel } from '../data/kana'
 import { getAudioContext, setMicActive } from './audio'
 
 export type PassSource = 'asr' | 'formant'
@@ -40,7 +40,8 @@ const FRAME_MS = 23 // 4 フレーム ≒ 92ms
 const STREAK_TO_PASS = 4
 
 /** 母音ごとの物理特徴（帯域の平均レベル 0〜255 の比で判定） */
-export function vowelMatches(target: Kana, b: Bands): boolean {
+export function vowelMatches(kana: Kana, b: Bands): boolean {
+  const target: Vowel = KANA_INFO[kana]?.vowel ?? 'あ'
   const { low: L, midLow: ML, midHigh: MH, highF2: H2, vHigh: VH } = b
   const eRatio = H2 / Math.max(ML, 1)
   const hiAvg = (H2 + VH) / 2
@@ -67,6 +68,15 @@ export function vowelMatches(target: Kana, b: Bands): boolean {
 /* ---------- 音声認識の文字合わせ ---------- */
 
 const HOMOPHONES: Record<Kana, string[]> = {
+  か: ['蚊', '可', '課', '科'], き: ['木', '気', '黄', '期'], く: ['九', '区', '句', '苦'], け: ['毛', '家'], こ: ['子', '粉', '個', '小'],
+  さ: ['差'], し: ['四', '死', '詩', '市', '氏', 'she'], す: ['酢', '巣'], せ: ['背', '瀬'], そ: ['祖', '素'],
+  た: ['田', '他'], ち: ['血', '地', '知', '千'], つ: ['津'], て: ['手'], と: ['戸', '都', '十'],
+  な: ['菜', '名'], に: ['二', '荷', '似'], ぬ: ['奴'], ね: ['根', '寝', '値'], の: ['野', '乃'],
+  は: ['葉', '歯', '刃', 'わ', 'ha'], ひ: ['日', '火', '非', '比'], ふ: ['府', '布', '負', '風'], へ: ['屁', '辺', 'え'], ほ: ['帆', '歩', '穂'],
+  ま: ['間', '真', '魔'], み: ['実', '身', '三', 'me'], む: ['無', '六'], め: ['目', '芽'], も: ['藻', '喪'],
+  や: ['矢', '屋', '夜'], ゆ: ['湯', 'you'], よ: ['世', '夜', '四', 'yo'],
+  ら: ['等'], り: ['利', '理', '里'], る: ['留'], れ: ['礼', '例', '零'], ろ: ['炉', '路', '六'],
+  わ: ['輪', '和', '話', 'は'], を: ['お', '尾', '緒', '御', 'o', 'oh'], ん: ['うん', 'ん', 'n', 'm'],
   あ: ['a', 'ah', '阿', '亜', '吾'],
   い: ['i', 'ee', '胃', '井', '意', '亥', '位', '易', '良い'],
   う: ['u', 'oo', '鵜', '宇', '卯', '有'],
@@ -84,7 +94,9 @@ export function transcriptMatches(target: Kana, raw: string): boolean {
   if (!t) return false
   if (t === target) return true
   if ([...t].every((c) => c === target)) return true // 「ああ」「あーあ」
-  return HOMOPHONES[target].includes(t)
+  const r = KANA_INFO[target]?.romaji
+  if (r && t === r) return true
+  return (HOMOPHONES[target] ?? []).includes(t)
 }
 
 /* ---------- エンジン本体 ---------- */

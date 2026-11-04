@@ -69,7 +69,7 @@ export function Card({ char, variant, onTap, hideLetter, children }: CardProps) 
       >
         {variant === 'letter' && <MasuGrid />}
         {variant === 'picture' && (
-          <img src={a.url} alt={info.word} draggable={false} className="absolute inset-0 h-full w-full object-contain p-[3%]" />
+          <img src={a.url} alt={info.word} draggable={false} className={`absolute inset-0 h-full w-full object-contain ${info.framed && !a.custom ? '' : 'p-[3%]'}`} />
         )}
         {(variant === 'letter' || a.overlay) && !hideLetter && (
           <span
@@ -84,6 +84,16 @@ export function Card({ char, variant, onTap, hideLetter, children }: CardProps) 
             {char}
           </span>
         )}
+        {variant === 'picture' && !a.custom && a.overlay && !hideLetter &&
+          (info.labels ?? []).map((lb) => (
+            <span
+              key={lb.text}
+              className="font-card pointer-events-none absolute whitespace-nowrap leading-none text-stone-900"
+              style={{ left: `${lb.cx}%`, top: `${lb.cy}%`, fontSize: (size.h * lb.h) / 100 / 0.86, transform: 'translate(-50%, -50%)' }}
+            >
+              {lb.text}
+            </span>
+          ))}
         {children}
       </motion.button>
     </div>
