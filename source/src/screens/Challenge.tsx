@@ -153,7 +153,7 @@ export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void
           </main>
 
           <footer className="flex flex-wrap items-center justify-center gap-4 px-4 pb-[max(16px,env(safe-area-inset-bottom))]">
-            <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} />
+            <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} heard={voice.heard} />
             {meter && micOk && <BandMeter frame={voice.frame} />}
             {!micOk && voice.status !== 'starting' && (
               <ActionButton icon={<Hand />} label="できた" onClick={() => correct('manual')} strong />

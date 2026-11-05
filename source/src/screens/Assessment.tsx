@@ -244,7 +244,7 @@ export function Assessment({ onHome }: { onHome: () => void }) {
             </AnimatePresence>
           </main>
           <footer className="flex flex-wrap items-center justify-center gap-3 px-4 pb-[max(16px,env(safe-area-inset-bottom))]">
-            <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} />
+            <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} heard={voice.heard} />
             <button type="button" onClick={() => answer(false, 'skip')} className="flex h-14 items-center gap-1 rounded-full border-2 border-stone-300 bg-white px-5 text-lg font-bold text-stone-600">
               <SkipForward size={20} /> よめない
             </button>

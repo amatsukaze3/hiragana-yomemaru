@@ -49,14 +49,14 @@ const UTT_MIN_PROB = 0.5
  * 子音や出だしをのぞいた後ろの2/3（母音のところ）で、5つの母音の確率を平均し、
  * 目標の母音がいちばん高く、しかも一定以上（50%）のときだけ合格。
  */
-export function utteranceMatches(target: Vowel, probs: number[][]): boolean {
+export function utteranceMatches(target: Vowel, probs: number[][], minProb = UTT_MIN_PROB): boolean {
   const n = probs.length
   if (n < UTT_MIN_FRAMES || n > UTT_MAX_FRAMES) return false
   const tail = probs.slice(Math.floor(n * 0.34))
   const avg = [0, 0, 0, 0, 0]
   for (const p of tail) for (let i = 0; i < 5; i++) avg[i] += p[i] / tail.length
   const k = VOWEL_ORDER.indexOf(target)
-  const thr = (globalThis as unknown as { __vthr?: number }).__vthr ?? UTT_MIN_PROB
+  const thr = (globalThis as unknown as { __vthr?: number }).__vthr ?? minProb
   return avg.every((v, i) => i === k || v < avg[k]) && avg[k] >= thr
 }
 
@@ -93,36 +93,82 @@ export function vowelIs(target: Vowel, b: Bands): boolean {
 
 /* ---------- 音声認識の文字合わせ ---------- */
 
+/**
+ * 音声認識は1文字だけを読むと、同じ読みの漢字や英字・数字で返すことがある。
+ * その文字の読みになる、よく出る形をここに集める（同じ漢字が2つの文字に入っていてもよい）
+ */
 const HOMOPHONES: Record<Kana, string[]> = {
-  か: ['蚊', '可', '課', '科'], き: ['木', '気', '黄', '期'], く: ['九', '区', '句', '苦'], け: ['毛', '家'], こ: ['子', '粉', '個', '小'],
-  さ: ['差'], し: ['四', '死', '詩', '市', '氏', 'she'], す: ['酢', '巣'], せ: ['背', '瀬'], そ: ['祖', '素'],
-  た: ['田', '他'], ち: ['血', '地', '知', '千'], つ: ['津'], て: ['手'], と: ['戸', '都', '十'],
-  な: ['菜', '名'], に: ['二', '荷', '似'], ぬ: ['奴'], ね: ['根', '寝', '値'], の: ['野', '乃'],
-  は: ['葉', '歯', '刃', 'わ', 'ha'], ひ: ['日', '火', '非', '比'], ふ: ['府', '布', '負', '風'], へ: ['屁', '辺', 'え'], ほ: ['帆', '歩', '穂'],
-  ま: ['間', '真', '魔'], み: ['実', '身', '三', 'me'], む: ['無', '六'], め: ['目', '芽'], も: ['藻', '喪'],
-  や: ['矢', '屋', '夜'], ゆ: ['湯', 'you'], よ: ['世', '夜', '四', 'yo'],
-  ら: ['等'], り: ['利', '理', '里'], る: ['留'], れ: ['礼', '例', '零'], ろ: ['炉', '路', '六'],
-  わ: ['輪', '和', '話', 'は'], を: ['お', '尾', '緒', '御', 'o', 'oh'], ん: ['うん', 'ん', 'n', 'm'],
-  あ: ['a', 'ah', '阿', '亜', '吾'],
-  い: ['i', 'ee', '胃', '井', '意', '亥', '位', '易', '良い'],
-  う: ['u', 'oo', '鵜', '宇', '卯', '有'],
-  え: ['e', 'eh', '絵', '柄', '江', '餌', '重'],
-  お: ['o', 'oh', '尾', '緒', '御', '於', 'を'],
+  あ: ['亜', '阿', '吾', 'ah'],
+  い: ['胃', '井', '意', '位', '衣', '医', '異', '亥', '易', '以', '良い', 'e', 'ee'],
+  う: ['鵜', '宇', '卯', '有', '雨', '羽', '右', 'oo'],
+  え: ['絵', '柄', '江', '餌', '重', '会', '恵', 'a', 'eh'],
+  お: ['尾', '緒', '御', '於', '小', '雄', '男', 'を', 'o', 'oh'],
+  か: ['蚊', '可', '課', '科', '化', '火', '下', '加', '価', '家', '歌', '日', 'ka'],
+  き: ['木', '気', '黄', '期', '機', '器', '危', '記', '起', '生', '樹', 'ki', 'key'],
+  く: ['九', '区', '句', '苦', '来', '具', '9', 'ku'],
+  け: ['毛', '家', '気', '化', 'k', 'ke'],
+  こ: ['子', '粉', '個', '小', '故', '戸', '湖', '古', 'ko'],
+  さ: ['差', '左', '佐', '砂', 'sa'],
+  し: ['四', '死', '詩', '市', '氏', '師', '士', '詞', '4', 'c', 'she', 'see', 'shi'],
+  す: ['酢', '巣', '素', '須', '州', 'su'],
+  せ: ['背', '瀬', '世', '是', 'se'],
+  そ: ['祖', '素', '其', 'so'],
+  た: ['田', '他', '多', '太', 'ta'],
+  ち: ['血', '地', '知', '千', '智', '池', '値', 'chi'],
+  つ: ['津', '都', 'tsu'],
+  て: ['手', 'te'],
+  と: ['戸', '都', '十', '斗', '図', '徒', '10', 'to'],
+  な: ['菜', '名', '那', 'na'],
+  に: ['二', '荷', '似', '尼', '煮', '2', 'ni'],
+  ぬ: ['奴', 'nu'],
+  ね: ['根', '寝', '値', '音', '子', 'ne'],
+  の: ['野', '乃', '之', 'no'],
+  は: ['葉', '歯', '刃', '派', '羽', '波', 'わ', 'ha'],
+  ひ: ['日', '火', '非', '比', '陽', '灯', '碑', 'hi'],
+  ふ: ['府', '布', '負', '風', '符', '婦', '譜', 'fu'],
+  へ: ['屁', '辺', '経', 'え', 'he'],
+  ほ: ['帆', '歩', '穂', '保', '補', 'ho'],
+  ま: ['間', '真', '魔', '馬', '麻', 'ma'],
+  み: ['実', '身', '三', '見', '美', '未', '味', '巳', '3', 'me', 'mi'],
+  む: ['無', '六', '夢', '6', 'mu'],
+  め: ['目', '芽', '女', '雌', 'me'],
+  も: ['藻', '喪', '茂', 'mo'],
+  や: ['矢', '屋', '夜', '八', '野', '哉', '8', 'ya'],
+  ゆ: ['湯', '油', '由', 'u', 'you', 'yu'],
+  よ: ['世', '夜', '四', '代', '余', '予', '与', 'yo'],
+  ら: ['等', '羅', '良', 'ra'],
+  り: ['利', '理', '里', '李', '梨', '吏', 'ri'],
+  る: ['留', '流', '瑠', 'ru'],
+  れ: ['礼', '例', '零', 're'],
+  ろ: ['炉', '路', '六', '呂', 'ro'],
+  わ: ['輪', '和', '話', '環', 'は', 'wa'],
+  を: ['お', '尾', '緒', '御', 'o', 'oh', 'wo'],
+  ん: ['うん', 'ん', 'n', 'm'],
 }
 
 function toHiragana(s: string) {
   return s.replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60))
 }
 
-export function transcriptMatches(target: Kana, raw: string): boolean {
-  const t = toHiragana(raw.normalize('NFKC').toLowerCase())
-    .replace(/[\s、。．.!！?？〜~ーっ]/g, '')
+function oneMatches(target: Kana, t: string): boolean {
   if (!t) return false
   if (t === target) return true
   if ([...t].every((c) => c === target)) return true // 「ああ」「あーあ」
+  if (t.length <= 3 && t.startsWith(target) && /^[ぁ-ゖ]+$/.test(t) && /^[あいうえおんー]*$/.test(t.slice(1))) return true // 「かあ」「かん」
   const r = KANA_INFO[target]?.romaji
   if (r && t === r) return true
   return (HOMOPHONES[target] ?? []).includes(t)
+}
+
+export function transcriptMatches(target: Kana, raw: string): boolean {
+  const base = toHiragana(raw.normalize('NFKC').toLowerCase())
+  const whole = base.replace(/[\s、。．.,!！?？〜~ーっ「」]/g, '')
+  if (oneMatches(target, whole)) return true
+  // 前の声とつながって返ってきたとき（「さ か」など）は、最後のことばで くらべる
+  const words = base.split(/[\s、。．.,!！?？]+/).map((w) => w.replace(/[〜~ーっ「」]/g, '')).filter(Boolean)
+  if (words.length > 1 && oneMatches(target, words[words.length - 1])) return true
+  // 区切りなしで つながったとき（「かきく」）は、最後の1文字
+  return /^[ぁ-ゖ]{2,6}$/.test(whole) && whole.endsWith(target)
 }
 
 /* ---------- エンジン本体 ---------- */
@@ -141,6 +187,11 @@ interface SpeechRecognitionLike {
   onerror: ((e: { error: string }) => void) | null
 }
 
+function isIOS() {
+  const ua = navigator.userAgent
+  return /iPhone|iPad|iPod/.test(ua) || (ua.includes('Macintosh') && navigator.maxTouchPoints > 1)
+}
+
 export class HybridVoiceJudge {
   private target: Kana | null = null
   private stream: MediaStream | null = null
@@ -150,9 +201,13 @@ export class HybridVoiceJudge {
   private recog: SpeechRecognitionLike | null = null
   private running = false
   private asrAlive = false
-  /** 音声認識が実際に声を聞きとれている（結果が返ってきた）か。聞きとれている端末では、合格は音声認識で決める */
-  private asrHeard = false
   private uttCount = 0
+  private asrLen = 0
+  private asrSkip = 0
+  private asrOnly = false
+  private iosAsrFailed = false
+  /** 音声認識が聞きとったことば（画面に出して、通らないときの手がかりにする） */
+  onHeard: ((text: string) => void) | null = null
   private freq = new Uint8Array(0)
   private time = new Float32Array(0)
   private noiseFloor = 0.006
@@ -176,13 +231,26 @@ export class HybridVoiceJudge {
 
   async start(): Promise<MicStatus> {
     if (this.running) return 'listening'
+    // iPhone/iPad：音声認識（Apple）と周波数解析が同じマイクを取りあうので、音声認識だけで判定する
+    const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }
+    if (isIOS() && !this.iosAsrFailed && (w.SpeechRecognition || w.webkitSpeechRecognition)) {
+      this.asrOnly = true
+      this.lastError = ''
+      this.running = true
+      this.startAsr()
+      if (this.asrAlive) {
+        this.onStatus?.('listening', true)
+        return 'listening'
+      }
+      this.running = false
+      this.asrOnly = false
+    }
     if (!HybridVoiceJudge.supported()) {
       this.onStatus?.('unsupported', false)
       return 'unsupported'
     }
     this.onStatus?.('starting', false)
     this.lastError = ''
-    this.asrHeard = false
     this.uttCount = 0
     setMicActive(true)
     try {
@@ -210,13 +278,15 @@ export class HybridVoiceJudge {
     this.time = new Float32Array(this.analyser.fftSize)
     this.running = true
     this.timer = window.setInterval(() => this.tick(), FRAME_MS)
-    this.startAsr()
+    // iPhone/iPad で周波数解析を使うときは、マイクの取りあいをさけるため音声認識は使わない
+    if (!isIOS()) this.startAsr()
     this.onStatus?.('listening', this.asrAlive)
     return 'listening'
   }
 
   stop() {
     this.running = false
+    this.asrOnly = false
     if (this.timer) window.clearInterval(this.timer)
     this.timer = null
     try {
@@ -243,12 +313,9 @@ export class HybridVoiceJudge {
     this.quietFrames = 0
     this.targetSetAt = performance.now()
     this.lockUntil = performance.now() + lockMs
-    // 音声認識に残っている途中結果を捨てる（onend で自動再開）
-    try {
-      this.recog?.abort()
-    } catch {
-      /* noop */
-    }
+    // 音声認識は止めない（止めると再開に時間がかかり、すぐ読んだ声を聞きのがす）。
+    // かわりに、いまある結果より前のものは この問題では使わない
+    this.asrSkip = this.asrLen
   }
 
   /** チャイムなどを鳴らしている間は判定しない */
@@ -324,8 +391,9 @@ export class HybridVoiceJudge {
         this.utt = null
         this.uttCount++
         // 音声認識が動く端末では、合格は音声認識で決める（認識が3回の発声のあいだ何も返さないときだけ、周波数解析にまかせる）
-        const formantAllowed = !this.asrAlive || (!this.asrHeard && this.uttCount > 3)
-        if (formantAllowed && this.target && utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', u.probs)) {
+        // 音声認識が動いているときは、周波数解析は より はっきりした声（60%以上）だけ合格にする
+        const thr = this.asrAlive ? 0.6 : UTT_MIN_PROB
+        if (this.target && utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', u.probs, thr)) {
           this.onFrame?.({ bands, voiced, match: true, streak: STREAK_TO_PASS })
           this.pass('formant')
           return
@@ -338,10 +406,6 @@ export class HybridVoiceJudge {
 
 
   private startAsr() {
-    // iPhone/iPad では音声認識がマイクを取りあい、周波数解析の入力が止まることがあるので使わない
-    const ua = navigator.userAgent
-    const ios = /iPhone|iPad|iPod/.test(ua) || (ua.includes('Macintosh') && navigator.maxTouchPoints > 1)
-    if (ios) return
     const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor }
     const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition
     if (!Ctor) return
@@ -352,9 +416,11 @@ export class HybridVoiceJudge {
     r.interimResults = true
     r.maxAlternatives = 5
     r.onresult = (e) => {
-      this.asrHeard = true
+      this.asrLen = e.results.length
+      const latest = e.results[e.results.length - 1]
+      if (latest && latest[0]) this.onHeard?.(latest[0].transcript)
       if (!this.target || performance.now() < this.lockUntil) return
-      for (let i = e.resultIndex; i < e.results.length; i++) {
+      for (let i = Math.max(e.resultIndex, this.asrSkip); i < e.results.length; i++) {
         const alts = e.results[i]
         for (let j = 0; j < alts.length; j++) {
           if (this.target && transcriptMatches(this.target, alts[j].transcript)) {
@@ -368,11 +434,20 @@ export class HybridVoiceJudge {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
         fatal = true
         this.asrAlive = false
-        this.asrHeard = false
+            if (this.asrOnly) {
+          // 音声認識が使えない → 周波数解析で判定する
+          this.iosAsrFailed = true
+          this.running = false
+          this.asrOnly = false
+          void this.start()
+          return
+        }
         this.onStatus?.('listening', false)
       }
     }
     r.onend = () => {
+      this.asrLen = 0
+      this.asrSkip = 0
       if (this.running && !fatal) {
         window.setTimeout(() => {
           try {

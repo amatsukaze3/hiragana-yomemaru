@@ -12,7 +12,7 @@ const LABELS: Record<keyof FrameInfo['bands'], string> = {
 }
 
 /** マイクの状態と、声の大きさの目安 */
-export function MicBadge({ status, frame, onRetry, error }: { status: MicStatus; frame: React.RefObject<FrameInfo | null>; onRetry?: () => void; error?: string }) {
+export function MicBadge({ status, frame, onRetry, error, heard }: { status: MicStatus; frame: React.RefObject<FrameInfo | null>; onRetry?: () => void; error?: string; heard?: string }) {
   const [help, setHelp] = useState(false)
   const ring = useRef<HTMLSpanElement>(null)
   useEffect(() => {
@@ -44,7 +44,10 @@ export function MicBadge({ status, frame, onRetry, error }: { status: MicStatus;
           {listening ? <Mic size={26} /> : <MicOff size={26} />}
         </motion.span>
       </span>
-      <span className="text-lg text-stone-600">{text}</span>
+      <span className="flex flex-col leading-tight">
+        <span className="text-lg text-stone-600">{text}</span>
+        {listening && heard ? <span className="font-card max-w-[12em] truncate text-sm text-stone-400">きこえた：{heard}</span> : null}
+      </span>
       {(status === 'denied' || status === 'error' || status === 'unsupported') && (
         <>
           {onRetry && (

@@ -10,6 +10,7 @@ export function useVoiceJudge(target: Kana | null, onPass: (src: PassSource) => 
   const engine = useRef<HybridVoiceJudge | null>(null)
   const [status, setStatus] = useState<MicStatus>('idle')
   const [asr, setAsr] = useState(false)
+  const [heard, setHeard] = useState('')
   const frame = useRef<FrameInfo | null>(null)
   const passRef = useRef(onPass)
   passRef.current = onPass
@@ -23,6 +24,7 @@ export function useVoiceJudge(target: Kana | null, onPass: (src: PassSource) => 
       setStatus(s)
       setAsr(a)
     }
+    e.onHeard = (t) => setHeard(t)
     e.onFrame = (f) => {
       frame.current = f
     }
@@ -31,6 +33,7 @@ export function useVoiceJudge(target: Kana | null, onPass: (src: PassSource) => 
 
   useEffect(() => {
     engine.current!.setTarget(target)
+    setHeard('')
   }, [target])
 
   const start = useCallback(() => engine.current!.start(), [])
@@ -38,5 +41,5 @@ export function useVoiceJudge(target: Kana | null, onPass: (src: PassSource) => 
   const hold = useCallback((ms: number) => engine.current!.hold(ms), [])
 
   const lastError = () => engine.current!.lastError
-  return { status, asr, start, stop, hold, frame, lastError }
+  return { status, asr, start, stop, hold, frame, lastError, heard }
 }

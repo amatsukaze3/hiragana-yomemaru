@@ -170,7 +170,7 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
               {voice.status === 'idle' ? (
                 <ActionButton icon={<Mic />} label="マイクで よむ" onClick={() => void voice.start()} />
               ) : (
-                <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} />
+                <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} heard={voice.heard} />
               )}
               <ActionButton label="できた" onClick={passOne} strong />
             </>
