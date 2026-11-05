@@ -8,6 +8,7 @@
  * 子どもの短い単母音は音声認識だけだと無視されやすいので、②を並行して動かします。
  */
 import { KANA_INFO, type Kana, type Vowel } from '../data/kana'
+import { VOWEL_ORDER, vowelProbs } from './vowelClassifier'
 import { getAudioContext, setMicActive } from './audio'
 
 export type PassSource = 'asr' | 'formant'
@@ -41,19 +42,22 @@ const STREAK_TO_PASS = 4
 const UTT_END_FRAMES = 7 // 約160ms 声が止まったら、ひとつの発声の終わり
 const UTT_MIN_FRAMES = 5 // 約0.12秒より短い音は判定しない
 const UTT_MAX_FRAMES = 50 // 約1.15秒より長い発声（おしゃべり・文）は不合格
+const UTT_MIN_PROB = 0.5
 
-/** ひとつの発声が、目標の母音1つを読んだものかどうか */
-export function utteranceMatches(
-  target: Vowel,
-  u: { frames: number; counts: Record<Vowel, number>; best: number },
-): boolean {
-  if (u.frames < UTT_MIN_FRAMES || u.frames > UTT_MAX_FRAMES) return false
-  if (u.best < STREAK_TO_PASS) return false
-  const mine = u.counts[target]
-  if (mine < u.frames * 0.45) return false
-  // ほかの母音より はっきり強いこと（1.25倍以上）
-  for (const v of VOWELS) if (v !== target && u.counts[v] * 1.25 > mine) return false
-  return true
+/**
+ * ひとつの発声が、目標の母音を読んだものかどうか。
+ * 子音や出だしをのぞいた後ろの2/3（母音のところ）で、5つの母音の確率を平均し、
+ * 目標の母音がいちばん高く、しかも一定以上（50%）のときだけ合格。
+ */
+export function utteranceMatches(target: Vowel, probs: number[][]): boolean {
+  const n = probs.length
+  if (n < UTT_MIN_FRAMES || n > UTT_MAX_FRAMES) return false
+  const tail = probs.slice(Math.floor(n * 0.34))
+  const avg = [0, 0, 0, 0, 0]
+  for (const p of tail) for (let i = 0; i < 5; i++) avg[i] += p[i] / tail.length
+  const k = VOWEL_ORDER.indexOf(target)
+  const thr = (globalThis as unknown as { __vthr?: number }).__vthr ?? UTT_MIN_PROB
+  return avg.every((v, i) => i === k || v < avg[k]) && avg[k] >= thr
 }
 
 /** 母音ごとの物理特徴（帯域の平均レベル 0〜255 の比で判定） */
@@ -61,7 +65,6 @@ export function vowelMatches(kana: Kana, b: Bands): boolean {
   return vowelIs(KANA_INFO[kana]?.vowel ?? 'あ', b)
 }
 
-const VOWELS: Vowel[] = ['あ', 'い', 'う', 'え', 'お']
 
 export function vowelIs(target: Vowel, b: Bands): boolean {
   const { low: L, midLow: ML, midHigh: MH, highF2: H2, vHigh: VH } = b
@@ -80,7 +83,8 @@ export function vowelIs(target: Vowel, b: Bands): boolean {
       return eRatio < 0.65 && H2 <= peakLow * 0.45 && Math.max(ML, MH) >= L * 0.7
     case 'あ':
       // MidHigh（800-1400Hz）が優勢
-      return MH >= ML * 0.9 && MH >= H2 && MH >= VH && MH >= L * 0.8
+      // （子どもの高い声は Low に声の高さの成分が入るので、Low との比はゆるめにする）
+      return MH >= ML * 0.9 && MH >= H2 && MH >= VH && MH >= L * 0.6
     case 'う':
       // Low に集中し、高い帯域が弱い
       return L >= ML && L >= MH * 1.15 && hiAvg <= L * 0.6
@@ -158,7 +162,7 @@ export class HybridVoiceJudge {
   private lockUntil = 0
   private targetSetAt = 0
   // ひとつの発声（声が出はじめてから止まるまで）のまとめ
-  private utt: { frames: number; silent: number; counts: Record<Vowel, number>; best: number; run: number } | null = null
+  private utt: { probs: number[][]; silent: number; run: number } | null = null
 
   onPass: ((source: PassSource) => void) | null = null
   onFrame: ((f: FrameInfo) => void) | null = null
@@ -183,7 +187,7 @@ export class HybridVoiceJudge {
     setMicActive(true)
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true },
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       })
     } catch (e) {
       setMicActive(false)
@@ -199,8 +203,8 @@ export class HybridVoiceJudge {
     this.analyser = ctx.createAnalyser()
     this.analyser.fftSize = 2048
     this.analyser.smoothingTimeConstant = 0.3
-    this.analyser.minDecibels = -90
-    this.analyser.maxDecibels = -20
+    this.analyser.minDecibels = -100
+    this.analyser.maxDecibels = 0
     this.source.connect(this.analyser)
     this.freq = new Uint8Array(this.analyser.frequencyBinCount)
     this.time = new Float32Array(this.analyser.fftSize)
@@ -300,18 +304,18 @@ export class HybridVoiceJudge {
       if (now >= this.lockUntil && (this.quietFrames >= 3 || now - this.targetSetAt > 900)) this.armed = true
     }
 
-    const match = !!this.target && voiced && vowelMatches(this.target, bands)
+    const probs = voiced ? vowelProbs(this.freq, this.analyser!.context.sampleRate / this.analyser!.fftSize) : null
+    const tv = this.target ? VOWEL_ORDER.indexOf(KANA_INFO[this.target]?.vowel ?? 'あ') : -1
+    const match = !!probs && tv >= 0 && probs.indexOf(Math.max(...probs)) === tv
     const listening = this.armed && now >= this.lockUntil && !!this.target
 
-    // 発声ごとに判定する：短い1文字ぶんの声で、その間ずっと目標の母音がいちばん強いときだけ合格
+    // 発声ごとに判定する（声が止まったところで、その発声全体を見て決める）
     if (listening && voiced) {
-      if (!this.utt) this.utt = { frames: 0, silent: 0, counts: { あ: 0, い: 0, う: 0, え: 0, お: 0 }, best: 0, run: 0 }
+      if (!this.utt) this.utt = { probs: [], silent: 0, run: 0 }
       const u = this.utt
-      u.frames++
       u.silent = 0
-      for (const v of VOWELS) if (vowelIs(v, bands)) u.counts[v]++
+      if (probs) u.probs.push(probs)
       u.run = match ? u.run + 1 : 0
-      u.best = Math.max(u.best, u.run)
     } else if (this.utt) {
       this.utt.silent++
       if (!listening) this.utt = null
@@ -321,7 +325,7 @@ export class HybridVoiceJudge {
         this.uttCount++
         // 音声認識が動く端末では、合格は音声認識で決める（認識が3回の発声のあいだ何も返さないときだけ、周波数解析にまかせる）
         const formantAllowed = !this.asrAlive || (!this.asrHeard && this.uttCount > 3)
-        if (formantAllowed && this.target && utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', u)) {
+        if (formantAllowed && this.target && utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', u.probs)) {
           this.onFrame?.({ bands, voiced, match: true, streak: STREAK_TO_PASS })
           this.pass('formant')
           return
