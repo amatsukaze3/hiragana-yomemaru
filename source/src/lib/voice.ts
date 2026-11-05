@@ -8,7 +8,7 @@
  * 子どもの短い単母音は音声認識だけだと無視されやすいので、②を並行して動かします。
  */
 import { KANA_INFO, type Kana, type Vowel } from '../data/kana'
-import { VOWEL_ORDER, vowelProbs } from './vowelClassifier'
+import { VOWEL_ORDER, meanShape, modelProbs, personalProbs, vowelFeature } from './vowelClassifier'
 import { getAudioContext, setMicActive } from './audio'
 
 export type PassSource = 'asr' | 'formant'
@@ -217,7 +217,10 @@ export class HybridVoiceJudge {
   private lockUntil = 0
   private targetSetAt = 0
   // ひとつの発声（声が出はじめてから止まるまで）のまとめ
-  private utt: { probs: number[][]; silent: number; run: number } | null = null
+  private utt: { feats: number[][]; silent: number; run: number } | null = null
+  /** 登録した その子の「あいうえお」の形（なければ学習モデルで判定） */
+  private voiceprint: number[][] | null = null
+  private captureCb: ((shape: number[] | null) => void) | null = null
 
   onPass: ((source: PassSource) => void) | null = null
   onFrame: ((f: FrameInfo) => void) | null = null
@@ -233,7 +236,7 @@ export class HybridVoiceJudge {
     if (this.running) return 'listening'
     // iPhone/iPad：音声認識（Apple）と周波数解析が同じマイクを取りあうので、音声認識だけで判定する
     const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }
-    if (isIOS() && !this.iosAsrFailed && (w.SpeechRecognition || w.webkitSpeechRecognition)) {
+    if (isIOS() && !this.forceAnalyser && !this.iosAsrFailed && (w.SpeechRecognition || w.webkitSpeechRecognition)) {
       this.asrOnly = true
       this.lastError = ''
       this.running = true
@@ -278,8 +281,8 @@ export class HybridVoiceJudge {
     this.time = new Float32Array(this.analyser.fftSize)
     this.running = true
     this.timer = window.setInterval(() => this.tick(), FRAME_MS)
-    // iPhone/iPad で周波数解析を使うときは、マイクの取りあいをさけるため音声認識は使わない
-    if (!isIOS()) this.startAsr()
+    // iPhone/iPad で周波数解析を使うときと、声の登録中は、音声認識を使わない
+    if (!isIOS() && !this.forceAnalyser) this.startAsr()
     this.onStatus?.('listening', this.asrAlive)
     return 'listening'
   }
@@ -317,6 +320,33 @@ export class HybridVoiceJudge {
     // かわりに、いまある結果より前のものは この問題では使わない
     this.asrSkip = this.asrLen
   }
+
+  private probsOf(f: number[]) {
+    return this.voiceprint ? personalProbs(f, this.voiceprint) : modelProbs(f)
+  }
+
+  /** その子の「あいうえお」を使う（null で学習モデルにもどす） */
+  setVoiceprint(C: number[][] | null) {
+    this.voiceprint = C
+  }
+
+  /** 声の登録：次の1回の発声の形を受けとる（問題は出さない） */
+  capture(cb: (shape: number[] | null) => void, lockMs = 400) {
+    this.target = null
+    this.utt = null
+    this.captureCb = cb
+    this.armed = false
+    this.quietFrames = 0
+    this.targetSetAt = performance.now()
+    this.lockUntil = performance.now() + lockMs
+  }
+
+  cancelCapture() {
+    this.captureCb = null
+  }
+
+  /** 声の登録には周波数解析が要るので、そのあいだは音声認識だけのモードにしない */
+  forceAnalyser = false
 
   /** チャイムなどを鳴らしている間は判定しない */
   hold(ms: number) {
@@ -371,17 +401,18 @@ export class HybridVoiceJudge {
       if (now >= this.lockUntil && (this.quietFrames >= 3 || now - this.targetSetAt > 900)) this.armed = true
     }
 
-    const probs = voiced ? vowelProbs(this.freq, this.analyser!.context.sampleRate / this.analyser!.fftSize) : null
+    const feat = voiced ? vowelFeature(this.freq, this.analyser!.context.sampleRate / this.analyser!.fftSize) : null
+    const probs = feat ? this.probsOf(feat) : null
     const tv = this.target ? VOWEL_ORDER.indexOf(KANA_INFO[this.target]?.vowel ?? 'あ') : -1
     const match = !!probs && tv >= 0 && probs.indexOf(Math.max(...probs)) === tv
-    const listening = this.armed && now >= this.lockUntil && !!this.target
+    const listening = this.armed && now >= this.lockUntil && (!!this.target || !!this.captureCb)
 
     // 発声ごとに判定する（声が止まったところで、その発声全体を見て決める）
     if (listening && voiced) {
-      if (!this.utt) this.utt = { probs: [], silent: 0, run: 0 }
+      if (!this.utt) this.utt = { feats: [], silent: 0, run: 0 }
       const u = this.utt
       u.silent = 0
-      if (probs) u.probs.push(probs)
+      if (feat) u.feats.push(feat)
       u.run = match ? u.run + 1 : 0
     } else if (this.utt) {
       this.utt.silent++
@@ -390,10 +421,19 @@ export class HybridVoiceJudge {
         const u = this.utt
         this.utt = null
         this.uttCount++
-        // 音声認識が動く端末では、合格は音声認識で決める（認識が3回の発声のあいだ何も返さないときだけ、周波数解析にまかせる）
-        // 音声認識が動いているときは、周波数解析は より はっきりした声（60%以上）だけ合格にする
-        const thr = this.asrAlive ? 0.6 : UTT_MIN_PROB
-        if (this.target && utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', u.probs, thr)) {
+        // 声の登録中：この発声の形を返す
+        if (this.captureCb) {
+          if (u.feats.length >= UTT_MIN_FRAMES && u.feats.length <= UTT_MAX_FRAMES * 2) {
+            const cb = this.captureCb
+            this.captureCb = null
+            cb(meanShape(u.feats))
+          }
+          return
+        }
+        // 登録があれば その子の声とくらべて 45%以上、なければ学習モデルで 50%以上
+        // （音声認識が動いているときの学習モデルは、より はっきりした 60%以上）
+        const thr = this.voiceprint ? 0.45 : this.asrAlive ? 0.6 : UTT_MIN_PROB
+        if (this.target && utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', u.feats.map((f) => this.probsOf(f)), thr)) {
           this.onFrame?.({ bands, voiced, match: true, streak: STREAK_TO_PASS })
           this.pass('formant')
           return

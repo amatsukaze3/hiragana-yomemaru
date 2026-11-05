@@ -9,6 +9,8 @@ import { KANA, smartShuffle, type Kana } from '../data/kana'
 import { addRecord, clearRecords, formatDate, loadRecords, remark, type AssessRecord } from '../lib/assessRecords'
 import { playChime, sayVoice } from '../lib/audio'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
+import { voiceprintUseful } from '../lib/voiceprint'
+import { VoiceRegister } from '../components/VoiceRegister'
 import { ActionButton } from './Learn'
 
 type Phase = 'menu' | 'name' | 'test' | 'result'
@@ -28,6 +30,7 @@ export function Assessment({ onHome }: { onHome: () => void }) {
   const [last, setLast] = useState<AssessRecord | null>(null)
   const [confirmReset, setConfirmReset] = useState(false)
   const [starting, setStarting] = useState(false)
+  const [registering, setRegistering] = useState(false)
   const busy = useRef(false)
 
   const target = phase === 'test' && order.length ? order[idx] : null
@@ -91,6 +94,12 @@ export function Assessment({ onHome }: { onHome: () => void }) {
       return
     }
     setName(n)
+    // パソコンなどでは、はじめに その子の「あいうえお」を とうろくして、判定を その子の声に あわせる
+    if (voiceprintUseful()) setRegistering(true)
+    else await runTest()
+  }
+
+  const runTest = async () => {
     setOrder(smartShuffle(KANA.length, shuffle([...KANA])))
     setIdx(0)
     setResults({})
@@ -279,6 +288,16 @@ export function Assessment({ onHome }: { onHome: () => void }) {
       )}
 
       <Confetti burst={burst} />
+      {registering && (
+        <VoiceRegister
+          name={name}
+          onCancel={() => setRegistering(false)}
+          onDone={() => {
+            setRegistering(false)
+            void runTest()
+          }}
+        />
+      )}
     </div>
   )
 }

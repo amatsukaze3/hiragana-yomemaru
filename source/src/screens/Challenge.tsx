@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { Hand, House, Mic, Play, Trophy } from 'lucide-react'
+import { AudioLines, Hand, House, Mic, Play, Trophy } from 'lucide-react'
 import { Card } from '../components/Card'
 import { Confetti, Hanamaru, Modal } from '../components/Celebrate'
 import { BandMeter, MicBadge } from '../components/MicStatus'
@@ -9,6 +9,8 @@ import { smartShuffle, type Kana, type Row } from '../data/kana'
 import { playChime, sayVoice } from '../lib/audio'
 import { lsGet, lsSet } from '../lib/storage'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
+import { loadVoiceprint, voiceprintUseful } from '../lib/voiceprint'
+import { VoiceRegister } from '../components/VoiceRegister'
 import type { PassSource } from '../lib/voice'
 import { ActionButton } from './Learn'
 
@@ -40,6 +42,8 @@ export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void
   const busy = useRef(false)
   const manualCount = useRef(0)
   const lastSource = useRef<PassSource | 'manual'>('formant')
+  const [registering, setRegistering] = useState(false)
+  const [hasPrint, setHasPrint] = useState(() => !!loadVoiceprint())
 
   const target = phase === 'playing' ? questions[idx] : null
 
@@ -114,6 +118,11 @@ export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void
             </p>
           )}
           <ActionButton icon={<Play />} label="スタート" onClick={() => void start()} strong />
+          {voiceprintUseful() && (
+            <button type="button" onClick={() => setRegistering(true)} className="flex items-center gap-1.5 rounded-full border-2 border-amber-300 bg-white px-4 py-2 text-base font-bold text-stone-700">
+              <AudioLines size={18} /> {hasPrint ? 'こえを とうろくしなおす' : 'こえを とうろくすると よく きこえるよ'}
+            </button>
+          )}
           <p className="flex items-center gap-1 text-sm text-stone-400">
             <Mic size={14} /> はじめに マイクの きょかを きかれたら「きょか」を おしてね
           </p>
@@ -163,6 +172,15 @@ export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void
       )}
 
       <Confetti burst={burst} />
+      {registering && (
+        <VoiceRegister
+          onCancel={() => setRegistering(false)}
+          onDone={() => {
+            setRegistering(false)
+            setHasPrint(true)
+          }}
+        />
+      )}
 
       <Modal open={phase === 'finished' && !!result}>
         {result && (

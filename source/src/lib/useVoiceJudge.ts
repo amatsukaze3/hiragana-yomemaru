@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Kana } from '../data/kana'
+import { loadVoiceprint } from './voiceprint'
 import { HybridVoiceJudge, type FrameInfo, type MicStatus, type PassSource } from './voice'
 
 /**
@@ -36,10 +37,19 @@ export function useVoiceJudge(target: Kana | null, onPass: (src: PassSource) => 
     setHeard('')
   }, [target])
 
-  const start = useCallback(() => engine.current!.start(), [])
+  const start = useCallback((opts?: { forRegister?: boolean }) => {
+    const e = engine.current!
+    e.forceAnalyser = !!opts?.forRegister
+    // 登録があれば、その子の声とくらべて判定する
+    e.setVoiceprint(opts?.forRegister ? null : (loadVoiceprint()?.C ?? null))
+    return e.start()
+  }, [])
+  const capture = useCallback((cb: (shape: number[] | null) => void, lockMs?: number) => engine.current!.capture(cb, lockMs), [])
+  const cancelCapture = useCallback(() => engine.current!.cancelCapture(), [])
+  const refreshVoiceprint = useCallback(() => engine.current!.setVoiceprint(loadVoiceprint()?.C ?? null), [])
   const stop = useCallback(() => engine.current!.stop(), [])
   const hold = useCallback((ms: number) => engine.current!.hold(ms), [])
 
   const lastError = () => engine.current!.lastError
-  return { status, asr, start, stop, hold, frame, lastError, heard }
+  return { status, asr, start, stop, hold, frame, lastError, heard, capture, cancelCapture, refreshVoiceprint }
 }

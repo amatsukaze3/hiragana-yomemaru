@@ -5,6 +5,9 @@ import { KANA_INFO, ROWS, type Kana } from '../data/kana'
 import { useCards } from '../lib/cards'
 import { clearUserFont, detectFontStatus, registerUserFont, userFontName, type FontStatus } from '../lib/font'
 import { lsGet, lsSet } from '../lib/storage'
+import { clearVoiceprint, loadVoiceprint, voiceprintUseful } from '../lib/voiceprint'
+import { formatDate } from '../lib/assessRecords'
+import { VoiceRegister } from './VoiceRegister'
 
 export function useMeterSetting(): [boolean, (v: boolean) => void] {
   const [on, setOn] = useState(() => lsGet('yomemaru:meter') === '1')
@@ -19,6 +22,8 @@ export function SettingsPanel({ open, onClose, meter, setMeter }: { open: boolea
   const [fontError, setFontError] = useState(false)
   const fileRefs = useRef<Partial<Record<Kana, HTMLInputElement | null>>>({})
   const fontRef = useRef<HTMLInputElement>(null)
+  const [registering, setRegistering] = useState(false)
+  const [print, setPrint] = useState(loadVoiceprint)
 
   const refreshFont = async () => {
     setFontStatus(await detectFontStatus())
@@ -145,12 +150,49 @@ export function SettingsPanel({ open, onClose, meter, setMeter }: { open: boolea
               />
             </section>
 
+            {voiceprintUseful() && (
+              <section className="flex flex-col gap-2 rounded-2xl border-2 border-amber-100 bg-white p-4 text-sm text-stone-700">
+                <h3 className="text-base font-bold text-stone-800">こえの とうろく</h3>
+                <p className="leading-relaxed text-stone-500">
+                  つかう子の「あ・い・う・え・お」を とうろくすると、その子の声に あわせて判定するので、よく合格するようになります。つかう子が かわったら、とうろくしなおしてください。
+                </p>
+                <p className="text-stone-600">{print ? `とうろくずみ（${print.name ? `${print.name} さん・` : ''}${formatDate(print.date)}）` : 'まだ とうろくしていません'}</p>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => setRegistering(true)} className="rounded-full bg-amber-400 px-4 py-1.5 font-bold text-stone-900">
+                    {print ? 'とうろくしなおす' : 'とうろくする'}
+                  </button>
+                  {print && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearVoiceprint()
+                        setPrint(null)
+                      }}
+                      className="rounded-full border-2 border-stone-200 px-4 py-1.5 text-stone-600"
+                    >
+                      けす
+                    </button>
+                  )}
+                </div>
+              </section>
+            )}
+
             <label className="flex items-center gap-3 rounded-2xl border-2 border-amber-100 bg-white p-4 text-sm text-stone-700">
               <input id="meter" type="checkbox" checked={meter} onChange={(e) => setMeter(e.target.checked)} className="h-5 w-5 accent-orange-500" />
               おんどくの画面に、声の帯域メーター（保護者向け）を出す
             </label>
           </motion.aside>
         </motion.div>
+      )}
+      {registering && (
+        <VoiceRegister
+          key="register"
+          onCancel={() => setRegistering(false)}
+          onDone={() => {
+            setRegistering(false)
+            setPrint(loadVoiceprint())
+          }}
+        />
       )}
     </AnimatePresence>
   )
