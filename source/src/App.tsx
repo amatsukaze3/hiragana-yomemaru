@@ -6,11 +6,12 @@ import { CardsProvider } from './lib/cards'
 import { loadUserFont } from './lib/font'
 import { lsGet, lsSet } from './lib/storage'
 import { ROWS, type Row } from './data/kana'
+import { Assessment } from './screens/Assessment'
 import { Challenge } from './screens/Challenge'
 import { Home } from './screens/Home'
 import { Learn } from './screens/Learn'
 
-type Screen = 'home' | 'learn' | 'challenge'
+type Screen = 'home' | 'learn' | 'challenge' | 'assess'
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home')
@@ -32,8 +33,9 @@ export default function App() {
       <div className="no-touch-scroll h-full overflow-hidden bg-stone-50 pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
         <AnimatePresence mode="wait">
           <motion.div key={screen} className="h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
-            {screen === 'home' && <Home row={row} onRow={setRow} onLearn={() => setScreen('learn')} onChallenge={() => setScreen('challenge')} onSettings={() => setSettings(true)} />}
+            {screen === 'home' && <Home onAssess={() => setScreen('assess')} row={row} onRow={setRow} onLearn={() => setScreen('learn')} onChallenge={() => setScreen('challenge')} onSettings={() => setSettings(true)} />}
             {screen === 'learn' && <Learn key={row.id} row={row} onHome={() => setScreen('home')} />}
+            {screen === 'assess' && <Assessment onHome={() => setScreen('home')} />}
             {screen === 'challenge' && <Challenge key={row.id} row={row} onHome={() => setScreen('home')} meter={meter} />}
           </motion.div>
         </AnimatePresence>

@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { motion } from 'motion/react'
 import { BookOpen, ImagePlus, Mic, Timer } from 'lucide-react'
 import { Mascot } from '../components/Mascot'
@@ -5,6 +6,7 @@ import { ROWS, type Row } from '../data/kana'
 import { formatTime, getBest } from './Challenge'
 
 interface Props {
+  onAssess: () => void
   row: Row
   onRow: (r: Row) => void
   onLearn: () => void
@@ -12,8 +14,18 @@ interface Props {
   onSettings: () => void
 }
 
-export function Home({ row, onRow, onLearn, onChallenge, onSettings }: Props) {
+export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess }: Props) {
   const best = getBest(row.id)
+  // 先生用：よめ丸くんを 5回つづけて タップすると アセスメントモード
+  const taps = useRef<number[]>([])
+  const tapMascot = () => {
+    const now = Date.now()
+    taps.current = [...taps.current.filter((t) => now - t < 2500), now]
+    if (taps.current.length >= 5) {
+      taps.current = []
+      onAssess()
+    }
+  }
   return (
     <div className="flex h-full flex-col">
       <header className="flex justify-end px-4 pt-3">
@@ -28,7 +40,9 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings }: Props) {
 
       <main className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col items-center justify-center gap-4 overflow-y-auto px-4 pb-4" style={{ touchAction: 'pan-y' }}>
         <div className="flex items-center gap-3">
-          <Mascot size={110} />
+          <button type="button" onClick={tapMascot} aria-label="よめ丸くん" className="rounded-full">
+            <Mascot size={110} />
+          </button>
           <h1 className="text-4xl font-bold tracking-wide text-stone-800 sm:text-6xl">
             ひらがな<span className="text-orange-500">よめ丸</span>
           </h1>
@@ -85,7 +99,16 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings }: Props) {
           />
         </div>
       </main>
-      <footer className="pb-[max(10px,env(safe-area-inset-bottom))] text-center text-xs text-stone-400">こえ：VOICEVOX:ずんだもん</footer>
+      <footer className="flex flex-col items-center gap-0.5 px-4 pb-[max(10px,env(safe-area-inset-bottom))] text-center text-xs text-stone-400">
+        <span>
+          © 2026 TOSS中丹教育サークル 大松 /{' '}
+          <a href="./terms.html" target="_blank" rel="noopener" className="text-stone-500 underline">
+            アセスメントモードの利用および利用規約
+          </a>
+          （商用利用不可）
+        </span>
+        <span>こえ：VOICEVOX:ずんだもん</span>
+      </footer>
     </div>
   )
 }
