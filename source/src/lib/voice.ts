@@ -38,10 +38,32 @@ const BAND_RANGES: Record<keyof Bands, [number, number]> = {
 
 const FRAME_MS = 23 // 4 フレーム ≒ 92ms
 const STREAK_TO_PASS = 4
+const UTT_END_FRAMES = 7 // 約160ms 声が止まったら、ひとつの発声の終わり
+const UTT_MIN_FRAMES = 5 // 約0.12秒より短い音は判定しない
+const UTT_MAX_FRAMES = 50 // 約1.15秒より長い発声（おしゃべり・文）は不合格
+
+/** ひとつの発声が、目標の母音1つを読んだものかどうか */
+export function utteranceMatches(
+  target: Vowel,
+  u: { frames: number; counts: Record<Vowel, number>; best: number },
+): boolean {
+  if (u.frames < UTT_MIN_FRAMES || u.frames > UTT_MAX_FRAMES) return false
+  if (u.best < STREAK_TO_PASS) return false
+  const mine = u.counts[target]
+  if (mine < u.frames * 0.45) return false
+  // ほかの母音より はっきり強いこと（1.25倍以上）
+  for (const v of VOWELS) if (v !== target && u.counts[v] * 1.25 > mine) return false
+  return true
+}
 
 /** 母音ごとの物理特徴（帯域の平均レベル 0〜255 の比で判定） */
 export function vowelMatches(kana: Kana, b: Bands): boolean {
-  const target: Vowel = KANA_INFO[kana]?.vowel ?? 'あ'
+  return vowelIs(KANA_INFO[kana]?.vowel ?? 'あ', b)
+}
+
+const VOWELS: Vowel[] = ['あ', 'い', 'う', 'え', 'お']
+
+export function vowelIs(target: Vowel, b: Bands): boolean {
   const { low: L, midLow: ML, midHigh: MH, highF2: H2, vHigh: VH } = b
   const eRatio = H2 / Math.max(ML, 1)
   const hiAvg = (H2 + VH) / 2
@@ -124,6 +146,9 @@ export class HybridVoiceJudge {
   private recog: SpeechRecognitionLike | null = null
   private running = false
   private asrAlive = false
+  /** 音声認識が実際に声を聞きとれている（結果が返ってきた）か。聞きとれている端末では、合格は音声認識で決める */
+  private asrHeard = false
+  private uttCount = 0
   private freq = new Uint8Array(0)
   private time = new Float32Array(0)
   private noiseFloor = 0.006
@@ -132,6 +157,8 @@ export class HybridVoiceJudge {
   private quietFrames = 0
   private lockUntil = 0
   private targetSetAt = 0
+  // ひとつの発声（声が出はじめてから止まるまで）のまとめ
+  private utt: { frames: number; silent: number; counts: Record<Vowel, number>; best: number; run: number } | null = null
 
   onPass: ((source: PassSource) => void) | null = null
   onFrame: ((f: FrameInfo) => void) | null = null
@@ -151,6 +178,8 @@ export class HybridVoiceJudge {
     }
     this.onStatus?.('starting', false)
     this.lastError = ''
+    this.asrHeard = false
+    this.uttCount = 0
     setMicActive(true)
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
@@ -203,6 +232,7 @@ export class HybridVoiceJudge {
 
   /** 出題する文字を変える。前の声の残りで誤合格しないよう、少しの間ロックする */
   setTarget(k: Kana | null, lockMs = 300) {
+    this.utt = null
     this.target = k
     this.streak = 0
     this.armed = false
@@ -219,6 +249,7 @@ export class HybridVoiceJudge {
 
   /** チャイムなどを鳴らしている間は判定しない */
   hold(ms: number) {
+    this.utt = null
     this.lockUntil = Math.max(this.lockUntil, performance.now() + ms)
     this.streak = 0
   }
@@ -270,12 +301,37 @@ export class HybridVoiceJudge {
     }
 
     const match = !!this.target && voiced && vowelMatches(this.target, bands)
-    if (this.armed && now >= this.lockUntil && match) this.streak++
-    else this.streak = 0
+    const listening = this.armed && now >= this.lockUntil && !!this.target
 
-    this.onFrame?.({ bands, voiced, match, streak: this.streak })
-    if (this.streak >= STREAK_TO_PASS) this.pass('formant')
+    // 発声ごとに判定する：短い1文字ぶんの声で、その間ずっと目標の母音がいちばん強いときだけ合格
+    if (listening && voiced) {
+      if (!this.utt) this.utt = { frames: 0, silent: 0, counts: { あ: 0, い: 0, う: 0, え: 0, お: 0 }, best: 0, run: 0 }
+      const u = this.utt
+      u.frames++
+      u.silent = 0
+      for (const v of VOWELS) if (vowelIs(v, bands)) u.counts[v]++
+      u.run = match ? u.run + 1 : 0
+      u.best = Math.max(u.best, u.run)
+    } else if (this.utt) {
+      this.utt.silent++
+      if (!listening) this.utt = null
+      else if (this.utt.silent >= UTT_END_FRAMES) {
+        const u = this.utt
+        this.utt = null
+        this.uttCount++
+        // 音声認識が動く端末では、合格は音声認識で決める（認識が3回の発声のあいだ何も返さないときだけ、周波数解析にまかせる）
+        const formantAllowed = !this.asrAlive || (!this.asrHeard && this.uttCount > 3)
+        if (formantAllowed && this.target && utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', u)) {
+          this.onFrame?.({ bands, voiced, match: true, streak: STREAK_TO_PASS })
+          this.pass('formant')
+          return
+        }
+      }
+    }
+    this.streak = this.utt?.run ?? 0
+    this.onFrame?.({ bands, voiced, match, streak: Math.min(this.streak, STREAK_TO_PASS) })
   }
+
 
   private startAsr() {
     // iPhone/iPad では音声認識がマイクを取りあい、周波数解析の入力が止まることがあるので使わない
@@ -292,6 +348,7 @@ export class HybridVoiceJudge {
     r.interimResults = true
     r.maxAlternatives = 5
     r.onresult = (e) => {
+      this.asrHeard = true
       if (!this.target || performance.now() < this.lockUntil) return
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const alts = e.results[i]
@@ -307,6 +364,7 @@ export class HybridVoiceJudge {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
         fatal = true
         this.asrAlive = false
+        this.asrHeard = false
         this.onStatus?.('listening', false)
       }
     }

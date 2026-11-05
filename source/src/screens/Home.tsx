@@ -101,7 +101,7 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess }:
       </main>
       <footer className="flex flex-col items-center gap-0.5 px-4 pb-[max(10px,env(safe-area-inset-bottom))] text-center text-xs text-stone-400">
         <span>
-          © 2026 TOSS中丹教育サークル 大松 /{' '}
+          © 2026 TOSS中丹教育サークル 大松幹生 /{' '}
           <a href="./terms.html" target="_blank" rel="noopener" className="text-stone-500 underline">
             アセスメントモードの利用および利用規約
           </a>

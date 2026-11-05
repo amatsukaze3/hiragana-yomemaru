@@ -27,6 +27,7 @@ export function Assessment({ onHome }: { onHome: () => void }) {
   const [burst, setBurst] = useState(0)
   const [last, setLast] = useState<AssessRecord | null>(null)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [starting, setStarting] = useState(false)
   const busy = useRef(false)
 
   const target = phase === 'test' && order.length ? order[idx] : null
@@ -95,9 +96,19 @@ export function Assessment({ onHome }: { onHome: () => void }) {
     setResults({})
     setManual(0)
     busy.current = false
-    sayVoice('assess_start')
     await voice.start()
-    setPhase('test')
+    // ずんだもんが話しているあいだは きかない（声を まちがえて合格にしないため）
+    voice.hold(6000)
+    setStarting(true)
+    let begun = false
+    const begin = () => {
+      if (begun) return
+      begun = true
+      setStarting(false)
+      setPhase('test')
+    }
+    sayVoice('assess_start', begin)
+    window.setTimeout(begin, 6000) // 声が鳴らなかったときも はじめる
   }
 
   const quit = () => {
@@ -214,7 +225,11 @@ export function Assessment({ onHome }: { onHome: () => void }) {
             style={{ touchAction: 'auto', userSelect: 'text', WebkitUserSelect: 'text' }}
           />
           {nameError && <p className="text-lg text-red-700">ひらがなだけで いれてね</p>}
-          <ActionButton icon={<Play />} label="スタート" onClick={() => void start()} strong />
+          {starting ? (
+            <p className="text-xl font-bold text-orange-600">ずんだもんの おはなしを きいてね</p>
+          ) : (
+            <ActionButton icon={<Play />} label="スタート" onClick={() => void start()} strong />
+          )}
           <p className="text-sm text-stone-400">スタートを おすと マイクが つきます</p>
         </main>
       )}

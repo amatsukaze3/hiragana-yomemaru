@@ -217,8 +217,8 @@ export function speak(text: string, opts: { onEnd?: () => void } = {}) {
 }
 
 /** ほめことば（ずんだもん） */
-export function sayVoice(name: ClipName) {
-  void playClip(name)
+export function sayVoice(name: ClipName, onEnd?: () => void) {
+  void playClip(name, onEnd)
 }
 
 /** 予備：端末の音声合成 */
