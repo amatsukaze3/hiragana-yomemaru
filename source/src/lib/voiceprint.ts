@@ -26,9 +26,7 @@ export function clearVoiceprint() {
   lsSet(KEY, 'null')
 }
 
-/** iPhone・iPad は Apple の音声認識で判定するので、声の登録は使わない */
+/** こえの とうろく は、パソコン・iPad・iPhone のどれでも使う（iPhone/iPad では、とうろくがあると Apple の音声認識のかわりに使う） */
 export function voiceprintUseful() {
-  const ua = navigator.userAgent
-  const ios = /iPhone|iPad|iPod/.test(ua) || (ua.includes('Macintosh') && navigator.maxTouchPoints > 1)
-  return !ios
+  return true
 }

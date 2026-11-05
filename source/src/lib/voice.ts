@@ -192,6 +192,17 @@ function isIOS() {
   return /iPhone|iPad|iPod/.test(ua) || (ua.includes('Macintosh') && navigator.maxTouchPoints > 1)
 }
 
+/** t から、前の部分 prefix と同じところを のぞく（認識が言いなおしても、ちがいが出たところから後を返す） */
+function stripPrefix(t: string, prefix: string) {
+  const a = t.replace(/\s/g, '')
+  const b = prefix.replace(/\s/g, '')
+  let n = 0
+  while (n < a.length && n < b.length && a[n] === b[n]) n++
+  // 書きかえられて ほとんど一致しないときは、最後の数文字だけを見る
+  if (n < b.length - 2) return a.slice(-3)
+  return a.slice(n)
+}
+
 export class HybridVoiceJudge {
   private target: Kana | null = null
   private stream: MediaStream | null = null
@@ -202,8 +213,11 @@ export class HybridVoiceJudge {
   private running = false
   private asrAlive = false
   private uttCount = 0
-  private asrLen = 0
   private asrSkip = 0
+  // iPhone/iPad の音声認識は、ことばを1つの結果に つぎたしていく。問題がかわったときの「そこまでの文字」をおぼえておく
+  private asrLastIdx = -1
+  private asrLastText = ''
+  private asrSkipText = ''
   private asrOnly = false
   private iosAsrFailed = false
   /** 音声認識が聞きとったことば（画面に出して、通らないときの手がかりにする） */
@@ -236,7 +250,8 @@ export class HybridVoiceJudge {
     if (this.running) return 'listening'
     // iPhone/iPad：音声認識（Apple）と周波数解析が同じマイクを取りあうので、音声認識だけで判定する
     const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }
-    if (isIOS() && !this.forceAnalyser && !this.iosAsrFailed && (w.SpeechRecognition || w.webkitSpeechRecognition)) {
+    // ただし こえの とうろく があるときは、その子の声とくらべる周波数解析のほうが 確実なので そちらを使う
+    if (isIOS() && !this.forceAnalyser && !this.voiceprint && !this.iosAsrFailed && (w.SpeechRecognition || w.webkitSpeechRecognition)) {
       this.asrOnly = true
       this.lastError = ''
       this.running = true
@@ -318,7 +333,8 @@ export class HybridVoiceJudge {
     this.lockUntil = performance.now() + lockMs
     // 音声認識は止めない（止めると再開に時間がかかり、すぐ読んだ声を聞きのがす）。
     // かわりに、いまある結果より前のものは この問題では使わない
-    this.asrSkip = this.asrLen
+    this.asrSkip = Math.max(0, this.asrLastIdx)
+    this.asrSkipText = this.asrLastText
   }
 
   private probsOf(f: number[]) {
@@ -456,14 +472,26 @@ export class HybridVoiceJudge {
     r.interimResults = true
     r.maxAlternatives = 5
     r.onresult = (e) => {
-      this.asrLen = e.results.length
-      const latest = e.results[e.results.length - 1]
-      if (latest && latest[0]) this.onHeard?.(latest[0].transcript)
-      if (!this.target || performance.now() < this.lockUntil) return
+      const last = e.results.length - 1
+      const latest = e.results[last]
+      // 前の問題で聞きとった部分を のぞいた、新しい部分だけを見る
+      const fresh = (i: number, t: string) => (i === this.asrSkip && this.asrSkipText ? stripPrefix(t, this.asrSkipText) : t)
+      if (latest && latest[0]) {
+        this.asrLastIdx = last
+        this.asrLastText = latest[0].transcript
+        this.onHeard?.(fresh(last, latest[0].transcript))
+      }
+      if (!this.target || performance.now() < this.lockUntil) {
+        // ロック中に聞こえた分（ずんだもんの声・前の問題の声）も のぞく
+        this.asrSkip = Math.max(0, this.asrLastIdx)
+        this.asrSkipText = this.asrLastText
+        return
+      }
       for (let i = Math.max(e.resultIndex, this.asrSkip); i < e.results.length; i++) {
         const alts = e.results[i]
         for (let j = 0; j < alts.length; j++) {
-          if (this.target && transcriptMatches(this.target, alts[j].transcript)) {
+          const t = fresh(i, alts[j].transcript)
+          if (this.target && t && transcriptMatches(this.target, t)) {
             this.pass('asr')
             return
           }
@@ -486,8 +514,10 @@ export class HybridVoiceJudge {
       }
     }
     r.onend = () => {
-      this.asrLen = 0
       this.asrSkip = 0
+      this.asrLastIdx = -1
+      this.asrLastText = ''
+      this.asrSkipText = ''
       if (this.running && !fatal) {
         window.setTimeout(() => {
           try {
