@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { SettingsPanel, useMeterSetting } from './components/SettingsPanel'
+import { Tutorial, tutorialDone } from './components/Tutorial'
+import { loadVoiceprint } from './lib/voiceprint'
 import { installUnlockListener } from './lib/audio'
 import { CardsProvider } from './lib/cards'
 import { loadUserFont } from './lib/font'
@@ -17,6 +19,8 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('home')
   const [settings, setSettings] = useState(false)
   const [meter, setMeter] = useMeterSetting()
+  // はじめて開いたとき（まだ声の登録がないとき）は、チュートリアルで いちばん最初に 声を登録する
+  const [tutorial, setTutorial] = useState(() => !tutorialDone() && !loadVoiceprint())
   const [row, setRowState] = useState<Row>(() => ROWS.find((r) => r.id === lsGet('yomemaru:row')) ?? ROWS[0])
   const setRow = (r: Row) => {
     setRowState(r)
@@ -39,6 +43,7 @@ export default function App() {
             {screen === 'challenge' && <Challenge key={row.id} row={row} onHome={() => setScreen('home')} meter={meter} />}
           </motion.div>
         </AnimatePresence>
+        {tutorial && <Tutorial onClose={() => setTutorial(false)} />}
         <SettingsPanel open={settings} onClose={() => setSettings(false)} meter={meter} setMeter={setMeter} />
       </div>
     </CardsProvider>

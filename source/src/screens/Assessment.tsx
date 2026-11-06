@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { motion } from 'motion/react'
 import { Check, ClipboardList, House, Play, SkipForward, Trash2, Volume2, X } from 'lucide-react'
 import { Card } from '../components/Card'
 import { Confetti, Hanamaru } from '../components/Celebrate'
@@ -57,7 +57,7 @@ export function Assessment({ onHome }: { onHome: () => void }) {
     )
   }
 
-  const voice = useVoiceJudge(target, () => answer(true, 'voice'))
+  const voice = useVoiceJudge(target, () => answer(true, 'voice'), idx)
 
   const finish = (res: Record<string, boolean>, manualCount: number) => {
     voice.stop()
@@ -246,11 +246,9 @@ export function Assessment({ onHome }: { onHome: () => void }) {
       {phase === 'test' && target && (
         <>
           <main className="relative min-h-0 flex-1 px-4 py-3">
-            <AnimatePresence mode="wait">
-              <motion.div key={`${idx}-${target}`} className="mx-auto h-full w-full max-w-2xl" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
-                <Card char={target} variant="letter" />
-              </motion.div>
-            </AnimatePresence>
+            <motion.div key={`${idx}-${target}`} className="mx-auto h-full w-full max-w-2xl" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.18 }}>
+              <Card char={target} variant="letter" />
+            </motion.div>
           </main>
           <footer className="flex flex-wrap items-center justify-center gap-3 px-4 pb-[max(16px,env(safe-area-inset-bottom))]">
             <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} heard={voice.heard} />

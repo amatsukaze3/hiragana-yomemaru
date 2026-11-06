@@ -18,7 +18,7 @@ let tmp = new Float32Array(0)
 let env = new Float32Array(0)
 
 /** AnalyserNode の getByteFrequencyData の結果から、スペクトルの形（40点・正規化ずみ）を返す */
-export function vowelFeature(bytes: Uint8Array, binHz: number): number[] | null {
+export function vowelFeature(bytes: Uint8Array, binHz: number, noise?: Float32Array | null): number[] | null {
   const n = bytes.length
   if (env.length !== n) {
     env = new Float32Array(n)
@@ -32,8 +32,15 @@ export function vowelFeature(bytes: Uint8Array, binHz: number): number[] | null 
   const floorDb = (peak / 255) * (MAX_DB - MIN_DB) + MIN_DB - 60
   for (let i = 0; i < n; i++) {
     let m = 0
-    for (let j = Math.max(0, i - half); j <= Math.min(n - 1, i + half); j++) if (bytes[j] > m) m = bytes[j]
-    tmp[i] = Math.max(floorDb, (m / 255) * (MAX_DB - MIN_DB) + MIN_DB)
+    let mj = i
+    for (let j = Math.max(0, i - half); j <= Math.min(n - 1, i + half); j++) if (bytes[j] > m) ((m = bytes[j]), (mj = j))
+    let db = (m / 255) * (MAX_DB - MIN_DB) + MIN_DB
+    // まわりの音（教室のざわざわ）の分を 差し引く
+    if (noise && noise.length === n) {
+      const pw = Math.pow(10, db / 10)
+      db = 10 * Math.log10(Math.max(pw - noise[mj], pw * 0.03))
+    }
+    tmp[i] = Math.max(floorDb, db)
   }
   const sm = Math.max(1, Math.round(94 / binHz))
   for (let i = 0; i < n; i++) {
@@ -67,6 +74,14 @@ function softmax(z: number[]) {
   const e = z.map((v) => Math.exp(v - mx))
   const sum = e.reduce((a, b) => a + b, 0)
   return e.map((v) => v / sum)
+}
+
+/** まわりの音のスペクトル（パワー）を ゆっくり平均する */
+export function updateNoise(noise: Float32Array, bytes: Uint8Array, rate = 0.05) {
+  for (let i = 0; i < bytes.length; i++) {
+    const pw = Math.pow(10, ((bytes[i] / 255) * (MAX_DB - MIN_DB) + MIN_DB) / 10)
+    noise[i] = noise[i] === 0 ? pw : noise[i] * (1 - rate) + pw * rate
+  }
 }
 
 /** 学習モデルでの 5つの母音の確率 */

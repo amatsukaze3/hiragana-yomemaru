@@ -8,7 +8,7 @@
  * 子どもの短い単母音は音声認識だけだと無視されやすいので、②を並行して動かします。
  */
 import { KANA_INFO, type Kana, type Vowel } from '../data/kana'
-import { VOWEL_ORDER, meanShape, modelProbs, personalProbs, vowelFeature } from './vowelClassifier'
+import { VOWEL_ORDER, meanShape, modelProbs, personalProbs, updateNoise, vowelFeature } from './vowelClassifier'
 import { getAudioContext, setMicActive } from './audio'
 
 export type PassSource = 'asr' | 'formant'
@@ -225,6 +225,9 @@ export class HybridVoiceJudge {
   private freq = new Uint8Array(0)
   private time = new Float32Array(0)
   private noiseFloor = 0.003
+  // 直近 約2秒の音の大きさ（いちばん静かなところを「まわりの音」とみなす）
+  private levelHist: number[] = []
+  private noiseSpec: Float32Array | null = null
   private streak = 0
   private armed = true
   private quietFrames = 0
@@ -247,6 +250,9 @@ export class HybridVoiceJudge {
   }
 
   async start(): Promise<MicStatus> {
+    // テスト用：状態を見られるようにする
+    const dw = window as unknown as { __yomeDebug?: boolean; __judge?: unknown }
+    if (dw.__yomeDebug) dw.__judge = this
     if (this.running) return 'listening'
     // iPhone/iPad：音声認識（Apple）と周波数解析が同じマイクを取りあうので、音声認識だけで判定する
     const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }
@@ -396,12 +402,22 @@ export class HybridVoiceJudge {
     let sq = 0
     for (let i = 0; i < this.time.length; i++) sq += this.time[i] * this.time[i]
     const rms = Math.sqrt(sq / this.time.length)
-    // 小さな声でも聞きとれるように、しきい値は まわりの雑音の 2.2倍（最低 約-54dB）。
+    // 小さな声でも聞きとれるように、しきい値は まわりの雑音の 1.9倍（最低 約-54dB）。
     // 声が出ているあいだは、語尾が小さくなっても とぎれないよう 0.6倍まで下げる
-    const startThr = Math.max(this.noiseFloor * 2.2, 0.002)
-    const voiced = rms > (this.utt ? startThr * 0.6 : startThr)
-    if (!voiced) {
-      // 周りの雑音レベルをゆっくり追いかける
+    const startThr = Math.max(this.noiseFloor * 1.9, 0.002)
+    const voiced = rms > (this.utt ? Math.max(startThr * 0.6, this.noiseFloor * 1.3) : startThr)
+    // 声が出ていないときの音を「まわりの音」として おぼえる（声の形から差し引く）
+    if (!this.noiseSpec || this.noiseSpec.length !== this.freq.length) this.noiseSpec = new Float32Array(this.freq.length)
+    if (!voiced && !this.utt && rms <= this.noiseFloor * 1.5) updateNoise(this.noiseSpec, this.freq)
+    // まわりの音（教室のざわざわ）の大きさ：直近 約2秒のうち 静かな方から1割のところ。
+    // ずっと ざわざわしていても、それを「声」とまちがえ続けないようにする
+    this.levelHist.push(rms)
+    if (this.levelHist.length > 90) this.levelHist.shift()
+    if (this.levelHist.length >= 20) {
+      const sorted = [...this.levelHist].sort((a, b) => a - b)
+      const bg = sorted[Math.floor(sorted.length * 0.1)]
+      this.noiseFloor = Math.min(0.3, Math.max(0.001, bg))
+    } else if (!voiced) {
       this.noiseFloor = Math.min(0.05, Math.max(0.001, this.noiseFloor * 0.96 + rms * 0.04))
     }
 
@@ -420,7 +436,7 @@ export class HybridVoiceJudge {
       if (now >= this.lockUntil && (this.quietFrames >= 3 || now - this.targetSetAt > 900)) this.armed = true
     }
 
-    const feat = voiced ? vowelFeature(this.freq, this.analyser!.context.sampleRate / this.analyser!.fftSize) : null
+    const feat = voiced ? vowelFeature(this.freq, this.analyser!.context.sampleRate / this.analyser!.fftSize, this.noiseSpec) : null
     const probs = feat ? this.probsOf(feat) : null
     const tv = this.target ? VOWEL_ORDER.indexOf(KANA_INFO[this.target]?.vowel ?? 'あ') : -1
     const match = !!probs && tv >= 0 && probs.indexOf(Math.max(...probs)) === tv
@@ -435,6 +451,8 @@ export class HybridVoiceJudge {
         u.feats.push(feat)
         u.levels.push(rms)
       }
+      // 長すぎる「声」は まわりの音なので、いったん捨てて 次の声を待つ
+      if (u.feats.length > UTT_MAX_FRAMES * 2) this.utt = null
       u.run = match ? u.run + 1 : 0
     } else if (this.utt) {
       this.utt.silent++
@@ -448,7 +466,8 @@ export class HybridVoiceJudge {
         const core = u.feats.filter((_, i) => u.levels[i] >= top * 0.25)
         // 声の登録中：この発声の形を返す
         if (this.captureCb) {
-          if (u.feats.length >= UTT_MIN_FRAMES && u.feats.length <= UTT_MAX_FRAMES * 2) {
+          // まわりの子の声をひろわないよう、まわりの音より はっきり大きい声（約+14dB）だけを登録する
+          if (u.feats.length >= UTT_MIN_FRAMES && u.feats.length <= UTT_MAX_FRAMES * 2 && top >= this.noiseFloor * 5) {
             const cb = this.captureCb
             this.captureCb = null
             cb(meanShape(core))

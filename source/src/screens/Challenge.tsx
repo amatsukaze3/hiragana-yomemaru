@@ -78,7 +78,7 @@ export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void
     }
   }
 
-  const voice = useVoiceJudge(target, (src) => correct(src))
+  const voice = useVoiceJudge(target, (src) => correct(src), idx)
 
   const start = async () => {
     setQuestions(smartShuffle(TOTAL, row.kana, questions[TOTAL - 1]))
@@ -141,11 +141,10 @@ export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void
           </p>
 
           <main className="relative min-h-0 flex-1 px-4 py-3">
-            <AnimatePresence mode="wait">
-              <motion.div key={`${idx}-${questions[idx]}`} className="mx-auto h-full w-full max-w-2xl" initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.08 }} transition={{ duration: 0.2 }}>
-                <Card char={questions[idx]} variant="letter" />
-              </motion.div>
-            </AnimatePresence>
+            {/* 前のカードの消える動きを待たずに、すぐ次のカードを出す（待つと止まることがあるため） */}
+            <motion.div key={`${idx}-${questions[idx]}`} className="mx-auto h-full w-full max-w-2xl" initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.2 }}>
+              <Card char={questions[idx]} variant="letter" />
+            </motion.div>
             <AnimatePresence>
               {flash > 0 && (
                 <motion.p
