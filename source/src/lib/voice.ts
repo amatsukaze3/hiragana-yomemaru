@@ -49,9 +49,9 @@ const UTT_MIN_PROB = 0.5
  * 子音や出だしをのぞいた後ろの2/3（母音のところ）で、5つの母音の確率を平均し、
  * 目標の母音がいちばん高く、しかも一定以上（50%）のときだけ合格。
  */
-export function utteranceMatches(target: Vowel, probs: number[][], minProb = UTT_MIN_PROB): boolean {
+export function utteranceMatches(target: Vowel, probs: number[][], minProb = UTT_MIN_PROB, minFrames = UTT_MIN_FRAMES): boolean {
   const n = probs.length
-  if (n < UTT_MIN_FRAMES || n > UTT_MAX_FRAMES) return false
+  if (n < minFrames || n > UTT_MAX_FRAMES) return false
   const tail = probs.slice(Math.floor(n * 0.34))
   const avg = [0, 0, 0, 0, 0]
   for (const p of tail) for (let i = 0; i < 5; i++) avg[i] += p[i] / tail.length
@@ -224,14 +224,14 @@ export class HybridVoiceJudge {
   onHeard: ((text: string) => void) | null = null
   private freq = new Uint8Array(0)
   private time = new Float32Array(0)
-  private noiseFloor = 0.006
+  private noiseFloor = 0.003
   private streak = 0
   private armed = true
   private quietFrames = 0
   private lockUntil = 0
   private targetSetAt = 0
   // ひとつの発声（声が出はじめてから止まるまで）のまとめ
-  private utt: { feats: number[][]; silent: number; run: number } | null = null
+  private utt: { feats: number[][]; levels: number[]; silent: number; run: number } | null = null
   /** 登録した その子の「あいうえお」の形（なければ学習モデルで判定） */
   private voiceprint: number[][] | null = null
   private captureCb: ((shape: number[] | null) => void) | null = null
@@ -289,7 +289,7 @@ export class HybridVoiceJudge {
     this.analyser = ctx.createAnalyser()
     this.analyser.fftSize = 2048
     this.analyser.smoothingTimeConstant = 0.3
-    this.analyser.minDecibels = -100
+    this.analyser.minDecibels = -130
     this.analyser.maxDecibels = 0
     this.source.connect(this.analyser)
     this.freq = new Uint8Array(this.analyser.frequencyBinCount)
@@ -396,10 +396,13 @@ export class HybridVoiceJudge {
     let sq = 0
     for (let i = 0; i < this.time.length; i++) sq += this.time[i] * this.time[i]
     const rms = Math.sqrt(sq / this.time.length)
-    const voiced = rms > Math.max(this.noiseFloor * 2.8, 0.008)
+    // 小さな声でも聞きとれるように、しきい値は まわりの雑音の 2.2倍（最低 約-54dB）。
+    // 声が出ているあいだは、語尾が小さくなっても とぎれないよう 0.6倍まで下げる
+    const startThr = Math.max(this.noiseFloor * 2.2, 0.002)
+    const voiced = rms > (this.utt ? startThr * 0.6 : startThr)
     if (!voiced) {
       // 周りの雑音レベルをゆっくり追いかける
-      this.noiseFloor = Math.min(0.05, Math.max(0.002, this.noiseFloor * 0.96 + rms * 0.04))
+      this.noiseFloor = Math.min(0.05, Math.max(0.001, this.noiseFloor * 0.96 + rms * 0.04))
     }
 
     const bands: Bands = {
@@ -425,10 +428,13 @@ export class HybridVoiceJudge {
 
     // 発声ごとに判定する（声が止まったところで、その発声全体を見て決める）
     if (listening && voiced) {
-      if (!this.utt) this.utt = { feats: [], silent: 0, run: 0 }
+      if (!this.utt) this.utt = { feats: [], levels: [], silent: 0, run: 0 }
       const u = this.utt
       u.silent = 0
-      if (feat) u.feats.push(feat)
+      if (feat) {
+        u.feats.push(feat)
+        u.levels.push(rms)
+      }
       u.run = match ? u.run + 1 : 0
     } else if (this.utt) {
       this.utt.silent++
@@ -437,19 +443,23 @@ export class HybridVoiceJudge {
         const u = this.utt
         this.utt = null
         this.uttCount++
+        // 声の大きさによらず同じに判定できるよう、その発声のいちばん大きいところから -12dB までの部分だけを使う
+        const top = Math.max(0, ...u.levels)
+        const core = u.feats.filter((_, i) => u.levels[i] >= top * 0.25)
         // 声の登録中：この発声の形を返す
         if (this.captureCb) {
           if (u.feats.length >= UTT_MIN_FRAMES && u.feats.length <= UTT_MAX_FRAMES * 2) {
             const cb = this.captureCb
             this.captureCb = null
-            cb(meanShape(u.feats))
+            cb(meanShape(core))
           }
           return
         }
         // 登録があれば その子の声とくらべて 45%以上、なければ学習モデルで 50%以上
         // （音声認識が動いているときの学習モデルは、より はっきりした 60%以上）
         const thr = this.voiceprint ? 0.45 : this.asrAlive ? 0.6 : UTT_MIN_PROB
-        if (this.target && utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', u.feats.map((f) => this.probsOf(f)), thr)) {
+        const lenOk = u.feats.length >= UTT_MIN_FRAMES && u.feats.length <= UTT_MAX_FRAMES
+        if (this.target && lenOk && utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', core.map((f) => this.probsOf(f)), thr, 3)) {
           this.onFrame?.({ bands, voiced, match: true, streak: STREAK_TO_PASS })
           this.pass('formant')
           return

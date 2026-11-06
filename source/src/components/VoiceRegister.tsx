@@ -17,6 +17,8 @@ export function VoiceRegister({ name, onDone, onCancel }: { name?: string; onDon
   const voice = useVoiceJudge(null, () => {})
   const [step, setStep] = useState(-1) // -1: はじめる前、0〜4: あ〜お、5: おわり
   const [waiting, setWaiting] = useState(false)
+  const [slow, setSlow] = useState(false)
+  const slowTimer = useRef(0)
   const shapes = useRef<(number[] | null)[]>([null, null, null, null, null])
   const alive = useRef(true)
 
@@ -32,18 +34,24 @@ export function VoiceRegister({ name, onDone, onCancel }: { name?: string; onDon
   const ask = (i: number) => {
     setStep(i)
     setWaiting(false)
+    setSlow(false)
+    window.clearTimeout(slowTimer.current)
     voice.cancelCapture()
     // お手本を聞いてから、その子の声を1回とる
     speak(VOWEL_ORDER[i], {
       onEnd: () => {
         if (!alive.current) return
         setWaiting(true)
+        // しばらく聞きとれないときは、マイクに近づくよう 声をかける
+        slowTimer.current = window.setTimeout(() => alive.current && setSlow(true), 5000)
         voice.capture((shape) => {
           if (!alive.current) return
           if (!shape) {
             ask(i) // 短すぎたときは もういちど
             return
           }
+          window.clearTimeout(slowTimer.current)
+          setSlow(false)
           shapes.current[i] = shape
           playChime()
           if (i + 1 < 5) window.setTimeout(() => alive.current && ask(i + 1), 700)
@@ -110,7 +118,10 @@ export function VoiceRegister({ name, onDone, onCancel }: { name?: string; onDon
             </motion.div>
           </main>
           <footer className="flex flex-wrap items-center justify-center gap-4 px-4 pb-[max(16px,env(safe-area-inset-bottom))]">
-            <p className="text-2xl font-bold text-orange-600">{waiting ? `「${VOWEL_ORDER[step]}」と よんでね` : 'きいてね…'}</p>
+            <div className="flex flex-col items-center">
+              <p className="text-2xl font-bold text-orange-600">{waiting ? `「${VOWEL_ORDER[step]}」と よんでね` : 'きいてね…'}</p>
+              {slow && <p className="text-base text-stone-500">マイクに ちかづいて よんでね（おおきな こえで なくて だいじょうぶ）</p>}
+            </div>
             <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void begin()} />
             <button type="button" onClick={() => ask(step)} className="flex h-12 items-center gap-1 rounded-full border-2 border-stone-300 bg-white px-4 text-base font-bold text-stone-600">
               <RotateCcw size={18} /> もういちど

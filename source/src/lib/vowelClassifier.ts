@@ -11,7 +11,7 @@ export const VOWEL_ORDER: Vowel[] = ['あ', 'い', 'う', 'え', 'お']
 const GRID: number[] = M.grid
 const W: number[][] = M.W
 const B: number[] = M.b
-const MIN_DB = -100
+const MIN_DB = -130
 const MAX_DB = 0
 
 let tmp = new Float32Array(0)
@@ -26,10 +26,14 @@ export function vowelFeature(bytes: Uint8Array, binHz: number): number[] | null 
   }
   // 倍音の山をつないだ「包絡」にする（最大値フィルタ 約330Hz → 平均 約190Hz）
   const half = Math.max(1, Math.round(164 / binHz))
+  let peak = 0
+  for (let i = 0; i < n; i++) if (bytes[i] > peak) peak = bytes[i]
+  // 声の大きさによらず同じ形になるよう、いちばん強いところから 60dB 下を底にする
+  const floorDb = (peak / 255) * (MAX_DB - MIN_DB) + MIN_DB - 60
   for (let i = 0; i < n; i++) {
     let m = 0
     for (let j = Math.max(0, i - half); j <= Math.min(n - 1, i + half); j++) if (bytes[j] > m) m = bytes[j]
-    tmp[i] = (m / 255) * (MAX_DB - MIN_DB) + MIN_DB
+    tmp[i] = Math.max(floorDb, (m / 255) * (MAX_DB - MIN_DB) + MIN_DB)
   }
   const sm = Math.max(1, Math.round(94 / binHz))
   for (let i = 0; i < n; i++) {
