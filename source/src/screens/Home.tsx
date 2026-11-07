@@ -1,8 +1,12 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import { BookOpen, ImagePlus, Mic, Timer } from 'lucide-react'
+import { BookOpen, ImagePlus, Lock, Mic, Rocket, Timer } from 'lucide-react'
 import { Mascot } from '../components/Mascot'
 import { ROWS, type Row } from '../data/kana'
+import { KanaProgress } from '../components/KanaProgress'
+import { Modal } from '../components/Celebrate'
+import { allMastered, getShootBest, loadMastered, setShootSeen, shootSeen } from '../lib/progress'
+import { playChime } from '../lib/audio'
 import { formatTime, getBest } from './Challenge'
 
 interface Props {
@@ -12,10 +16,23 @@ interface Props {
   onLearn: () => void
   onChallenge: () => void
   onSettings: () => void
+  onShoot: () => void
 }
 
-export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess }: Props) {
+export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, onShoot }: Props) {
   const best = getBest(row.id)
+  const [mastered] = useState(loadMastered)
+  const unlocked = allMastered(mastered)
+  // 46文字 ぜんぶ よめたら、はじめての ときだけ お知らせを 出す
+  const [announce, setAnnounce] = useState(() => {
+    if (unlocked && !shootSeen()) {
+      setShootSeen()
+      window.setTimeout(playChime, 400)
+      return true
+    }
+    return false
+  })
+  const shootBest = getShootBest()
   // 先生用：よめ丸くんを 5回つづけて タップすると アセスメントモード
   const taps = useRef<number[]>([])
   const tapMascot = () => {
@@ -38,15 +55,17 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess }:
         </button>
       </header>
 
-      <main className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col items-center justify-center gap-4 overflow-y-auto px-4 pb-4" style={{ touchAction: 'pan-y' }}>
+      <main className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col items-center justify-center gap-3 overflow-y-auto px-4 pb-4" style={{ touchAction: 'pan-y' }}>
         <div className="flex items-center gap-3">
           <button type="button" onClick={tapMascot} aria-label="よめ丸くん" className="rounded-full">
-            <Mascot size={110} />
+            <Mascot size={84} />
           </button>
-          <h1 className="text-4xl font-bold tracking-wide text-stone-800 sm:text-6xl">
+          <h1 className="text-4xl font-bold tracking-wide text-stone-800 sm:text-5xl">
             ひらがな<span className="text-orange-500">よめ丸</span>
           </h1>
         </div>
+
+        <KanaProgress mastered={mastered} row={row} onRow={onRow} />
 
         {/* 行えらび */}
         <section className="w-full" aria-label="ぎょうを えらぶ">
@@ -61,7 +80,7 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess }:
                     onClick={() => onRow(r)}
                     whileTap={{ scale: 0.94 }}
                     aria-pressed={on}
-                    className={`font-card flex h-14 w-full items-center justify-center rounded-2xl text-2xl sm:h-16 sm:text-3xl ${
+                    className={`font-card flex h-12 w-full items-center justify-center rounded-2xl text-2xl sm:h-14 sm:text-3xl ${
                       on ? 'bg-orange-500 text-white shadow-[0_4px_0_#c2410c]' : 'border-2 border-amber-200 bg-white text-stone-700'
                     }`}
                   >
@@ -97,8 +116,45 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess }:
             }
             tone="bg-orange-400 shadow-[0_8px_0_#c2410c]"
           />
+          {unlocked ? (
+            <div className="grid sm:col-span-2">
+              <ModeButton
+                onClick={onShoot}
+                num="★"
+                title="よめ丸くん シューティング"
+                sub={shootBest ? `こえで いん石を うちおとせ！ ・ さいこう ${shootBest}こ` : 'こえで いん石を うちおとせ！'}
+                icon={<Rocket size={34} />}
+                tone="bg-sky-300 shadow-[0_8px_0_#0284c7]"
+              />
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-2 rounded-[28px] border-2 border-dashed border-stone-300 px-4 py-3 text-base text-stone-400 sm:col-span-2">
+              <Lock size={20} /> 46もじ ぜんぶ「マイクで よむ」で よめると…？
+            </div>
+          )}
         </div>
       </main>
+      <Modal open={announce}>
+        <Rocket size={72} className="text-sky-500" />
+        <p className="text-3xl font-bold text-stone-800">46もじ ぜんぶ よめたね！</p>
+        <p className="text-xl text-stone-600">「よめ丸くん シューティング」が あらわれた！</p>
+        <Mascot size={100} mood="cheer" />
+        <div className="flex flex-wrap justify-center gap-3">
+          <button type="button" onClick={() => setAnnounce(false)} className="rounded-full border-2 border-amber-300 bg-white px-6 py-3 text-xl font-bold text-stone-700">
+            あとで
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAnnounce(false)
+              onShoot()
+            }}
+            className="rounded-full bg-sky-500 px-6 py-3 text-xl font-bold text-white shadow-[0_5px_0_#0369a1]"
+          >
+            あそぶ！
+          </button>
+        </div>
+      </Modal>
       <footer className="flex flex-col items-center gap-0.5 px-4 pb-[max(10px,env(safe-area-inset-bottom))] text-center text-xs text-stone-400">
         <span>
           © 2026 TOSS中丹教育サークル 大松幹生 /{' '}
@@ -119,7 +175,7 @@ function ModeButton({ onClick, num, title, sub, icon, tone }: { onClick: () => v
       type="button"
       onClick={onClick}
       whileTap={{ y: 6, boxShadow: '0 2px 0 rgba(0,0,0,0.15)' }}
-      className={`flex items-center gap-4 rounded-[28px] px-6 py-5 text-left text-stone-900 ${tone}`}
+      className={`flex items-center gap-4 rounded-[28px] px-5 py-3 text-left text-stone-900 ${tone}`}
     >
       <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white/80">{icon}</span>
       <span className="flex min-w-0 flex-col">

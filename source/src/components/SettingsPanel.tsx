@@ -8,6 +8,44 @@ import { lsGet, lsSet } from '../lib/storage'
 import { clearVoiceprint, loadVoiceprint, voiceprintUseful } from '../lib/voiceprint'
 import { formatDate } from '../lib/assessRecords'
 import { VoiceRegister } from './VoiceRegister'
+import { clearMastered, loadMastered } from '../lib/progress'
+
+/** 「よめたよ バー」の きろくを けす（使う子が かわったとき） */
+function ProgressReset() {
+  const [n, setN] = useState(() => loadMastered().size)
+  const [ask, setAsk] = useState(false)
+  return (
+    <section className="flex flex-col gap-2 rounded-2xl border-2 border-amber-100 bg-white p-4 text-sm text-stone-700">
+      <h3 className="text-base font-bold text-stone-800">よめたよ バー の きろく</h3>
+      <p className="leading-relaxed text-stone-500">「おぼえる」のステップ5で、マイクで読めた文字を記録しています（この端末の中だけ）。46文字そろうと「よめ丸くん シューティング」が出ます。</p>
+      <p className="text-stone-600">いま {n} / 46 もじ</p>
+      {ask ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-bold text-rose-600">ほんとうに けしますか？</span>
+          <button
+            type="button"
+            onClick={() => {
+              clearMastered()
+              setN(0)
+              setAsk(false)
+              location.reload()
+            }}
+            className="rounded-full bg-rose-500 px-4 py-1.5 font-bold text-white"
+          >
+            けす
+          </button>
+          <button type="button" onClick={() => setAsk(false)} className="rounded-full border-2 border-stone-200 px-4 py-1.5 text-stone-600">
+            やめる
+          </button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setAsk(true)} disabled={n === 0} className="self-start rounded-full border-2 border-stone-200 px-4 py-1.5 text-stone-600 disabled:opacity-40">
+          きろくを けす
+        </button>
+      )}
+    </section>
+  )
+}
 
 export function useMeterSetting(): [boolean, (v: boolean) => void] {
   const [on, setOn] = useState(() => lsGet('yomemaru:meter') === '1')
@@ -149,6 +187,8 @@ export function SettingsPanel({ open, onClose, meter, setMeter }: { open: boolea
                 }}
               />
             </section>
+
+            <ProgressReset />
 
             {voiceprintUseful() && (
               <section className="flex flex-col gap-2 rounded-2xl border-2 border-amber-100 bg-white p-4 text-sm text-stone-700">

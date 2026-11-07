@@ -9,6 +9,7 @@ import { TraceCanvas } from '../components/TraceCanvas'
 import { KANA_INFO, smartShuffle, type Kana, type Row } from '../data/kana'
 import { playChime, sayVoice, speak } from '../lib/audio'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
+import { markMastered } from '../lib/progress'
 
 const STEPS = [
   { title: 'え と もじ', guide: 'えを みて、きいてみよう。カードを おすと もういちど きけるよ' },
@@ -53,9 +54,11 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
   }, [idx, LAST])
 
   const busy = useRef(false)
-  const passOne = () => {
+  const passOne = (byVoice = false) => {
     if (busy.current) return
     busy.current = true
+    // マイクで読めた文字を「よめたよ バー」に きろくする（「できた」ボタンでは きろくしない）
+    if (byVoice) markMastered(char)
     playChime()
     voice.hold(900)
     setBurst((b) => b + 1)
@@ -64,7 +67,7 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
       advance5()
     }, 700)
   }
-  const voice = useVoiceJudge(voiceTarget, passOne)
+  const voice = useVoiceJudge(voiceTarget, () => passOne(true))
 
   // ステップ5を出たらマイクを止める
   useEffect(() => {
@@ -172,7 +175,7 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
               ) : (
                 <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} heard={voice.heard} />
               )}
-              <ActionButton label="できた" onClick={passOne} strong />
+              <ActionButton label="できた" onClick={() => passOne(false)} strong />
             </>
           )}
         </div>

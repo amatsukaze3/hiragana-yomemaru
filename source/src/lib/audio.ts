@@ -294,3 +294,61 @@ export function playTick() {
     /* noop */
   }
 }
+
+/** シューティング：ビームの「ピュン！」と 爆発の「ボン」 */
+export function playBeam() {
+  try {
+    const c = getAudioContext()
+    if (c.state === 'suspended') void c.resume()
+    const now = c.currentTime
+    const osc = c.createOscillator()
+    const g = c.createGain()
+    osc.type = 'square'
+    osc.frequency.setValueAtTime(1800, now)
+    osc.frequency.exponentialRampToValueAtTime(300, now + 0.18)
+    g.gain.setValueAtTime(0.0001, now)
+    g.gain.exponentialRampToValueAtTime(0.12, now + 0.01)
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.2)
+    osc.connect(g).connect(c.destination)
+    osc.start(now)
+    osc.stop(now + 0.22)
+    // ボン（ノイズ）
+    const len = Math.floor(c.sampleRate * 0.35)
+    const buf = c.createBuffer(1, len, c.sampleRate)
+    const d = buf.getChannelData(0)
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2)
+    const src = c.createBufferSource()
+    src.buffer = buf
+    const lp = c.createBiquadFilter()
+    lp.type = 'lowpass'
+    lp.frequency.value = 1200
+    const g2 = c.createGain()
+    g2.gain.value = 0.35
+    src.connect(lp).connect(g2).connect(c.destination)
+    src.start(now + 0.16)
+  } catch {
+    /* noop */
+  }
+}
+
+/** シューティング：いん石が 下まで 落ちたときの「ブブー」 */
+export function playMiss() {
+  try {
+    const c = getAudioContext()
+    const now = c.currentTime
+    for (const t of [0, 0.2]) {
+      const osc = c.createOscillator()
+      const g = c.createGain()
+      osc.type = 'sawtooth'
+      osc.frequency.value = 160
+      g.gain.setValueAtTime(0.0001, now + t)
+      g.gain.exponentialRampToValueAtTime(0.1, now + t + 0.02)
+      g.gain.exponentialRampToValueAtTime(0.0001, now + t + 0.17)
+      osc.connect(g).connect(c.destination)
+      osc.start(now + t)
+      osc.stop(now + t + 0.18)
+    }
+  } catch {
+    /* noop */
+  }
+}
