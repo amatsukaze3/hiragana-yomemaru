@@ -1,0 +1,21 @@
+# よめ丸シューティングの ずんだもん音声を VOICEVOX で つくる（一時的なブランチ voice-gen に push したときだけ うごく）
+name: shoot-voice
+on:
+  push:
+    branches: [voice-gen]
+  workflow_dispatch:
+jobs:
+  make:
+    runs-on: ubuntu-latest
+    services:
+      voicevox:
+        image: voicevox/voicevox_engine:cpu-latest
+        ports: ['50021:50021']
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - run: python3 tools/shoot-voice/make_voices.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shoot-voice
+          path: source/src/assets/voice/shoot/
