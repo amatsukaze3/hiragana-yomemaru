@@ -210,6 +210,20 @@ async function playClip(key: string, onEnd?: () => void, fallbackText?: string) 
   else onEnd?.()
 }
 
+/** 別のアプリ（よめ丸シューティングなど）の音声ファイルを追加する */
+export function registerClips(map: Record<string, string>) {
+  Object.assign(CLIPS, map)
+}
+
+export function hasClip(key: string) {
+  return !!CLIPS[key]
+}
+
+/** 登録した音声ファイルを鳴らす（端末の音声合成には切り替えない） */
+export function playVoice(key: string, onEnd?: () => void) {
+  void playClip(key, onEnd)
+}
+
 /** ひらがなを読み上げる（ずんだもんの声） */
 export function speak(text: string, opts: { onEnd?: () => void } = {}) {
   if (CLIPS[text]) void playClip(text, opts.onEnd, text)

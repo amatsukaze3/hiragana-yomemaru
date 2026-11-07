@@ -5,7 +5,8 @@ import { Mascot } from '../components/Mascot'
 import { ROWS, type Row } from '../data/kana'
 import { KanaProgress } from '../components/KanaProgress'
 import { Modal } from '../components/Celebrate'
-import { allMastered, getShootBest, loadMastered, setShootSeen, shootSeen } from '../lib/progress'
+import { allMastered, loadMastered, setShootSeen, shootSeen } from '../lib/progress'
+import { getBestScore } from '../shooting/words'
 import { playChime } from '../lib/audio'
 import { formatTime, getBest } from './Challenge'
 
@@ -32,7 +33,7 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, o
     }
     return false
   })
-  const shootBest = getShootBest()
+  const shootBest = Math.max(getBestScore('normal'), getBestScore('fast'))
   // 先生用：よめ丸くんを 5回つづけて タップすると アセスメントモード
   const taps = useRef<number[]>([])
   const tapMascot = () => {
@@ -121,11 +122,11 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, o
           <div className="flex justify-center sm:col-span-2">
             {unlocked ? (
               <button type="button" onClick={onShoot} className="flex items-center gap-1.5 rounded-full border border-sky-200 bg-white px-4 py-1.5 text-sm text-sky-700">
-                <Rocket size={16} /> よめ丸くん シューティング{shootBest ? `（さいこう ${shootBest}こ）` : ''}
+                <Rocket size={16} /> よめ丸シューティング{shootBest ? `（さいこう ${shootBest}てん）` : ''}
               </button>
             ) : (
               <p className="flex items-center gap-1 text-xs text-stone-400">
-                <Lock size={13} /> ぜんぶの ひらがなを おぼえられたら「よめまるくん シューティング」が できるように なるよ。
+                <Lock size={13} /> ぜんぶの ひらがなを おぼえられたら「よめ丸シューティング」が できるように なるよ。
               </p>
             )}
           </div>
@@ -134,7 +135,7 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, o
       <Modal open={announce}>
         <Rocket size={72} className="text-sky-500" />
         <p className="text-3xl font-bold text-stone-800">46もじ ぜんぶ よめたね！</p>
-        <p className="text-xl text-stone-600">「よめ丸くん シューティング」が あらわれた！</p>
+        <p className="text-xl text-stone-600">「よめ丸シューティング」が あらわれた！</p>
         <Mascot size={100} mood="cheer" />
         <div className="flex flex-wrap justify-center gap-3">
           <button type="button" onClick={() => setAnnounce(false)} className="rounded-full border-2 border-amber-300 bg-white px-6 py-3 text-xl font-bold text-stone-700">

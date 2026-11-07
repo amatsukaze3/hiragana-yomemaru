@@ -17,7 +17,7 @@ function ProgressReset() {
   return (
     <section className="flex flex-col gap-2 rounded-2xl border-2 border-amber-100 bg-white p-4 text-sm text-stone-700">
       <h3 className="text-base font-bold text-stone-800">よめたよ バー の きろく</h3>
-      <p className="leading-relaxed text-stone-500">「おぼえる」のステップ5で、マイクで読めた文字を記録しています（この端末の中だけ）。46文字そろうと「よめ丸くん シューティング」が出ます。</p>
+      <p className="leading-relaxed text-stone-500">「おぼえる」のステップ5で、マイクで読めた文字を記録しています（この端末の中だけ）。46文字そろうと「よめ丸シューティング」が出ます。</p>
       <p className="text-stone-600">いま {n} / 46 もじ</p>
       {ask ? (
         <div className="flex flex-wrap items-center gap-2">

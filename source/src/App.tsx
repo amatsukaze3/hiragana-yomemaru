@@ -12,7 +12,7 @@ import { Assessment } from './screens/Assessment'
 import { Challenge } from './screens/Challenge'
 import { Home } from './screens/Home'
 import { Learn } from './screens/Learn'
-import { Shooting } from './screens/Shooting'
+import { ShootGame } from './shooting/ShootApp'
 
 type Screen = 'home' | 'learn' | 'challenge' | 'assess' | 'shoot'
 
@@ -39,7 +39,7 @@ export default function App() {
         <AnimatePresence initial={false}>
           <motion.div key={screen} className="h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.18 }}>
             {screen === 'home' && <Home onAssess={() => setScreen('assess')} row={row} onRow={setRow} onLearn={() => setScreen('learn')} onChallenge={() => setScreen('challenge')} onSettings={() => setSettings(true)} onShoot={() => setScreen('shoot')} />}
-            {screen === 'shoot' && <Shooting onHome={() => setScreen('home')} />}
+            {screen === 'shoot' && <ShootGame onExit={() => setScreen('home')} />}
             {screen === 'learn' && <Learn key={row.id} row={row} onHome={() => setScreen('home')} />}
             {screen === 'assess' && <Assessment onHome={() => setScreen('home')} />}
             {screen === 'challenge' && <Challenge key={row.id} row={row} onHome={() => setScreen('home')} meter={meter} />}

@@ -4,7 +4,6 @@ import { lsGet, lsSet } from './storage'
 
 const KEY = 'yomemaru:mastered'
 const SEEN_KEY = 'yomemaru:shootSeen'
-const BEST_KEY = 'yomemaru:shootBest'
 
 export function loadMastered(): Set<Kana> {
   try {
@@ -37,5 +36,3 @@ export function allMastered(s = loadMastered()) {
 export const shootSeen = () => lsGet(SEEN_KEY) === '1'
 export const setShootSeen = () => lsSet(SEEN_KEY, '1')
 
-export const getShootBest = () => Number(lsGet(BEST_KEY) ?? 0) || 0
-export const setShootBest = (n: number) => lsSet(BEST_KEY, String(n))
