@@ -116,22 +116,18 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, o
             }
             tone="bg-orange-400 shadow-[0_8px_0_#c2410c]"
           />
-          {unlocked ? (
-            <div className="grid sm:col-span-2">
-              <ModeButton
-                onClick={onShoot}
-                num="★"
-                title="よめ丸くん シューティング"
-                sub={shootBest ? `こえで いん石を うちおとせ！ ・ さいこう ${shootBest}こ` : 'こえで いん石を うちおとせ！'}
-                icon={<Rocket size={34} />}
-                tone="bg-sky-300 shadow-[0_8px_0_#0284c7]"
-              />
-            </div>
-          ) : (
-            <div className="flex items-center justify-center gap-2 rounded-[28px] border-2 border-dashed border-stone-300 px-4 py-3 text-base text-stone-400 sm:col-span-2">
-              <Lock size={20} /> 46もじ ぜんぶ「マイクで よむ」で よめると…？
-            </div>
-          )}
+          {/* おまけ（オプション）なので、ひかえめに */}
+          <div className="flex justify-center sm:col-span-2">
+            {unlocked ? (
+              <button type="button" onClick={onShoot} className="flex items-center gap-1.5 rounded-full border border-sky-200 bg-white px-4 py-1.5 text-sm text-sky-700">
+                <Rocket size={16} /> よめ丸くん シューティング{shootBest ? `（さいこう ${shootBest}こ）` : ''}
+              </button>
+            ) : (
+              <p className="flex items-center gap-1 text-xs text-stone-400">
+                <Lock size={13} /> ぜんぶの ひらがなを おぼえられたら「よめまるくん シューティング」が できるように なるよ。
+              </p>
+            )}
+          </div>
         </div>
       </main>
       <Modal open={announce}>
