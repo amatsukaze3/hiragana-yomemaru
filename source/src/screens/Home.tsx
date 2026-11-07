@@ -44,8 +44,9 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, o
     }
   }
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex justify-end px-4 pt-3">
+    <div className="relative flex h-full flex-col">
+      {/* iPad などでは 右上に うかせて、たての 場所を ひろく使う */}
+      <header className="z-10 flex justify-end px-4 pt-3 sm:absolute sm:right-0 sm:top-[env(safe-area-inset-top)]">
         <button
           type="button"
           onClick={onSettings}
@@ -55,7 +56,7 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, o
         </button>
       </header>
 
-      <main className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col items-center justify-center gap-3 overflow-y-auto px-4 pb-4" style={{ touchAction: 'pan-y' }}>
+      <main className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col items-center justify-center gap-3 overflow-y-auto px-4 pb-3 sm:pt-3" style={{ touchAction: 'pan-y' }}>
         <div className="flex items-center gap-3">
           <button type="button" onClick={tapMascot} aria-label="よめ丸くん" className="rounded-full">
             <Mascot size={84} />
