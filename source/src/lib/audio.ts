@@ -12,7 +12,7 @@ for (const [path, url] of Object.entries(FILES)) byName[path.split('/').pop()!.r
 const CLIPS: Record<string, string> = {}
 for (const n of Object.keys(byName)) if (n.startsWith('assess_') || n === 'pass5' || n === 'clear10') CLIPS[n] = byName[n]
 for (const info of Object.values(KANA_INFO)) if (byName[info.romaji]) CLIPS[info.char] = byName[info.romaji]
-export type ClipName = 'pass5' | 'clear10' | 'assess_name' | 'assess_start' | 'assess_r1' | 'assess_r2' | 'assess_r3' | 'assess_r4'
+export type ClipName = 'pass5' | 'clear10' | 'reg_guide' | 'retry_register' | 'assess_name' | 'assess_start' | 'assess_r1' | 'assess_r2' | 'assess_r3' | 'assess_r4'
 
 let ctx: AudioContext | null = null
 let unlocked = false

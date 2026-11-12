@@ -253,6 +253,7 @@ export class HybridVoiceJudge {
     // テスト用：状態を見られるようにする
     const dw = window as unknown as { __yomeDebug?: boolean; __judge?: unknown }
     if (dw.__yomeDebug) dw.__judge = this
+    this.paused = false
     if (this.running) return 'listening'
     // iPhone/iPad：音声認識（Apple）と周波数解析が同じマイクを取りあうので、音声認識だけで判定する
     const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }
@@ -377,8 +378,25 @@ export class HybridVoiceJudge {
     this.streak = 0
   }
 
+  /** 先生の一時停止：判定を止める（resume で もどす） */
+  paused = false
+  pause() {
+    this.paused = true
+    this.utt = null
+  }
+  resume(lockMs = 400) {
+    this.paused = false
+    this.utt = null
+    this.lockUntil = performance.now() + lockMs
+  }
+
+  private passCount = 0
+  /** 読んだのに合格しなかった発声ごとに よばれる */
+  onMiss?: () => void
+
   private pass(source: PassSource) {
-    if (!this.target) return
+    if (!this.target || this.paused) return
+    this.passCount++
     this.target = null
     this.streak = 0
     this.onPass?.(source)
@@ -440,7 +458,7 @@ export class HybridVoiceJudge {
     const probs = feat ? this.probsOf(feat) : null
     const tv = this.target ? VOWEL_ORDER.indexOf(KANA_INFO[this.target]?.vowel ?? 'あ') : -1
     const match = !!probs && tv >= 0 && probs.indexOf(Math.max(...probs)) === tv
-    const listening = this.armed && now >= this.lockUntil && (!!this.target || !!this.captureCb)
+    const listening = !this.paused && this.armed && now >= this.lockUntil && (!!this.target || !!this.captureCb)
 
     // 発声ごとに判定する（声が止まったところで、その発声全体を見て決める）
     if (listening && voiced) {
@@ -483,6 +501,14 @@ export class HybridVoiceJudge {
           this.pass('formant')
           return
         }
+        // 読んだのに 合格しなかった（音声認識が あとから 合格にすることもあるので 少し待ってから知らせる）
+        if (this.target && lenOk && !this.paused) {
+          const t = this.target
+          const n = this.passCount
+          window.setTimeout(() => {
+            if (this.target === t && this.passCount === n && !this.paused) this.onMiss?.()
+          }, 1500)
+        }
       }
     }
     this.streak = this.utt?.run ?? 0
@@ -510,7 +536,7 @@ export class HybridVoiceJudge {
         this.asrLastText = latest[0].transcript
         this.onHeard?.(fresh(last, latest[0].transcript))
       }
-      if (!this.target || performance.now() < this.lockUntil) {
+      if (!this.target || this.paused || performance.now() < this.lockUntil) {
         // ロック中に聞こえた分（ずんだもんの声・前の問題の声）も のぞく
         this.asrSkip = Math.max(0, this.asrLastIdx)
         this.asrSkipText = this.asrLastText

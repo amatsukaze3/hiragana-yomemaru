@@ -7,7 +7,7 @@ import { HybridVoiceJudge, type FrameInfo, type MicStatus, type PassSource } fro
  * 画面からハイブリッド判定エンジンを使うためのフック。
  * start() はボタンのタップから呼ぶ（iOS のマイク許可・自動再生対策）。
  */
-export function useVoiceJudge(target: Kana | null, onPass: (src: PassSource) => void, questionKey?: number) {
+export function useVoiceJudge(target: Kana | null, onPass: (src: PassSource) => void, questionKey?: number, onMiss?: () => void) {
   const engine = useRef<HybridVoiceJudge | null>(null)
   const [status, setStatus] = useState<MicStatus>('idle')
   const [asr, setAsr] = useState(false)
@@ -15,6 +15,8 @@ export function useVoiceJudge(target: Kana | null, onPass: (src: PassSource) => 
   const frame = useRef<FrameInfo | null>(null)
   const passRef = useRef(onPass)
   passRef.current = onPass
+  const missRef = useRef(onMiss)
+  missRef.current = onMiss
 
   if (!engine.current) engine.current = new HybridVoiceJudge()
 
@@ -26,6 +28,7 @@ export function useVoiceJudge(target: Kana | null, onPass: (src: PassSource) => 
       setAsr(a)
     }
     e.onHeard = (t) => setHeard(t)
+    e.onMiss = () => missRef.current?.()
     e.onFrame = (f) => {
       frame.current = f
     }
@@ -50,6 +53,8 @@ export function useVoiceJudge(target: Kana | null, onPass: (src: PassSource) => 
   const stop = useCallback(() => engine.current!.stop(), [])
   const hold = useCallback((ms: number) => engine.current!.hold(ms), [])
 
+  const pause = useCallback(() => engine.current!.pause(), [])
+  const resume = useCallback(() => engine.current!.resume(), [])
   const lastError = () => engine.current!.lastError
-  return { status, asr, start, stop, hold, frame, lastError, heard, capture, cancelCapture, refreshVoiceprint }
+  return { status, asr, start, stop, hold, frame, lastError, heard, capture, cancelCapture, refreshVoiceprint, pause, resume }
 }

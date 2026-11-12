@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { motion } from 'motion/react'
 import { ChevronLeft, ChevronRight, Eraser, House, Mic, Volume2 } from 'lucide-react'
 import { Card } from '../components/Card'
 import { Confetti, Hanamaru, Modal } from '../components/Celebrate'
@@ -10,6 +10,8 @@ import { KANA_INFO, smartShuffle, type Kana, type Row } from '../data/kana'
 import { playChime, sayVoice, speak } from '../lib/audio'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
 import { markMastered } from '../lib/progress'
+import { TeacherHelp } from '../components/TeacherHelp'
+import { useRetryRegister } from '../components/RetryPrompt'
 
 const STEPS = [
   { title: 'え と もじ', guide: 'えを みて、きいてみよう。カードを おすと もういちど きけるよ' },
@@ -59,6 +61,7 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
     busy.current = true
     // マイクで読めた文字を「よめたよ バー」に きろくする（「できた」ボタンでは きろくしない）
     if (byVoice) markMastered(char)
+    retry.reset()
     playChime()
     voice.hold(900)
     setBurst((b) => b + 1)
@@ -67,7 +70,9 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
       advance5()
     }, 700)
   }
-  const voice = useVoiceJudge(voiceTarget, () => passOne(true))
+  const retry = useRetryRegister()
+  const voice = useVoiceJudge(voiceTarget, () => passOne(true), idx, retry.onMiss)
+  retry.bind(voice)
 
   // ステップ5を出たらマイクを止める
   useEffect(() => {
@@ -116,6 +121,8 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
             </li>
           ))}
         </ol>
+        {/* せんせい ヘルプ：一時停止・強制合格（ステップ5で 合格にできる） */}
+        <TeacherHelp onPause={voice.pause} onResume={voice.resume} onPass={step === 4 && !hanamaru ? () => passOne(true) : undefined} onHome={onHome} />
       </header>
 
       <div className="flex flex-col items-center gap-1 px-4 pt-3 text-center">
@@ -132,22 +139,14 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
 
       {/* まんなか：カード */}
       <main className="min-h-0 flex-1 px-4 py-4">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={`${step}-${idx}-${char}`}
-            className="mx-auto h-full w-full max-w-3xl"
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -30 }}
-            transition={{ duration: 0.22 }}
-          >
+        {/* 前のカードが 消えるのを 待たずに 次を出す（待つと 止まることがあるため） */}
+        <motion.div key={`${step}-${idx}-${char}`} className="mx-auto h-full w-full max-w-3xl" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22 }}>
             {step === 0 && <Card char={char} variant="picture" onTap={() => speak(char)} />}
             {step === 1 && <TraceCanvas char={char} resetSignal={traceReset} />}
             {step === 2 && <Card char={char} variant="letter" onTap={() => speak(char)} />}
             {step === 3 && <Card char={char} variant="letter" />}
             {step === 4 && <Card char={char} variant="letter" />}
-          </motion.div>
-        </AnimatePresence>
+        </motion.div>
       </main>
 
       {/* 下：操作 */}
@@ -185,6 +184,7 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
 
       <span className="sr-only" aria-live="polite">{info.word}</span>
       <Confetti burst={burst} />
+      {retry.element}
 
       <Modal open={hanamaru}>
         <Hanamaru />

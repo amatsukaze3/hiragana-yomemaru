@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import { BookOpen, ImagePlus, Lock, Mic, Rocket, Timer } from 'lucide-react'
+import { AudioLines, BookOpen, ImagePlus, Lock, Mic, Rocket, Timer } from 'lucide-react'
+import { VoiceRegister } from '../components/VoiceRegister'
 import { Mascot } from '../components/Mascot'
 import { ROWS, type Row } from '../data/kana'
 import { KanaProgress } from '../components/KanaProgress'
@@ -34,6 +35,7 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, o
     return false
   })
   const shootBest = Math.max(getBestScore('normal'), getBestScore('fast'))
+  const [registering, setRegistering] = useState(false)
   // 先生用：よめ丸くんを 5回つづけて タップすると アセスメントモード
   const taps = useRef<number[]>([])
   const tapMascot = () => {
@@ -46,8 +48,16 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, o
   }
   return (
     <div className="relative flex h-full flex-col">
-      {/* iPad などでは 右上に うかせて、たての 場所を ひろく使う */}
-      <header className="z-10 flex justify-end px-4 pt-3 sm:absolute sm:right-0 sm:top-[env(safe-area-inset-top)]">
+      {/* iPad などでは 上の角に うかせて、たての 場所を ひろく使う */}
+      <header className="pointer-events-none z-10 flex justify-between px-4 pt-3 sm:absolute sm:inset-x-0 sm:top-[env(safe-area-inset-top)] [&>*]:pointer-events-auto">
+        {/* 左上：いつでも 声の とうろくを しなおせる */}
+        <button
+          type="button"
+          onClick={() => setRegistering(true)}
+          className="flex items-center gap-2 rounded-full border-2 border-orange-200 bg-white px-4 py-2 text-sm font-bold text-orange-700 shadow-sm"
+        >
+          <AudioLines size={20} /> こえの とうろく
+        </button>
         <button
           type="button"
           onClick={onSettings}
@@ -132,6 +142,7 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, o
           </div>
         </div>
       </main>
+      {registering && <VoiceRegister onCancel={() => setRegistering(false)} onDone={() => setRegistering(false)} />}
       <Modal open={announce}>
         <Rocket size={72} className="text-sky-500" />
         <p className="text-3xl font-bold text-stone-800">46もじ ぜんぶ よめたね！</p>

@@ -4,7 +4,7 @@ import { Mic, RotateCcw, X } from 'lucide-react'
 import { Card } from './Card'
 import { MicBadge } from './MicStatus'
 import { Mascot } from './Mascot'
-import { playChime, speak } from '../lib/audio'
+import { playChime, sayVoice, speak } from '../lib/audio'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
 import { VOWEL_ORDER } from '../lib/vowelClassifier'
 import { saveVoiceprint } from '../lib/voiceprint'
@@ -72,7 +72,16 @@ export function VoiceRegister({ name, onDone, onCancel }: { name?: string; onDon
   const begin = async () => {
     shapes.current = [null, null, null, null, null]
     await voice.start({ forRegister: true })
-    ask(0)
+    setStep(0)
+    // 「ぼくの こえを、そっくり まねしてね。」と 言ってから はじめる
+    let went = false
+    const go = () => {
+      if (went || !alive.current) return
+      went = true
+      ask(0)
+    }
+    sayVoice('reg_guide', go)
+    window.setTimeout(go, 4500)
   }
 
   return (
@@ -95,12 +104,12 @@ export function VoiceRegister({ name, onDone, onCancel }: { name?: string; onDon
         <main className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-5 px-4 text-center">
           <Mascot size={120} />
           <p className="text-2xl font-bold leading-relaxed text-stone-800">
-            「あ・い・う・え・お」を
+            ぼくの こえを、
             <br />
-            ひとつずつ よんでね
+            そっくり まねしてね！
           </p>
           <p className="text-base leading-relaxed text-stone-500">
-            ずんだもんの おてほんの あとに、いつもの こえで 1かいずつ よみます。
+            ずんだもんの「あ・い・う・え・お」の あとに、おなじように 1かいずつ よむよ。
             <br />
             （おうちのかた・先生へ：その子の声を おぼえて、判定を その子に あわせます。保存するのは 声の特徴の数値だけで、声そのものは 保存しません。この端末の外にも おくられません）
           </p>
@@ -119,7 +128,7 @@ export function VoiceRegister({ name, onDone, onCancel }: { name?: string; onDon
           </main>
           <footer className="flex flex-wrap items-center justify-center gap-4 px-4 pb-[max(16px,env(safe-area-inset-bottom))]">
             <div className="flex flex-col items-center">
-              <p className="text-2xl font-bold text-orange-600">{waiting ? `「${VOWEL_ORDER[step]}」と よんでね` : 'きいてね…'}</p>
+              <p className="text-2xl font-bold text-orange-600">{waiting ? `「${VOWEL_ORDER[step]}」と まねしてね` : 'きいてね…'}</p>
               {slow && <p className="text-base text-stone-500">マイクに ちかづいて よんでね（おおきな こえで なくて だいじょうぶ）</p>}
             </div>
             <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void begin()} />

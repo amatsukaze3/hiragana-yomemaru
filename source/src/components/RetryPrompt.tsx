@@ -1,0 +1,94 @@
+import { useEffect, useRef, useState } from 'react'
+import { AudioLines, Play } from 'lucide-react'
+import { Mascot } from './Mascot'
+import { sayVoice } from '../lib/audio'
+import { VoiceRegister } from './VoiceRegister'
+
+/** 5回 読んでも 合格しないとき：声の登録を すすめる */
+export const MISS_LIMIT = 5
+
+export function RetryPrompt({ open, onRegister, onContinue }: { open: boolean; onRegister: () => void; onContinue: () => void }) {
+  useEffect(() => {
+    if (open) sayVoice('retry_register')
+  }, [open])
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/30 p-4">
+      <div className="flex w-full max-w-md flex-col items-center gap-4 rounded-[32px] border-4 border-amber-200 bg-stone-50 px-6 py-7 text-center shadow-xl">
+        <Mascot size={96} />
+        <p className="text-2xl font-bold leading-relaxed text-stone-800">
+          うまく ききとれなくて ごめんね。
+          <br />
+          もういちど きみの こえを
+          <br />
+          きかせて ほしいのだ。
+        </p>
+        <div className="flex w-full flex-col gap-3">
+          <button type="button" onClick={onRegister} className="flex items-center justify-center gap-2 rounded-full bg-orange-500 py-3 text-xl font-bold text-white shadow-[0_5px_0_#c2410c]">
+            <AudioLines size={24} /> こえを とうろくする
+          </button>
+          <button type="button" onClick={onContinue} className="flex items-center justify-center gap-2 rounded-full border-2 border-amber-300 bg-white py-2.5 text-lg font-bold text-stone-700">
+            <Play size={20} /> このまま つづける
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type VoiceCtl = { pause: () => void; resume: () => void; stop: () => void; start: () => Promise<unknown> }
+
+/**
+ * 「読んだのに 合格しない」が 5回 つづいたら、声の登録を すすめる しくみ。
+ * 合格したら reset() で 数えなおす。onPause/onResume は ゲームの時間を止めるため。
+ */
+export function useRetryRegister(hooks?: { onPause?: () => void; onResume?: () => void }) {
+  const [prompt, setPrompt] = useState(false)
+  const [reg, setReg] = useState(false)
+  const misses = useRef(0)
+  const voice = useRef<VoiceCtl | null>(null)
+  const h = useRef(hooks)
+  h.current = hooks
+
+  const onMiss = () => {
+    misses.current += 1
+    if (misses.current >= MISS_LIMIT && voice.current) {
+      misses.current = 0
+      voice.current.pause()
+      h.current?.onPause?.()
+      setPrompt(true)
+    }
+  }
+  const back = () => {
+    setReg(false)
+    misses.current = 0
+    // 新しい登録を 読みこみなおすため、マイクを はじめから うごかす
+    void voice.current?.start()
+    h.current?.onResume?.()
+  }
+  const element = (
+    <>
+      <RetryPrompt
+        open={prompt}
+        onRegister={() => {
+          setPrompt(false)
+          voice.current?.stop()
+          setReg(true)
+        }}
+        onContinue={() => {
+          setPrompt(false)
+          voice.current?.resume()
+          h.current?.onResume?.()
+        }}
+      />
+      {reg && <VoiceRegister onCancel={back} onDone={back} />}
+    </>
+  )
+  return {
+    bind: (v: VoiceCtl) => void (voice.current = v),
+    onMiss,
+    reset: () => void (misses.current = 0),
+    element,
+    active: prompt || reg,
+  }
+}

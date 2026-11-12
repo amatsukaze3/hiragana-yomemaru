@@ -9,6 +9,41 @@ import { clearVoiceprint, loadVoiceprint, voiceprintUseful } from '../lib/voicep
 import { formatDate } from '../lib/assessRecords'
 import { VoiceRegister } from './VoiceRegister'
 import { clearMastered, loadMastered } from '../lib/progress'
+import { clearTeacherPin, hasTeacherPin } from './TeacherHelp'
+
+/** 先生の暗証番号を けす（わすれたとき）。子どもが 消さないよう、たし算に答えてもらう */
+function PinReset() {
+  const [has, setHas] = useState(hasTeacherPin)
+  const [q] = useState(() => [12 + Math.floor(Math.random() * 30), 15 + Math.floor(Math.random() * 30)])
+  const [ans, setAns] = useState('')
+  return (
+    <section className="flex flex-col gap-2 rounded-2xl border-2 border-amber-100 bg-white p-4 text-sm text-stone-700">
+      <h3 className="text-base font-bold text-stone-800">先生用の暗証番号（せんせい ヘルプ）</h3>
+      <p className="leading-relaxed text-stone-500">練習中の「せんせい」ボタン（一時停止・強制合格）で使う4けたの番号です。忘れたときは、ここで消すと、次に押したときに 決めなおせます。</p>
+      {has ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span>
+            {q[0]} + {q[1]} =
+          </span>
+          <input value={ans} onChange={(e) => setAns(e.target.value.replace(/\D/g, ''))} inputMode="numeric" className="w-20 rounded-lg border-2 border-stone-200 px-2 py-1 text-base" aria-label="こたえ" />
+          <button
+            type="button"
+            disabled={Number(ans) !== q[0] + q[1]}
+            onClick={() => {
+              clearTeacherPin()
+              setHas(false)
+            }}
+            className="rounded-full border-2 border-stone-200 px-4 py-1.5 text-stone-600 disabled:opacity-40"
+          >
+            暗証番号を 消す
+          </button>
+        </div>
+      ) : (
+        <p className="text-stone-600">まだ 決めていません（はじめて「せんせい」ボタンを押したときに 決めます）</p>
+      )}
+    </section>
+  )
+}
 
 /** 「よめたよ バー」の きろくを けす（使う子が かわったとき） */
 function ProgressReset() {
@@ -189,6 +224,7 @@ export function SettingsPanel({ open, onClose, meter, setMeter }: { open: boolea
             </section>
 
             <ProgressReset />
+            <PinReset />
 
             {voiceprintUseful() && (
               <section className="flex flex-col gap-2 rounded-2xl border-2 border-amber-100 bg-white p-4 text-sm text-stone-700">

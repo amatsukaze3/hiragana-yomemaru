@@ -11,6 +11,8 @@ import { lsGet, lsSet } from '../lib/storage'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
 import { loadVoiceprint, voiceprintUseful } from '../lib/voiceprint'
 import { VoiceRegister } from '../components/VoiceRegister'
+import { TeacherHelp } from '../components/TeacherHelp'
+import { useRetryRegister } from '../components/RetryPrompt'
 import type { PassSource } from '../lib/voice'
 import { ActionButton } from './Learn'
 
@@ -39,6 +41,15 @@ export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void
   const [flash, setFlash] = useState(0)
   const [result, setResult] = useState<{ time: number; best: number | null; record: boolean; manual: number } | null>(null)
   const startAt = useRef(0)
+  // 一時停止中は 時間を止める
+  const pausedAt = useRef(0)
+  const pauseClock = () => {
+    if (!pausedAt.current) pausedAt.current = performance.now()
+  }
+  const resumeClock = () => {
+    if (pausedAt.current) startAt.current += performance.now() - pausedAt.current
+    pausedAt.current = 0
+  }
   const busy = useRef(false)
   const manualCount = useRef(0)
   const lastSource = useRef<PassSource | 'manual'>('formant')
@@ -52,6 +63,7 @@ export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void
     busy.current = true
     lastSource.current = src
     if (src === 'manual') manualCount.current++
+    retry.reset()
     playChime()
     voice.hold(900)
     setBurst((b) => b + 1)
@@ -78,7 +90,9 @@ export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void
     }
   }
 
-  const voice = useVoiceJudge(target, (src) => correct(src), idx)
+  const retry = useRetryRegister({ onPause: pauseClock, onResume: resumeClock })
+  const voice = useVoiceJudge(target, (src) => correct(src), idx, retry.onMiss)
+  retry.bind(voice)
 
   const start = async () => {
     setQuestions(smartShuffle(TOTAL, row.kana, questions[TOTAL - 1]))
@@ -88,6 +102,7 @@ export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void
     busy.current = false
     await voice.start()
     startAt.current = performance.now()
+    pausedAt.current = 0
     setPhase('playing')
   }
 
@@ -100,7 +115,21 @@ export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void
           <House size={24} />
         </button>
         <h2 className="min-w-0 flex-1 truncate text-xl font-bold text-stone-800 sm:text-2xl">② チャレンジ おんどく（{row.name}）</h2>
-        {phase === 'playing' && <Stopwatch startAt={startAt.current} />}
+        {phase === 'playing' && <Stopwatch startAt={startAt} pausedAt={pausedAt} />}
+        {phase === 'playing' && (
+          <TeacherHelp
+            onPause={() => {
+              voice.pause()
+              pauseClock()
+            }}
+            onResume={() => {
+              resumeClock()
+              voice.resume()
+            }}
+            onPass={() => correct('manual')}
+            onHome={onHome}
+          />
+        )}
       </header>
 
       {phase === 'ready' && (
@@ -171,6 +200,7 @@ export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void
       )}
 
       <Confetti burst={burst} />
+      {retry.element}
       {registering && (
         <VoiceRegister
           onCancel={() => setRegistering(false)}
@@ -206,17 +236,17 @@ export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void
   )
 }
 
-function Stopwatch({ startAt }: { startAt: number }) {
+function Stopwatch({ startAt, pausedAt }: { startAt: React.RefObject<number>; pausedAt: React.RefObject<number> }) {
   const ref = useRef<HTMLSpanElement>(null)
   useEffect(() => {
     let raf = 0
     const loop = () => {
-      if (ref.current) ref.current.textContent = ((performance.now() - startAt) / 1000).toFixed(1)
+      if (ref.current) ref.current.textContent = (((pausedAt.current || performance.now()) - startAt.current) / 1000).toFixed(1)
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
-  }, [startAt])
+  }, [startAt, pausedAt])
   return (
     <span className="flex items-baseline gap-1 rounded-full bg-white px-4 py-1.5 text-stone-700 shadow-sm">
       <span ref={ref} className="text-2xl font-bold tabular-nums">
