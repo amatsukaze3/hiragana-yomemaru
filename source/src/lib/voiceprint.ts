@@ -5,6 +5,13 @@ export interface Voiceprint {
   date: string
   name?: string
   C: number[][] // あ・い・う・え・お の形（各40点）
+  N?: number[] // 「ん」の形（聞きとりにくいので 別に 登録する）
+}
+
+/** 判定エンジンに わたす形：あ・い・う・え・お（＋ん） */
+export function voiceprintRows(v = loadVoiceprint()): number[][] | null {
+  if (!v) return null
+  return v.N && v.N.length === v.C[0].length ? [...v.C, v.N] : v.C
 }
 
 const KEY = 'yomemaru:voiceprint'

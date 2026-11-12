@@ -34,7 +34,7 @@ export function Tutorial({ onClose }: { onClose: () => void }) {
               きみの こえを おしえてね
             </p>
             <ol className="flex w-full flex-col gap-2 rounded-3xl border-2 border-amber-100 bg-white p-4 text-left text-lg text-stone-700">
-              <Step n={1} icon={<AudioLines size={20} />} text="こえの とうろく（「あ・い・う・え・お」を よむ）" now />
+              <Step n={1} icon={<AudioLines size={20} />} text="こえの とうろく（「あ・い・う・え・お・ん」を よむ）" now />
               <Step n={2} icon={<BookOpen size={20} />} text="① おぼえる で もじを おぼえる" />
               <Step n={3} icon={<Timer size={20} />} text="② チャレンジ おんどく で よんでみる" />
             </ol>

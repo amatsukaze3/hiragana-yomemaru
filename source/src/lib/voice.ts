@@ -49,12 +49,19 @@ const UTT_MIN_PROB = 0.5
  * 子音や出だしをのぞいた後ろの2/3（母音のところ）で、5つの母音の確率を平均し、
  * 目標の母音がいちばん高く、しかも一定以上（50%）のときだけ合格。
  */
+/** 発声の 後ろ2/3 の 確率の平均（0〜4：あいうえお、5：ん） */
+export function utteranceAvg(probs: number[][]) {
+  const tail = probs.slice(Math.floor(probs.length * 0.34))
+  const m = probs[0]?.length ?? 5
+  const avg = new Array<number>(m).fill(0)
+  for (const p of tail) for (let i = 0; i < m; i++) avg[i] += p[i] / tail.length
+  return avg
+}
+
 export function utteranceMatches(target: Vowel, probs: number[][], minProb = UTT_MIN_PROB, minFrames = UTT_MIN_FRAMES): boolean {
   const n = probs.length
   if (n < minFrames || n > UTT_MAX_FRAMES) return false
-  const tail = probs.slice(Math.floor(n * 0.34))
-  const avg = [0, 0, 0, 0, 0]
-  for (const p of tail) for (let i = 0; i < 5; i++) avg[i] += p[i] / tail.length
+  const avg = utteranceAvg(probs)
   const k = VOWEL_ORDER.indexOf(target)
   const thr = (globalThis as unknown as { __vthr?: number }).__vthr ?? minProb
   return avg.every((v, i) => i === k || v < avg[k]) && avg[k] >= thr
@@ -238,6 +245,7 @@ export class HybridVoiceJudge {
   /** 登録した その子の「あいうえお」の形（なければ学習モデルで判定） */
   private voiceprint: number[][] | null = null
   private captureCb: ((shape: number[] | null) => void) | null = null
+  private captureRatio = 5
 
   onPass: ((source: PassSource) => void) | null = null
   onFrame: ((f: FrameInfo) => void) | null = null
@@ -344,8 +352,18 @@ export class HybridVoiceJudge {
     this.asrSkipText = this.asrLastText
   }
 
+  /** あ・い・う・え・お の確率（「ん」の登録は ここでは 使わない：ほかの文字の判定を じゃましないため） */
   private probsOf(f: number[]) {
-    return this.voiceprint ? personalProbs(f, this.voiceprint) : modelProbs(f)
+    return this.voiceprint ? personalProbs(f, this.voiceprint.slice(0, 5)) : modelProbs(f)
+  }
+
+  /** 「ん」を 登録していれば、その子の「ん」と くらべて判定する（登録がなければ null） */
+  private nMatches(feats: number[][]) {
+    if (!this.voiceprint || this.voiceprint.length < 6) return null
+    const avg = utteranceAvg(feats.map((f) => personalProbs(f, this.voiceprint!)))
+    const top = avg.indexOf(Math.max(...avg))
+    // 「ん」が いちばん近く 45%以上、または「ん」と「う」を あわせて 60%以上で どちらかが いちばん
+    return (top === 5 && avg[5] >= 0.45) || ((top === 5 || top === 2) && avg[5] + avg[2] >= 0.6)
   }
 
   /** その子の「あいうえお」を使う（null で学習モデルにもどす） */
@@ -354,7 +372,8 @@ export class HybridVoiceJudge {
   }
 
   /** 声の登録：次の1回の発声の形を受けとる（問題は出さない） */
-  capture(cb: (shape: number[] | null) => void, lockMs = 400) {
+  capture(cb: (shape: number[] | null) => void, lockMs = 400, minRatio = 5) {
+    this.captureRatio = minRatio
     this.target = null
     this.utt = null
     this.captureCb = cb
@@ -485,7 +504,7 @@ export class HybridVoiceJudge {
         // 声の登録中：この発声の形を返す
         if (this.captureCb) {
           // まわりの子の声をひろわないよう、まわりの音より はっきり大きい声（約+14dB）だけを登録する
-          if (u.feats.length >= UTT_MIN_FRAMES && u.feats.length <= UTT_MAX_FRAMES * 2 && top >= this.noiseFloor * 5) {
+          if (u.feats.length >= UTT_MIN_FRAMES && u.feats.length <= UTT_MAX_FRAMES * 2 && top >= this.noiseFloor * this.captureRatio) {
             const cb = this.captureCb
             this.captureCb = null
             cb(meanShape(core))
@@ -496,7 +515,10 @@ export class HybridVoiceJudge {
         // （音声認識が動いているときの学習モデルは、より はっきりした 60%以上）
         const thr = this.voiceprint ? 0.45 : this.asrAlive ? 0.6 : UTT_MIN_PROB
         const lenOk = u.feats.length >= UTT_MIN_FRAMES && u.feats.length <= UTT_MAX_FRAMES
-        if (this.target && lenOk && utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', core.map((f) => this.probsOf(f)), thr, 3)) {
+        const nOk = this.target === 'ん' && lenOk && core.length >= 3 ? this.nMatches(core) : null
+        if ((window as unknown as { __yomeDebug?: boolean }).__yomeDebug && this.voiceprint)
+          console.log('UTT', this.target, u.feats.length, core.length, utteranceAvg(core.map((f) => personalProbs(f, this.voiceprint!))).map((v) => v.toFixed(2)).join(' '), nOk)
+        if (this.target && lenOk && (nOk ?? utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', core.map((f) => this.probsOf(f)), thr, 3))) {
           this.onFrame?.({ bands, voiced, match: true, streak: STREAK_TO_PASS })
           this.pass('formant')
           return

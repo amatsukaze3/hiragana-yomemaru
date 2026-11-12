@@ -7,19 +7,24 @@ import { Mascot } from './Mascot'
 import { playChime, sayVoice, speak } from '../lib/audio'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
 import { VOWEL_ORDER } from '../lib/vowelClassifier'
+import type { Kana } from '../data/kana'
+
+/** とうろくする音：あ・い・う・え・お と、聞きとりにくい「ん」 */
+const REG: Kana[] = [...VOWEL_ORDER, 'ん']
+const LASTSTEP = REG.length
 import { saveVoiceprint } from '../lib/voiceprint'
 
 /**
- * こえの とうろく：その子の「あ・い・う・え・お」を1回ずつ録って、この端末に保存する。
+ * こえの とうろく：その子の「あ・い・う・え・お・ん」を1回ずつ録って、この端末に保存する。
  * 以後の判定は、この声とくらべて行う（子どもの声のちがいに強くなる）。
  */
 export function VoiceRegister({ name, onDone, onCancel }: { name?: string; onDone: () => void; onCancel: () => void }) {
   const voice = useVoiceJudge(null, () => {})
-  const [step, setStep] = useState(-1) // -1: はじめる前、0〜4: あ〜お、5: おわり
+  const [step, setStep] = useState(-1) // -1: はじめる前、0〜5: あ〜お・ん、6: おわり
   const [waiting, setWaiting] = useState(false)
   const [slow, setSlow] = useState(false)
   const slowTimer = useRef(0)
-  const shapes = useRef<(number[] | null)[]>([null, null, null, null, null])
+  const shapes = useRef<(number[] | null)[]>(REG.map(() => null))
   const alive = useRef(true)
 
   useEffect(() => {
@@ -38,7 +43,7 @@ export function VoiceRegister({ name, onDone, onCancel }: { name?: string; onDon
     window.clearTimeout(slowTimer.current)
     voice.cancelCapture()
     // お手本を聞いてから、その子の声を1回とる
-    speak(VOWEL_ORDER[i], {
+    speak(REG[i], {
       onEnd: () => {
         if (!alive.current) return
         setWaiting(true)
@@ -54,23 +59,24 @@ export function VoiceRegister({ name, onDone, onCancel }: { name?: string; onDon
           setSlow(false)
           shapes.current[i] = shape
           playChime()
-          if (i + 1 < 5) window.setTimeout(() => alive.current && ask(i + 1), 700)
+          if (i + 1 < REG.length) window.setTimeout(() => alive.current && ask(i + 1), 700)
           else finish()
-        }, 350)
+        }, 350, REG[i] === 'ん' ? 3 : 5) // 「ん」は 小さな音なので すこし ゆるく
       },
     })
   }
 
   const finish = () => {
-    setStep(5)
+    setStep(LASTSTEP)
     setWaiting(false)
     voice.stop()
-    saveVoiceprint({ date: new Date().toISOString(), name, C: shapes.current as number[][] })
+    const s = shapes.current as number[][]
+    saveVoiceprint({ date: new Date().toISOString(), name, C: s.slice(0, 5), N: s[5] })
     window.setTimeout(() => alive.current && onDone(), 1200)
   }
 
   const begin = async () => {
-    shapes.current = [null, null, null, null, null]
+    shapes.current = REG.map(() => null)
     await voice.start({ forRegister: true })
     setStep(0)
     // 「ぼくの こえを、そっくり まねしてね。」と 言ってから はじめる
@@ -92,8 +98,8 @@ export function VoiceRegister({ name, onDone, onCancel }: { name?: string; onDon
         </button>
         <h2 className="min-w-0 flex-1 truncate text-xl font-bold text-stone-800 sm:text-2xl">こえの とうろく</h2>
         <div className="flex gap-1.5">
-          {VOWEL_ORDER.map((v, i) => (
-            <span key={v} className={`font-card flex h-9 w-9 items-center justify-center rounded-full text-lg ${i < step || step === 5 ? 'bg-orange-400 text-white' : i === step ? 'bg-amber-300 text-stone-900' : 'bg-stone-200 text-stone-500'}`}>
+          {REG.map((v, i) => (
+            <span key={v} className={`font-card flex h-9 w-9 items-center justify-center rounded-full text-lg ${i < step || step === LASTSTEP ? 'bg-orange-400 text-white' : i === step ? 'bg-amber-300 text-stone-900' : 'bg-stone-200 text-stone-500'}`}>
               {v}
             </span>
           ))}
@@ -109,7 +115,7 @@ export function VoiceRegister({ name, onDone, onCancel }: { name?: string; onDon
             そっくり まねしてね！
           </p>
           <p className="text-base leading-relaxed text-stone-500">
-            ずんだもんの「あ・い・う・え・お」の あとに、おなじように 1かいずつ よむよ。
+            ずんだもんの「あ・い・う・え・お・ん」の あとに、おなじように 1かいずつ よむよ。
             <br />
             （おうちのかた・先生へ：その子の声を おぼえて、判定を その子に あわせます。保存するのは 声の特徴の数値だけで、声そのものは 保存しません。この端末の外にも おくられません）
           </p>
@@ -119,16 +125,16 @@ export function VoiceRegister({ name, onDone, onCancel }: { name?: string; onDon
         </main>
       )}
 
-      {step >= 0 && step < 5 && (
+      {step >= 0 && step < LASTSTEP && (
         <>
           <main className="relative min-h-0 flex-1 px-4 py-3">
             <motion.div key={step} className="mx-auto h-full w-full max-w-2xl" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.18 }}>
-              <Card char={VOWEL_ORDER[step]} variant="letter" />
+              <Card char={REG[step]} variant="letter" />
             </motion.div>
           </main>
           <footer className="flex flex-wrap items-center justify-center gap-4 px-4 pb-[max(16px,env(safe-area-inset-bottom))]">
             <div className="flex flex-col items-center">
-              <p className="text-2xl font-bold text-orange-600">{waiting ? `「${VOWEL_ORDER[step]}」と まねしてね` : 'きいてね…'}</p>
+              <p className="text-2xl font-bold text-orange-600">{waiting ? `「${REG[step]}」と まねしてね` : 'きいてね…'}</p>
               {slow && <p className="text-base text-stone-500">マイクに ちかづいて よんでね（おおきな こえで なくて だいじょうぶ）</p>}
             </div>
             <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void begin()} />
@@ -139,7 +145,7 @@ export function VoiceRegister({ name, onDone, onCancel }: { name?: string; onDon
         </>
       )}
 
-      {step === 5 && (
+      {step === LASTSTEP && (
         <main className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-4 px-4 text-center">
           <Mascot size={120} mood="cheer" />
           <p className="text-3xl font-bold text-orange-500">とうろく できたよ！</p>
