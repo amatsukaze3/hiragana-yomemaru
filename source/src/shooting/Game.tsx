@@ -8,6 +8,8 @@ import { VoiceRegister } from '../components/VoiceRegister'
 import type { Kana } from '../data/kana'
 import { getAudioContext, playBeam } from '../lib/audio'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
+import { TeacherHelp } from '../components/TeacherHelp'
+import { useRetryRegister } from '../components/RetryPrompt'
 import { loadVoiceprint, voiceprintUseful } from '../lib/voiceprint'
 import { ActionButton } from '../screens/Learn'
 import { GoalRoad } from './GoalRoad'
@@ -149,9 +151,17 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
 
   /* ---------- 音声判定 ---------- */
   const targetKana = phase === 'playing' && !stampPop ? (cardsView.find((c) => c.id === targetId)?.kana ?? null) : null
-  const voice = useVoiceJudge(targetKana, () => {
-    if (targetRef.current != null) collect(targetRef.current)
-  }, targetId ?? 0)
+  // 5回 読んでも 合格しないときは、声の登録を すすめる（そのあいだは 一時停止）
+  const retry = useRetryRegister({ onPause: () => setPhase('paused'), onResume: () => setPhase('playing') })
+  const voice = useVoiceJudge(
+    targetKana,
+    () => {
+      if (targetRef.current != null) collect(targetRef.current)
+    },
+    targetId ?? 0,
+    retry.onMiss,
+  )
+  retry.bind(voice)
   const micOk = voice.status === 'listening'
 
   /* ---------- ことばと カード ---------- */
@@ -207,6 +217,7 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
     setHits((h) => [...h, hit])
     window.setTimeout(() => setHits((h) => h.filter((x) => x.id !== hit.id)), 700)
     playBeam()
+    retry.reset()
     window.setTimeout(() => sayKana(c.kana), 280)
     voice.hold(800)
     scoreRef.current += 10
@@ -454,6 +465,16 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
             >
               {phase === 'paused' ? <Play size={22} /> : <Pause size={22} />}
             </button>
+            {/* せんせい ヘルプ：一時停止・強制合格（光っている カードを GET） */}
+            <TeacherHelp
+              onPause={() => setPhase('paused')}
+              onResume={() => setPhase('playing')}
+              onPass={() => {
+                if (targetRef.current != null) collect(targetRef.current)
+              }}
+              passLabel="GETにする（ごうかく）"
+              onHome={onHome}
+            />
           </>
         )}
       </header>
@@ -658,6 +679,7 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
       </AnimatePresence>
 
       <Confetti burst={burst} />
+      {retry.element}
 
       {registering && (
         <VoiceRegister
