@@ -5,11 +5,12 @@ import { KANA_INFO, ROWS } from '../data/kana'
 import { GoalRoad } from './GoalRoad'
 import { Stamp } from './Stamp'
 import { sayWord } from './voices'
-import { STAMP_TOTAL, loadStamps } from './words'
+import { STAMP_TOTAL, loadGold, loadStamps } from './words'
 
 /** スタンプずかん（46こ で コンプリート） */
 export function Zukan({ onHome }: { onHome: () => void }) {
   const [stamps] = useState(loadStamps)
+  const [gold] = useState(loadGold)
   const complete = stamps.size >= STAMP_TOTAL
   const [burst] = useState(complete ? 1 : 0)
 
@@ -20,6 +21,11 @@ export function Zukan({ onHome }: { onHome: () => void }) {
           <House size={24} />
         </button>
         <h2 className="min-w-0 flex-1 truncate text-2xl font-bold text-stone-800">スタンプ ずかん</h2>
+        {gold.size > 0 && (
+          <span className="rounded-full bg-gradient-to-b from-amber-200 to-amber-400 px-3 py-1.5 text-lg font-bold tabular-nums text-amber-900 shadow-sm" aria-label={`きんの スタンプ ${gold.size}こ`}>
+            ✦ きん {gold.size}
+          </span>
+        )}
         <span className="rounded-full bg-white px-4 py-1.5 text-xl font-bold tabular-nums text-rose-500 shadow-sm">
           {stamps.size} / {STAMP_TOTAL}
         </span>
@@ -46,7 +52,7 @@ export function Zukan({ onHome }: { onHome: () => void }) {
                       className="flex w-full flex-col items-center gap-1 rounded-2xl bg-white p-2 shadow-sm"
                       aria-label={owned ? KANA_INFO[k].word : 'まだ'}
                     >
-                      <Stamp id={k} size={64} owned={owned} />
+                      <Stamp id={k} size={64} owned={owned} gold={gold.has(k)} />
                       <span className={`font-card text-lg leading-tight ${owned ? 'text-stone-800' : 'text-stone-300'}`}>{owned ? KANA_INFO[k].word : '？？？'}</span>
                     </button>
                   </li>

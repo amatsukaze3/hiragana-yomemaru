@@ -49,6 +49,22 @@ export function saveStamps(s: Set<Kana>) {
   lsSet(STAMP_KEY, JSON.stringify([...s]))
 }
 
+/** きんの スタンプ（「はやい モード」で もらった スタンプ） */
+const GOLD_KEY = 'yomemaru:shoot:gold'
+
+export function loadGold(): Set<Kana> {
+  try {
+    const arr = JSON.parse(lsGet(GOLD_KEY) ?? '[]') as string[]
+    return new Set(arr.filter((k) => BASIC.has(k)))
+  } catch {
+    return new Set()
+  }
+}
+
+export function saveGold(s: Set<Kana>) {
+  lsSet(GOLD_KEY, JSON.stringify([...s]))
+}
+
 /* ---------- モード ---------- */
 
 export type ModeId = 'normal' | 'fast'
@@ -109,6 +125,13 @@ export function pickWord(stamps: Set<Kana>, avoid: Set<Kana>, recent: Kana[]): W
 
 /* ---------- とちゅうセーブ ---------- */
 
+/** この回に もらった スタンプ（gold … きんの スタンプ） */
+export interface RoundStamp {
+  id: Kana
+  isNew: boolean
+  gold?: boolean
+}
+
 export interface SaveData {
   v: 1
   mode: ModeId
@@ -119,7 +142,7 @@ export interface SaveData {
   /** とちゅうの ことば（とれた もじ） */
   words: { id: Kana; got: boolean[] }[]
   /** この回に ゲットした スタンプ */
-  round: { id: Kana; isNew: boolean }[]
+  round: RoundStamp[]
   savedAt: number
 }
 

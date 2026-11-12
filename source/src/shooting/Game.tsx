@@ -15,7 +15,7 @@ import { ActionButton } from '../screens/Learn'
 import { GoalRoad } from './GoalRoad'
 import { Stamp } from './Stamp'
 import { sayKana, sayLine, sayStamp } from './voices'
-import { STAMP_TOTAL, clearSave, fallSecAt, getBestScore, loadStamps, pickWord, saveStamps, setBestScore, speedLevel, wordOf, writeSave, type Mode, type SaveData, type WordTask } from './words'
+import { STAMP_TOTAL, clearSave, loadGold, saveGold, type RoundStamp, fallSecAt, getBestScore, loadStamps, pickWord, saveStamps, setBestScore, speedLevel, wordOf, writeSave, type Mode, type SaveData, type WordTask } from './words'
 
 /* ---------- かたち ---------- */
 
@@ -89,8 +89,8 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
   const [lives, setLives] = useState(LIVES)
   const [level, setLevel] = useState(1)
   const [hits, setHits] = useState<Hit[]>([])
-  const [stampPop, setStampPop] = useState<{ task: WordTask; isNew: boolean; complete: boolean } | null>(null)
-  const [roundStamps, setRoundStamps] = useState<{ id: Kana; isNew: boolean }[]>([])
+  const [stampPop, setStampPop] = useState<{ task: WordTask; isNew: boolean; gold: boolean; complete: boolean } | null>(null)
+  const [roundStamps, setRoundStamps] = useState<RoundStamp[]>([])
   const [burst, setBurst] = useState(0)
   const [shakeScope, animateShake] = useAnimate()
   const [count, setCount] = useState(3)
@@ -117,7 +117,10 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
   const livesRef = useRef(LIVES)
   const stamps = useRef(loadStamps())
   const [stampCount, setStampCount] = useState(() => stamps.current.size)
-  const roundRef = useRef<{ id: Kana; isNew: boolean }[]>([])
+  const roundRef = useRef<RoundStamp[]>([])
+  const goldRef = useRef(loadGold())
+  /** はやい モードでは きんの スタンプ */
+  const goldMode = mode.id === 'fast'
 
   /* ---------- 大きさ ---------- */
   useLayoutEffect(() => {
@@ -229,15 +232,22 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
     if (w.got.every(Boolean)) {
       w.state = 'done'
       const isNew = !stamps.current.has(w.task.id)
+      // はやい モードなら きんの スタンプ（はじめて きんに なったときも NEW）
+      const gold = goldMode
+      const newGold = gold && !goldRef.current.has(w.task.id)
+      if (gold) {
+        goldRef.current.add(w.task.id)
+        saveGold(goldRef.current)
+      }
       stamps.current.add(w.task.id)
       saveStamps(stamps.current)
       scoreRef.current += 20 * w.task.letters.filter((l) => l.play).length
       setScore(scoreRef.current)
-      roundRef.current = [...roundRef.current, { id: w.task.id, isNew }]
+      roundRef.current = [...roundRef.current, { id: w.task.id, isNew: isNew || newGold, gold }]
       setRoundStamps(roundRef.current)
       setStampCount(stamps.current.size)
       const complete = isNew && stamps.current.size >= STAMP_TOTAL
-      setStampPop({ task: w.task, isNew, complete })
+      setStampPop({ task: w.task, isNew: isNew || newGold, gold, complete })
       setBurst((b) => b + 1)
       freezeUntil.current = performance.now() + STAMP_PAUSE_MS
       // ずんだもんの こえを マイクが ひろわないように、しゃべりおわるまで 判定を とめる
@@ -500,7 +510,7 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
                 className={`flex items-center gap-2 rounded-2xl border-4 bg-white px-2 py-1.5 shadow-sm ${w.state === 'failed' ? 'opacity-50' : ''}`}
                 style={{ borderColor: colorOf(w.uid) }}
               >
-                <Stamp id={w.task.id} size={52} owned={w.state === 'done'} />
+                <Stamp id={w.task.id} size={52} owned={w.state === 'done'} gold={goldMode} />
                 <div className="flex gap-1">
                   {w.task.letters.map((l, i) => (
                     <span
@@ -663,14 +673,16 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
         {stampPop && (
           <motion.div className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center bg-stone-900/25" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <motion.div
-              className="flex flex-col items-center gap-3 rounded-[32px] border-4 border-rose-200 bg-white px-8 py-6 shadow-xl"
+              className={`flex flex-col items-center gap-3 rounded-[32px] border-4 px-8 py-6 shadow-xl ${stampPop.gold ? 'border-amber-300 bg-gradient-to-b from-amber-50 to-white' : 'border-rose-200 bg-white'}`}
               initial={{ scale: 0.3, rotate: -20 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ type: 'spring', stiffness: 260, damping: 14 }}
             >
-              <p className="text-xl font-bold text-rose-500">{stampPop.complete ? '46こ コンプリート！！' : stampPop.isNew ? 'あたらしい スタンプ！' : 'スタンプ ゲット！'}</p>
+              <p className={`text-xl font-bold ${stampPop.gold ? 'text-amber-600' : 'text-rose-500'}`}>
+                {stampPop.complete ? '46こ コンプリート！！' : stampPop.gold ? (stampPop.isNew ? '✨ あたらしい きんの スタンプ！ ✨' : '✨ きんの スタンプ ゲット！ ✨') : stampPop.isNew ? 'あたらしい スタンプ！' : 'スタンプ ゲット！'}
+              </p>
               <motion.div initial={{ scale: 2.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.15, duration: 0.25, ease: 'easeIn' }}>
-                <Stamp id={stampPop.task.id} size={150} tilt={-8} />
+                <Stamp id={stampPop.task.id} size={150} tilt={-8} gold={stampPop.gold} />
               </motion.div>
               <p className="font-card text-5xl text-stone-800">{stampPop.task.word}</p>
             </motion.div>
@@ -713,8 +725,8 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
                     {roundStamps.map((s, i) => (
                       <motion.div key={`${s.id}-${i}`} className="flex flex-col items-center gap-1" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.3 + i * 0.12, type: 'spring', stiffness: 300, damping: 15 }}>
                         <span className="relative">
-                          <Stamp id={s.id} size={72} tilt={(i % 2 ? 6 : -6)} />
-                          {s.isNew && <span className="absolute -right-2 -top-2 rounded-full bg-rose-500 px-1.5 text-xs font-bold text-white">NEW</span>}
+                          <Stamp id={s.id} size={72} tilt={(i % 2 ? 6 : -6)} gold={s.gold} />
+                          {s.isNew && <span className={`absolute -right-2 -top-2 rounded-full px-1.5 text-xs font-bold text-white ${s.gold ? 'bg-amber-500' : 'bg-rose-500'}`}>NEW</span>}
                         </span>
                       </motion.div>
                     ))}
