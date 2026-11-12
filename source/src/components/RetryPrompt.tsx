@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AudioLines, Play } from 'lucide-react'
+import { AudioLines, Play, Volume2 } from 'lucide-react'
 import { Mascot } from './Mascot'
 import { sayVoice } from '../lib/audio'
 import { VoiceRegister } from './VoiceRegister'
@@ -15,7 +15,18 @@ export function RetryPrompt({ open, onRegister, onContinue }: { open: boolean; o
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/30 p-4">
       <div className="flex w-full max-w-md flex-col items-center gap-4 rounded-[32px] border-4 border-amber-200 bg-stone-50 px-6 py-7 text-center shadow-xl">
-        <Mascot size={96} />
+        <div className="relative">
+          <Mascot size={96} />
+          {/* もういちど きく（iPad で 自動の読み上げが 鳴らなかったときも、タップで 鳴らせる） */}
+          <button
+            type="button"
+            onClick={() => sayVoice('retry_register')}
+            aria-label="もういちど きく"
+            className="absolute -right-14 top-6 flex h-12 w-12 items-center justify-center rounded-full border-2 border-amber-300 bg-white text-orange-600 shadow-sm"
+          >
+            <Volume2 size={24} />
+          </button>
+        </div>
         <p className="text-2xl font-bold leading-relaxed text-stone-800">
           うまく ききとれなくて ごめんね。
           <br />
