@@ -6,11 +6,12 @@ import { Confetti, Hanamaru } from '../components/Celebrate'
 import { MicBadge } from '../components/MicStatus'
 import { Mascot } from '../components/Mascot'
 import { KANA, smartShuffle, type Kana } from '../data/kana'
-import { addRecord, clearRecords, formatDate, loadRecords, remark, type AssessRecord } from '../lib/assessRecords'
+import { addRecord, clearRecords, formatDate, loadRecords, remark, type AssessRecord, missedLabel } from '../lib/assessRecords'
 import { playChime, sayVoice } from '../lib/audio'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
 import { voiceprintUseful } from '../lib/voiceprint'
 import { VoiceRegister } from '../components/VoiceRegister'
+import { TeacherHelp } from '../components/TeacherHelp'
 import { ActionButton } from './Learn'
 
 type Phase = 'menu' | 'name' | 'test' | 'result'
@@ -24,7 +25,7 @@ export function Assessment({ onHome }: { onHome: () => void }) {
   const [nameError, setNameError] = useState(false)
   const [order, setOrder] = useState<Kana[]>([])
   const [idx, setIdx] = useState(0)
-  const [results, setResults] = useState<Record<string, boolean>>({})
+  const [results, setResults] = useState<Record<string, boolean | 'help'>>({})
   const [manual, setManual] = useState(0)
   const [burst, setBurst] = useState(0)
   const [last, setLast] = useState<AssessRecord | null>(null)
@@ -35,11 +36,12 @@ export function Assessment({ onHome }: { onHome: () => void }) {
 
   const target = phase === 'test' && order.length ? order[idx] : null
 
-  const answer = (ok: boolean, how: 'voice' | 'manual' | 'skip') => {
+  const answer = (ok: boolean, how: 'voice' | 'manual' | 'skip' | 'help') => {
     if (busy.current || phase !== 'test') return
     busy.current = true
     const k = order[idx]
-    const next = { ...results, [k]: ok }
+    // せんせいヘルプで 合格にした文字は、子どもには 合格を 見せるが、きろくは「よめなかった文字（ ）」にする
+    const next = { ...results, [k]: how === 'help' ? ('help' as const) : ok }
     setResults(next)
     if (how === 'manual') setManual((m) => m + 1)
     if (ok) {
@@ -59,10 +61,11 @@ export function Assessment({ onHome }: { onHome: () => void }) {
 
   const voice = useVoiceJudge(target, () => answer(true, 'voice'), idx)
 
-  const finish = (res: Record<string, boolean>, manualCount: number) => {
+  const finish = (res: Record<string, boolean | 'help'>, manualCount: number) => {
     voice.stop()
     const missed = KANA.filter((k) => res[k] === false)
-    const correct = KANA.length - missed.length
+    const helped = KANA.filter((k) => res[k] === 'help')
+    const correct = KANA.length - missed.length - helped.length
     const rec: AssessRecord = {
       id: String(Date.now()),
       date: new Date().toISOString(),
@@ -70,6 +73,7 @@ export function Assessment({ onHome }: { onHome: () => void }) {
       correct,
       total: KANA.length,
       missed,
+      helped,
       manual: manualCount,
     }
     addRecord(rec)
@@ -139,6 +143,9 @@ export function Assessment({ onHome }: { onHome: () => void }) {
             {idx + 1} / {order.length}
           </span>
         )}
+        {phase === 'test' && (
+          <TeacherHelp onPause={voice.pause} onResume={voice.resume} onPass={() => answer(true, 'help')} passLabel="ごうかくにする（きろくは（ ）つき）" />
+        )}
       </header>
 
       {phase === 'menu' && (
@@ -189,7 +196,7 @@ export function Assessment({ onHome }: { onHome: () => void }) {
                       <th className="py-1 pr-3 font-normal">なまえ</th>
                       <th className="py-1 pr-3 text-right font-normal">よめた数</th>
                       <th className="py-1 pr-3 text-right font-normal">修得率</th>
-                      <th className="py-1 font-normal">よめなかった文字</th>
+                      <th className="py-1 font-normal">よめなかった文字<span className="text-xs">（ ）＝せんせいヘルプ</span></th>
                     </tr>
                   </thead>
                   <tbody className="tabular-nums text-stone-800">
@@ -201,7 +208,7 @@ export function Assessment({ onHome }: { onHome: () => void }) {
                           {r.correct} / {r.total}
                         </td>
                         <td className="py-1.5 pr-3 text-right font-bold">{Math.round((r.correct / r.total) * 100)}%</td>
-                        <td className="font-card py-1.5 tracking-wider">{r.missed.length ? r.missed.join(' ') : 'なし'}</td>
+                        <td className="font-card py-1.5 tracking-wider">{missedLabel(r, KANA)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -272,11 +279,12 @@ export function Assessment({ onHome }: { onHome: () => void }) {
           <p className="text-lg text-stone-600">修得率 {Math.round((last.correct / last.total) * 100)}%</p>
           <p className="text-xl font-bold leading-relaxed text-stone-800">{remark(last.correct, last.total).text}</p>
           <Mascot size={90} mood="cheer" />
-          {last.missed.length > 0 && (
+          {last.missed.length + (last.helped?.length ?? 0) > 0 && (
             <p className="text-sm text-stone-500">
-              よめなかった文字：<span className="font-card text-lg tracking-wider text-stone-700">{last.missed.join(' ')}</span>
+              よめなかった文字：<span className="font-card text-lg tracking-wider text-stone-700">{missedLabel(last, KANA)}</span>
             </p>
           )}
+          {(last.helped?.length ?? 0) > 0 && <p className="text-xs text-stone-400">（ ）は せんせいヘルプで ごうかくにした文字です（よめなかった文字として きろく）</p>}
           {last.manual > 0 && <p className="text-xs text-stone-400">先生の「よめた」ボタンで○にした文字：{last.manual}こ</p>}
           <div className="mt-2 flex flex-wrap justify-center gap-3">
             <ActionButton label="きろくを みる" onClick={() => setPhase('menu')} />

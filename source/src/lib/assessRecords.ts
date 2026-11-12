@@ -9,6 +9,15 @@ export interface AssessRecord {
   total: number // 出題数（46）
   missed: string[] // よめなかった文字
   manual: number // 先生が「よめた」ボタンで○にした数
+  helped?: string[] // せんせいヘルプで合格にした文字（よめなかった文字として（ ）つきで記録）
+}
+
+/** よめなかった文字の表示：せんせいヘルプで合格にした文字は（ ）でかこむ（50音順） */
+export function missedLabel(r: AssessRecord, order: readonly string[]) {
+  const helped = new Set(r.helped ?? [])
+  const all = new Set([...r.missed, ...helped])
+  const list = order.filter((k) => all.has(k)).map((k) => (helped.has(k) ? `（${k}）` : k))
+  return list.length ? list.join(' ') : 'なし'
 }
 
 const KEY = 'yomemaru:assess'
