@@ -41,7 +41,7 @@ export function sayWord(id: Kana, onEnd?: () => void) {
 }
 
 /** これで ばっちり モードの セリフ */
-export type BtLine = 'intro' | 's1' | 's2' | 's3' | 's4' | 'test' | 'perfect'
+export type BtLine = 'intro' | 's1' | 's2' | 's3' | 's4' | 'test' | 'perfect' | 'boss' | 'win'
 export function sayBt(l: BtLine, onEnd?: () => void) {
   play(`bt_${l}`, onEnd)
 }

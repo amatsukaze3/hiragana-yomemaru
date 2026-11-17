@@ -12,6 +12,8 @@ import { KANA_INFO, type Kana } from '../data/kana'
 import { playChime } from '../lib/audio'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
 import { ActionButton } from '../screens/Learn'
+import { BossBattle, type BossState } from './BossBattle'
+import { playDefeat, playSuperBeam } from './bossSfx'
 import { playFanfare } from './fanfare'
 import { GoldMedal } from './GoldMedal'
 import { recordPracticed, type WeakPick } from './history'
@@ -49,6 +51,16 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
   const [answered, setAnswered] = useState(false)
   const [burst, setBurst] = useState(0)
   const busy = useRef(false)
+  /** カンペキテスト（じゃままるくんとの ボスバトル）の じょうたい */
+  const [boss, setBoss] = useState<BossState>('enter')
+  const [hitKey, setHitKey] = useState(0)
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+    }
+  }, [])
   const [narrow] = useState(() => window.innerWidth < 560)
 
   const isTest = step === TEST_STEP
@@ -68,6 +80,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
     setReady(false)
     setAnswered(false)
     setTraceDone(false)
+    if (isTest) return
     let alive = true
     const first = idx === 0
     const afterLine = () => {
@@ -77,10 +90,8 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
       else setReady(true)
     }
     const t = window.setTimeout(() => {
-      if (first) {
-        if (isTest) sayBt('test', afterLine)
-        else sayBt(STEPS[step].line, afterLine)
-      } else afterLine()
+      if (first) sayBt(STEPS[step].line, afterLine)
+      else afterLine()
     }, 350)
     return () => {
       alive = false
@@ -88,7 +99,64 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
     }
   }, [phase, step, idx, char, isTest])
 
+  // ボスバトル：あらわれる → セリフ → カードを なげる → うかんだら よむ
+  useEffect(() => {
+    if (phase !== 'learn' || !isTest) return
+    let on = true
+    const timers: number[] = []
+    const later = (fn: () => void, ms: number) => timers.push(window.setTimeout(() => on && fn(), ms))
+    if (boss === 'enter') {
+      let went = false
+      const go = () => {
+        if (went) return
+        went = true
+        setBoss('throw')
+      }
+      later(() => sayBt('boss', () => later(go, 250)), 900)
+      later(go, 9000) // 音声が ない ときの ほけん
+    } else if (boss === 'throw') {
+      later(() => {
+        setBoss('ready')
+        setReady(true)
+      }, 950)
+    }
+    return () => {
+      on = false
+      timers.forEach((t) => window.clearTimeout(t))
+    }
+  }, [phase, isTest, boss, idx])
+
+  /** よめた！ → よめ丸 スーパービーム */
+  const passBoss = () => {
+    if (busy.current || boss !== 'ready') return
+    busy.current = true
+    retry.reset()
+    setReady(false)
+    setBoss('hit')
+    setHitKey((k) => k + 1)
+    playSuperBeam()
+    voice.hold(1800)
+    const read = char
+    window.setTimeout(() => alive.current && sayKana(read), 1000)
+    window.setTimeout(() => {
+      busy.current = false
+      if (!alive.current) return
+      if (idx < TEST_N - 1) {
+        setIdx(idx + 1)
+        setBoss('throw')
+      } else {
+        // さいごの いちげき！ じゃままるくんを やっつけた
+        setBoss('defeat')
+        voice.stop()
+        playDefeat()
+        window.setTimeout(() => alive.current && sayBt('win'), 1700)
+        window.setTimeout(() => alive.current && finish(), 5000)
+      }
+    }, 1700)
+  }
+
   const passOne = () => {
+    if (isTest) return passBoss()
     if (busy.current) return
     busy.current = true
     retry.reset()
@@ -111,7 +179,10 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
     setStep(s)
     setIdx(0)
     setTraceReset((r) => r + 1)
-    if (s === TEST_STEP) setTestOrder(makeTestOrder(kana))
+    if (s === TEST_STEP) {
+      setTestOrder(makeTestOrder(kana))
+      setBoss('enter')
+    }
   }
 
   function next() {
@@ -212,9 +283,11 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
       {phase === 'learn' && (
         <>
           <div className="flex flex-col items-center gap-1 px-4 pt-3 text-center">
-            <h2 className="text-2xl font-bold text-stone-800 sm:text-3xl">{isTest ? <span className="text-amber-600">カンペキテスト</span> : <span className="text-violet-600">{STEPS[step].title}</span>}</h2>
-            <p className="text-base text-stone-500 sm:text-lg">{isTest ? 'でてきた もじを こえに だして よもう！' : STEPS[step].guide}</p>
-            <div className="mt-1 flex gap-2" aria-label={`${idx + 1} / ${count}`}>
+            <h2 className="text-2xl font-bold text-stone-800 sm:text-3xl">
+              {isTest ? <span className="text-violet-700"><span className="hidden sm:inline">カンペキテスト：</span>じゃままるくんを やっつけろ！</span> : <span className="text-violet-600">{STEPS[step].title}</span>}
+            </h2>
+            <p className="text-base text-stone-500 sm:text-lg">{isTest ? 'なげてきた もじを こえに だして よむと、よめ丸 スーパービーム！' : STEPS[step].guide}</p>
+            <div className={`mt-1 flex gap-2 ${isTest ? 'hidden' : ''}`} aria-label={`${idx + 1} / ${count}`}>
               {Array.from({ length: count }, (_, i) => (
                 <span key={i} className={`h-2.5 w-2.5 rounded-full ${i < idx ? (isTest ? 'bg-amber-400' : 'bg-violet-400') : i === idx ? 'bg-amber-500 ring-4 ring-amber-200' : 'bg-stone-200'}`} />
               ))}
@@ -222,35 +295,41 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
           </div>
 
           <main className="min-h-0 flex-1 px-4 py-4">
-            <motion.div key={`${step}-${idx}`} className="relative mx-auto h-full w-full max-w-3xl" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22 }}>
-              {step === 0 && <Card char={char} variant="picture" onTap={() => sayKana(char)} />}
-              {step === 1 && (
-                <TraceCanvas
-                  char={char}
-                  resetSignal={traceReset}
-                  onComplete={() => {
-                    // よみあげは なぞり おわった ときに TraceCanvas が する（ここで かさねて ならさない）
-                    setTraceDone(true)
-                    setBurst((x) => x + 1)
-                  }}
-                />
-              )}
-              {step === 2 && <Card char={char} variant="letter" onTap={() => sayKana(char)} />}
-              {step >= 3 && <Card char={char} variant="letter" />}
-              {/* おいかけ よみ：ずんだもんが よんだら「つぎは きみの ばん！」 */}
-              <AnimatePresence>
-                {micStep && ready && (
-                  <motion.span
-                    className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 rounded-full bg-violet-500 px-4 py-1.5 text-lg font-bold text-white shadow"
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    {step === 2 ? 'つぎは きみの ばん！' : 'よんでみよう！'}
-                  </motion.span>
+            {isTest ? (
+              <div className="mx-auto h-full w-full max-w-3xl">
+                <BossBattle state={boss} char={char} idx={idx} total={TEST_N} hitKey={hitKey} />
+              </div>
+            ) : (
+              <motion.div key={`${step}-${idx}`} className="relative mx-auto h-full w-full max-w-3xl" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22 }}>
+                {step === 0 && <Card char={char} variant="picture" onTap={() => sayKana(char)} />}
+                {step === 1 && (
+                  <TraceCanvas
+                    char={char}
+                    resetSignal={traceReset}
+                    onComplete={() => {
+                      // よみあげは なぞり おわった ときに TraceCanvas が する（ここで かさねて ならさない）
+                      setTraceDone(true)
+                      setBurst((x) => x + 1)
+                    }}
+                  />
                 )}
-              </AnimatePresence>
-            </motion.div>
+                {step === 2 && <Card char={char} variant="letter" onTap={() => sayKana(char)} />}
+                {step >= 3 && <Card char={char} variant="letter" />}
+                {/* おいかけ よみ：ずんだもんが よんだら「つぎは きみの ばん！」 */}
+                <AnimatePresence>
+                  {micStep && ready && (
+                    <motion.span
+                      className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 rounded-full bg-violet-500 px-4 py-1.5 text-lg font-bold text-white shadow"
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                    >
+                      {step === 2 ? 'つぎは きみの ばん！' : 'よんでみよう！'}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )}
           </main>
 
           <footer className="flex flex-wrap items-center justify-center gap-3 px-3 pb-[max(16px,env(safe-area-inset-bottom))] sm:px-6">
@@ -269,7 +348,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
             )}
             {micStep && <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} heard={voice.heard} />}
             {/* マイクが つかえないとき・こえで うまく いかないときの 「できた」 */}
-            {micStep && !micOk && voice.status !== 'starting' && <ActionButton label="できた" onClick={passOne} strong />}
+            {micStep && !micOk && voice.status !== 'starting' && (!isTest || boss === 'ready') && <ActionButton label="できた" onClick={passOne} strong />}
             {!micStep && (
               <motion.button
                 type="button"
@@ -302,7 +381,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
           <p className="text-xl text-stone-600">
             <span className="font-card text-3xl text-stone-800">{kana.join('・')}</span> が <span className="whitespace-nowrap">ばっちり よめたね！</span>
           </p>
-          <p className="rounded-full bg-amber-100 px-4 py-1 text-lg font-bold text-amber-800">よめ丸くんの きんメダルを ゲット！</p>
+          <p className="rounded-full bg-amber-100 px-4 py-1 text-lg font-bold text-amber-800">じゃままるくんを やっつけて、よめ丸くんの きんメダルを ゲット！</p>
           <div className="mt-2 flex flex-wrap justify-center gap-3">
             <ActionButton icon={<RotateCcw />} label="もういちど テスト" onClick={retest} />
             <ActionButton icon={<House />} label="メニューへ" onClick={onExit} strong />
