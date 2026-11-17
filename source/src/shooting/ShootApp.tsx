@@ -229,7 +229,7 @@ function Menu({ onPlay, onZukan, onBatchiri, onExit }: { onPlay: (m: ModeId, res
             ひらがなよめ丸で れんしゅうする
           </a>
         )}
-        <span>こえ：VOICEVOX:ずんだもん</span>
+        <span>こえ：VOICEVOX:ずんだもん／VOICEVOX:黒沢冴白</span>
       </footer>
     </div>
   )

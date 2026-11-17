@@ -45,3 +45,8 @@ export type BtLine = 'intro' | 's1' | 's2' | 's3' | 's4' | 'test' | 'perfect' | 
 export function sayBt(l: BtLine, onEnd?: () => void) {
   play(`bt_${l}`, onEnd)
 }
+
+/** ひらがなじゃままるくんの セリフ（VOICEVOX:黒沢冴白） */
+export function sayJama(key: string, onEnd?: () => void) {
+  play(`jm_${key}`, onEnd)
+}

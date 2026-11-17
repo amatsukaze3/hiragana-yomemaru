@@ -12,13 +12,14 @@ import { KANA_INFO, type Kana } from '../data/kana'
 import { playChime } from '../lib/audio'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
 import { ActionButton } from '../screens/Learn'
-import { BossBattle, type BossState } from './BossBattle'
+import { BossBattle } from './BossBattle'
+import { jamaKey, type BossState } from './jama'
 import { playDefeat, playSuperBeam } from './bossSfx'
 import { playFanfare } from './fanfare'
 import { GoldMedal } from './GoldMedal'
 import { logCleared, logCorrect, logError, onceper, type WeakPick } from '../lib/errorLog'
 import { makeTestOrder } from './testOrder'
-import { sayBt, sayKana, type BtLine } from './voices'
+import { sayBt, sayJama, sayKana, type BtLine } from './voices'
 
 /**
  * これで ばっちり モード！
@@ -54,6 +55,8 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
   /** カンペキテスト（じゃままるくんとの ボスバトル）の じょうたい */
   const [boss, setBoss] = useState<BossState>('enter')
   const [hitKey, setHitKey] = useState(0)
+  /** なかなか よめない（じゃままるくんが「どうした〜？」） */
+  const [slow, setSlow] = useState(false)
   const alive = useRef(true)
   useEffect(() => {
     alive.current = true
@@ -112,18 +115,55 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
         went = true
         setBoss('throw')
       }
-      later(() => sayBt('boss', () => later(go, 250)), 900)
-      later(go, 9000) // 音声が ない ときの ほけん
+      // じゃままるくん「ひらがなは よませないぞ〜！」→ ずんだもん「たいへんなのだ！…」→ なげる
+      later(() => sayJama('enter', () => later(() => sayBt('boss', () => later(go, 250)), 150)), 700)
+      later(go, 16000) // 音声が ない ときの ほけん
     } else if (boss === 'throw') {
-      later(() => {
+      // なげながら ひとこと。しゃべりおわってから マイクで きく（じゃままるくんの こえを よみと まちがえない ように）
+      let flown = false
+      let said = false
+      const ready = () => {
+        if (!flown || !said) return
         setBoss('ready')
         setReady(true)
+      }
+      later(() => {
+        flown = true
+        ready()
       }, 950)
+      later(
+        () =>
+          sayJama(jamaKey('throw', idx, TEST_N, false), () => {
+            said = true
+            ready()
+          }),
+        150,
+      )
+      later(() => {
+        said = true
+        ready()
+      }, 4000) // 音声が ない ときの ほけん
+    } else if (boss === 'ready') {
+      // なかなか よめないとき：7びょうで「どうした〜？」（しゃべる あいだは マイクを とめる）
+      later(() => {
+        setSlow(true)
+        voice.pause()
+        let back = false
+        const resume = () => {
+          if (back) return
+          back = true
+          voice.resume()
+        }
+        sayJama('slow', resume)
+        later(resume, 4000)
+      }, 7000)
     }
     return () => {
       on = false
       timers.forEach((t) => window.clearTimeout(t))
     }
+    // voice の メソッドは かわらない（useCallback）ので いれない
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, isTest, boss, idx])
 
   /** よめた！ → よめ丸 スーパービーム */
@@ -131,13 +171,16 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
     if (busy.current || boss !== 'ready') return
     busy.current = true
     retry.reset()
+    voice.resume() // 「どうした〜？」で とめていたら もどす
     setReady(false)
+    setSlow(false)
     setBoss('hit')
     setHitKey((k) => k + 1)
     playSuperBeam()
     voice.hold(1800)
-    const read = char
-    window.setTimeout(() => alive.current && sayKana(read), 1000)
+    const at = idx
+    // めいちゅうした あとに じゃままるくん「いててっ！」
+    window.setTimeout(() => alive.current && sayJama(jamaKey('hit', at, TEST_N, false)), 550)
     window.setTimeout(() => {
       busy.current = false
       if (!alive.current) return
@@ -149,8 +192,15 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
         setBoss('defeat')
         voice.stop()
         playDefeat()
-        window.setTimeout(() => alive.current && sayBt('win'), 1700)
-        window.setTimeout(() => alive.current && finish(), 5000)
+        // じゃままるくん「やられた〜！ おぼえてろ〜！」→ ずんだもん「やったのだ！…」→ はなまる
+        let done = false
+        const end = () => {
+          if (done || !alive.current) return
+          done = true
+          finish()
+        }
+        window.setTimeout(() => alive.current && sayJama('defeat', () => window.setTimeout(() => alive.current && sayBt('win', () => window.setTimeout(end, 300)), 200)), 400)
+        window.setTimeout(end, 11000) // 音声が ない ときの ほけん
       }
     }, 1700)
   }
@@ -301,7 +351,13 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
         <>
           <div className="flex flex-col items-center gap-1 px-4 pt-3 text-center">
             <h2 className="text-2xl font-bold text-stone-800 sm:text-3xl">
-              {isTest ? <span className="text-violet-700"><span className="hidden sm:inline">カンペキテスト：</span>じゃままるくんを やっつけろ！</span> : <span className="text-violet-600">{STEPS[step].title}</span>}
+              {isTest ? (
+                <span className="text-violet-700">
+                  <span className="hidden sm:inline">カンペキテスト：</span>じゃままるくんを やっつけろ！
+                </span>
+              ) : (
+                <span className="text-violet-600">{STEPS[step].title}</span>
+              )}
             </h2>
             <p className="text-base text-stone-500 sm:text-lg">{isTest ? 'なげてきた もじを こえに だして よむと、よめ丸 スーパービーム！' : STEPS[step].guide}</p>
             <div className={`mt-1 flex gap-2 ${isTest ? 'hidden' : ''}`} aria-label={`${idx + 1} / ${count}`}>
@@ -314,7 +370,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
           <main className="min-h-0 flex-1 px-4 py-4">
             {isTest ? (
               <div className="mx-auto h-full w-full max-w-3xl">
-                <BossBattle state={boss} char={char} idx={idx} total={TEST_N} hitKey={hitKey} />
+                <BossBattle state={boss} char={char} idx={idx} total={TEST_N} hitKey={hitKey} slow={slow} />
               </div>
             ) : (
               <motion.div key={`${step}-${idx}`} className="relative mx-auto h-full w-full max-w-3xl" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22 }}>

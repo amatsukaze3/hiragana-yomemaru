@@ -15,4 +15,4 @@
   - シューティングは `source/src/shooting/`。単体版は `npm run build:single:shoot`（→ `dist-single-shoot/shooting.html` を yomemaru-shooting リポジトリの `index.html` に）
 - `tools/shoot-voice/` … シューティングの ずんだもん音声の セリフと 生成スクリプト（VOICEVOX が うごいている状態で `python3 tools/shoot-voice/make_voices.py`。GitHub では `voice-gen` ブランチに push すると Actions で生成）
 
-こえ：VOICEVOX:ずんだもん
+こえ：VOICEVOX:ずんだもん／VOICEVOX:黒沢冴白（ひらがなじゃままるくん）

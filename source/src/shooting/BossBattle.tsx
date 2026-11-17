@@ -3,28 +3,18 @@ import { AnimatePresence, motion } from 'motion/react'
 import jamamaru from '../assets/jamamaru.webp'
 import yomemaru from '../assets/yomemaru.webp'
 import type { Kana } from '../data/kana'
+import { JAMA_TEXT, jamaKey, type BossState } from './jama'
 
 /**
  * カンペキテストの ボスバトル：ひらがなじゃままるくん が なげてくる もじを よんで、
- * よめ丸 スーパービームで やっつける。
- *
- * - enter  … じゃままるくんが あらわれる
- * - throw  … もじカードを なげる（とんでくる とちゅう）
- * - ready  … カードが うかんでいる（ここで よむ）
- * - hit    … スーパービーム！（カードを つらぬいて じゃままるくんに あたる）
- * - defeat … じゃままるくんが やられて とんでいく
+ * よめ丸 スーパービームで やっつける（じょうたいは jama.ts の BossState）。
  */
-export type BossState = 'enter' | 'throw' | 'ready' | 'hit' | 'defeat'
-
 // たての いち（%）：じゃままるくんの まんなか・カードが うかぶ ところ・よめ丸くんの あたま
 const BOSS_Y = 26
 const CARD_Y = 57
 const HERO_TOP = 82
 
-const THROW_TAUNTS = ['これが よめるかな〜？', 'えいっ！', 'まだまだ〜！', 'つぎは これだ！', 'これなら どうだ！', 'よめるもんか〜！']
-const HIT_TAUNTS = ['いててっ！', 'ぐぬぬ…', 'やるな〜！', 'うわっ！', 'なにっ！？']
-
-export function BossBattle({ state, char, idx, total, hitKey }: { state: BossState; char: Kana; idx: number; total: number; hitKey: number }) {
+export function BossBattle({ state, char, idx, total, hitKey, slow }: { state: BossState; char: Kana; idx: number; total: number; hitKey: number; slow: boolean }) {
   // あたった かず（ビームが あたる しゅんかんに へらしたいので、hit の ときは すこし おくらせる）
   const hitsDone = idx + (state === 'defeat' ? 1 : 0)
   const [hpShown, setHpShown] = useState(total - hitsDone)
@@ -37,28 +27,7 @@ export function BossBattle({ state, char, idx, total, hitKey }: { state: BossSta
   }, [state, idx, total, hitsDone])
 
   // じゃままるくんの セリフ
-  const [slow, setSlow] = useState(false)
-  useEffect(() => {
-    setSlow(false)
-    if (state !== 'ready') return
-    const t = window.setTimeout(() => setSlow(true), 7000)
-    return () => window.clearTimeout(t)
-  }, [state, idx])
-  const left = total - idx
-  const taunt =
-    state === 'enter'
-      ? 'ひらがなは よませないぞ〜！'
-      : state === 'defeat'
-        ? 'やられた〜！ おぼえてろ〜！'
-        : state === 'hit'
-          ? HIT_TAUNTS[idx % HIT_TAUNTS.length]
-          : slow
-            ? 'どうした〜？ よめないのか〜？'
-            : left <= 3 && idx > 0
-              ? 'ま、まずい…！'
-              : idx === 0
-                ? 'いくぞ〜！ えいっ！'
-                : THROW_TAUNTS[idx % THROW_TAUNTS.length]
+  const taunt = JAMA_TEXT[jamaKey(state, idx, total, slow)]
 
   const showCard = state === 'throw' || state === 'ready' || state === 'hit'
 

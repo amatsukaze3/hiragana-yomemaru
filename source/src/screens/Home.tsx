@@ -172,7 +172,7 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, o
           </a>
           （商用利用不可）
         </span>
-        <span>こえ：VOICEVOX:ずんだもん</span>
+        <span>こえ：VOICEVOX:ずんだもん／VOICEVOX:黒沢冴白</span>
       </footer>
     </div>
   )
