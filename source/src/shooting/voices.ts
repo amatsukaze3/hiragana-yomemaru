@@ -12,7 +12,7 @@ const map: Record<string, string> = {}
 for (const [path, url] of Object.entries(FILES)) map[`shoot:${path.split('/').pop()!.replace('.mp3', '')}`] = url
 registerClips(map)
 
-export type Line = 'start' | 'resume' | 'over' | 'record' | 'complete' | 'miss' | 'saved'
+export type Line = 'start' | 'resume' | 'over' | 'record' | 'complete' | 'miss' | 'saved' | 'gold'
 
 function play(name: string, onEnd?: () => void) {
   const key = `shoot:${name}`
@@ -38,4 +38,10 @@ export function sayStamp(id: Kana, onEnd?: () => void) {
 /** ことば だけ（ずかんで タッチしたとき） */
 export function sayWord(id: Kana, onEnd?: () => void) {
   play(`w_${KANA_INFO[id].romaji}`, onEnd)
+}
+
+/** これで ばっちり モードの セリフ */
+export type BtLine = 'intro' | 's1' | 's2' | 's3' | 's4' | 'test' | 'perfect'
+export function sayBt(l: BtLine, onEnd?: () => void) {
+  play(`bt_${l}`, onEnd)
 }

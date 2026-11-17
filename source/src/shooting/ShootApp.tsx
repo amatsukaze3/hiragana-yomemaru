@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { BookOpen, History, House, Rocket, Trophy, Zap } from 'lucide-react'
+import { BookOpen, History, House, Rocket, Sparkles, Trophy, Zap } from 'lucide-react'
 import { Mascot } from '../components/Mascot'
 import { installUnlockListener } from '../lib/audio'
 import { CardsProvider } from '../lib/cards'
 import { loadUserFont } from '../lib/font'
+import { Batchiri } from './Batchiri'
 import { Game } from './Game'
 import { GoalRoad } from './GoalRoad'
+import { pickWeak, type WeakPick } from './history'
 import { Zukan } from './Zukan'
 import { MODES, STAMP_TOTAL, getBestScore, loadSave, loadStamps, type ModeId, type SaveData } from './words'
 
-type Screen = { name: 'menu' } | { name: 'game'; mode: ModeId; resume?: SaveData | null } | { name: 'zukan' }
+type Screen = { name: 'menu' } | { name: 'game'; mode: ModeId; resume?: SaveData | null } | { name: 'zukan' } | { name: 'batchiri'; pick: WeakPick }
 
 /** ひらがなよめ丸の 本体 */
 export const MAIN_APP_URL = 'https://amatsukaze3.github.io/hiragana-yomemaru/'
@@ -52,19 +54,22 @@ export function ShootGame({ onExit }: { onExit?: () => void }) {
                 setScreen({ name: 'game', mode, resume })
               }}
               onZukan={() => setScreen({ name: 'zukan' })}
+                onBatchiri={(pick) => setScreen({ name: 'batchiri', pick })}
             />
           )}
           {screen.name === 'game' && <Game mode={MODES[screen.mode]} resume={screen.resume} onHome={() => setScreen({ name: 'menu' })} onZukan={() => setScreen({ name: 'zukan' })} />}
           {screen.name === 'zukan' && <Zukan onHome={() => setScreen({ name: 'menu' })} />}
+          {screen.name === 'batchiri' && <Batchiri pick={screen.pick} onExit={() => setScreen({ name: 'menu' })} />}
         </motion.div>
       </AnimatePresence>
     </div>
   )
 }
 
-function Menu({ onPlay, onZukan, onExit }: { onPlay: (m: ModeId, resume?: SaveData | null) => void; onZukan: () => void; onExit?: () => void }) {
+function Menu({ onPlay, onZukan, onBatchiri, onExit }: { onPlay: (m: ModeId, resume?: SaveData | null) => void; onZukan: () => void; onBatchiri: (pick: WeakPick) => void; onExit?: () => void }) {
   const owned = loadStamps().size
   const save = loadSave()
+  const [weak] = useState(() => pickWeak(3))
   return (
     <div className="relative flex h-full flex-col bg-gradient-to-b from-sky-100 via-stone-50 to-amber-50">
       {onExit && (
@@ -146,6 +151,30 @@ function Menu({ onPlay, onZukan, onExit }: { onPlay: (m: ModeId, resume?: SaveDa
         </div>
 
         {save && <p className="-mt-2 text-sm text-stone-500">あたらしく はじめると、セーブした つづきは きえるよ</p>}
+
+        {/* これで ばっちり モード！（にがてな もじを 3つ れんしゅう） */}
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.96 }}
+          onClick={() => onBatchiri(weak)}
+          className="flex w-full items-center justify-center gap-4 rounded-[28px] bg-violet-500 px-5 py-4 text-white shadow-[0_6px_0_#6d28d9]"
+        >
+          <Sparkles size={34} className="shrink-0" />
+          <span className="flex flex-col items-start text-left">
+            <span className="text-3xl font-bold">これで ばっちり モード！</span>
+            <span className="text-lg leading-snug opacity-95">
+              <span className="whitespace-nowrap">にがてな もじを 3つ れんしゅうして、</span>
+              <span className="whitespace-nowrap">カンペキテストに ちょうせん！</span>
+            </span>
+          </span>
+          <span className="font-card hidden shrink-0 gap-1 sm:flex" aria-hidden>
+            {weak.kana.map((k) => (
+              <span key={k} className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-3xl text-violet-700">
+                {k}
+              </span>
+            ))}
+          </span>
+        </motion.button>
 
         <motion.button
           type="button"
