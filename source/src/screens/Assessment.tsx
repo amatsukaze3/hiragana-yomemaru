@@ -6,6 +6,8 @@ import { Confetti, Hanamaru } from '../components/Celebrate'
 import { MicBadge } from '../components/MicStatus'
 import { Mascot } from '../components/Mascot'
 import { KANA, smartShuffle, type Kana } from '../data/kana'
+import { ErrorLogPanel } from '../components/ErrorLogPanel'
+import { logCorrect, logError, onceper } from '../lib/errorLog'
 import { addRecord, clearRecords, formatDate, loadRecords, remark, type AssessRecord, missedLabel } from '../lib/assessRecords'
 import { playChime, sayVoice } from '../lib/audio'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
@@ -40,6 +42,9 @@ export function Assessment({ onHome }: { onHome: () => void }) {
     if (busy.current || phase !== 'test') return
     busy.current = true
     const k = order[idx]
+    // まちがいログ：「よめない」・せんせいヘルプ は よめなかった、マイクで よめたら にがて度を へらす
+    if (how === 'skip' || how === 'help') logError(k, 'unread', 'assess')
+    else if (how === 'voice') logCorrect(k)
     // せんせいヘルプで 合格にした文字は、子どもには 合格を 見せるが、きろくは「よめなかった文字（ ）」にする
     const next = { ...results, [k]: how === 'help' ? ('help' as const) : ok }
     setResults(next)
@@ -59,7 +64,11 @@ export function Assessment({ onHome }: { onHome: () => void }) {
     )
   }
 
-  const voice = useVoiceJudge(target, () => answer(true, 'voice'), idx)
+  const wrongOnce = useRef(onceper())
+  const voice = useVoiceJudge(target, () => answer(true, 'voice'), idx, () => {
+    // よんだけど ちがう よみだった → まちがいログ（1もんで 1かいだけ）
+    if (target) wrongOnce.current(`${order.length}-${idx}-${target}`, () => logError(target, 'wrong', 'assess'))
+  })
 
   const finish = (res: Record<string, boolean | 'help'>, manualCount: number) => {
     voice.stop()
@@ -217,6 +226,8 @@ export function Assessment({ onHome }: { onHome: () => void }) {
             )}
             <p className="text-xs text-stone-400">きろくは この端末の ブラウザの中だけに のこり、外には おくられません。</p>
           </section>
+
+          <ErrorLogPanel />
         </main>
       )}
 

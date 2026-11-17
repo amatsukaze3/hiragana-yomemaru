@@ -13,7 +13,7 @@ import { useRetryRegister } from '../components/RetryPrompt'
 import { loadVoiceprint, voiceprintUseful } from '../lib/voiceprint'
 import { ActionButton } from '../screens/Learn'
 import { GoalRoad } from './GoalRoad'
-import { recordGot, recordMiss } from './history'
+import { logCorrect, logError, onceper } from '../lib/errorLog'
 import { Stamp } from './Stamp'
 import { sayKana, sayLine, sayStamp } from './voices'
 import { STAMP_TOTAL, clearSave, loadGold, saveGold, type RoundStamp, fallSecAt, getBestScore, loadStamps, pickWord, saveStamps, setBestScore, speedLevel, wordOf, writeSave, type Mode, type SaveData, type WordTask } from './words'
@@ -113,8 +113,8 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
   const lastLane = useRef(-1)
   const recent = useRef<Kana[]>([])
   const targetRef = useRef<number | null>(null)
-  /** いまの カードが ねらわれはじめた じこく（よむまでの じかんを はかる） */
-  const targetSince = useRef(0)
+  /** マイクの「まちがい」は 1まいの カードで 1かいだけ ログに のこす */
+  const wrongOnce = useRef(onceper())
   const override = useRef<number | null>(null)
   const scoreRef = useRef(0)
   const livesRef = useRef(LIVES)
@@ -162,10 +162,19 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
   const voice = useVoiceJudge(
     targetKana,
     () => {
-      if (targetRef.current != null) collect(targetRef.current, true)
+      if (targetRef.current == null) return
+      // マイクで ただしく よめた → いまの にがて度を へらす
+      const c = cards.current.find((x) => x.id === targetRef.current)
+      if (c) logCorrect(c.kana)
+      collect(targetRef.current)
     },
     targetId ?? 0,
-    retry.onMiss,
+    () => {
+      // よんだけど ちがう よみだった → まちがいログ
+      const c = cards.current.find((x) => x.id === targetRef.current)
+      if (c) wrongOnce.current(`${c.id}`, () => logError(c.kana, 'wrong', 'shoot'))
+      retry.onMiss()
+    },
   )
   retry.bind(voice)
   const micOk = voice.status === 'listening'
@@ -211,12 +220,10 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
     }, w.state === 'done' ? STAMP_PAUSE_MS : 900)
   }
 
-  /** byVoice … マイクで よめたとき（きろくに のこす。タッチや せんせいの ごうかくは のこさない） */
-  const collect = useCallback((id: number, byVoice = false) => {
+  const collect = useCallback((id: number) => {
     if (phaseRef.current !== 'playing') return
     const c = cards.current.find((x) => x.id === id)
     if (!c) return
-    if (byVoice) recordGot(c.kana, performance.now() - targetSince.current)
     cards.current = cards.current.filter((x) => x.id !== id)
     if (override.current === id) override.current = null
     syncCards()
@@ -267,7 +274,7 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
   }, [])
 
   const miss = (c: Falling) => {
-    recordMiss(c.kana)
+    logError(c.kana, 'unread', 'shoot')
     // そのことばの カードは ぜんぶ きえて、ことばは しっぱい
     const w = active.current.find((x) => x.uid === c.wordUid)
     cards.current = cards.current.filter((x) => x.wordUid !== c.wordUid)
@@ -368,7 +375,6 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
       const tid = t?.id ?? null
       if (tid !== targetRef.current) {
         targetRef.current = tid
-        targetSince.current = now
         setTargetId(tid)
       }
       lvlTimer += dt

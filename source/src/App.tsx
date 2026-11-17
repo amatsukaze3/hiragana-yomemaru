@@ -4,6 +4,7 @@ import { SettingsPanel, useMeterSetting } from './components/SettingsPanel'
 import { Tutorial, tutorialDone } from './components/Tutorial'
 import { loadVoiceprint } from './lib/voiceprint'
 import { installUnlockListener } from './lib/audio'
+import { installDayTracker } from './lib/loginDays'
 import { CardsProvider } from './lib/cards'
 import { loadUserFont } from './lib/font'
 import { lsGet, lsSet } from './lib/storage'
@@ -30,6 +31,7 @@ export default function App() {
 
   useEffect(() => {
     installUnlockListener() // iOS/Safari：最初のタップで音をアンロック
+    installDayTracker() // ログイン日数（これで ばっちり モードは 3日目から）
     void loadUserFont()
   }, [])
 

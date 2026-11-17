@@ -16,7 +16,7 @@ import { BossBattle, type BossState } from './BossBattle'
 import { playDefeat, playSuperBeam } from './bossSfx'
 import { playFanfare } from './fanfare'
 import { GoldMedal } from './GoldMedal'
-import { recordPracticed, type WeakPick } from './history'
+import { logCleared, logCorrect, logError, onceper, type WeakPick } from '../lib/errorLog'
 import { makeTestOrder } from './testOrder'
 import { sayBt, sayKana, type BtLine } from './voices'
 
@@ -171,7 +171,23 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
 
   const retry = useRetryRegister()
   const voiceTarget = phase === 'learn' && micStep && ready ? char : null
-  const voice = useVoiceJudge(voiceTarget, passOne, step * 100 + idx, retry.onMiss)
+  const wrongOnce = useRef(onceper())
+  const onVoicePass = () => {
+    // マイク テスト・カンペキテストで ひとりで よめた → いまの にがて度を へらす
+    if (step >= 3 && voiceTarget) logCorrect(voiceTarget)
+    passOne()
+  }
+  const voice = useVoiceJudge(voiceTarget, onVoicePass, step * 100 + idx, () => {
+    // よんだけど ちがう よみだった → まちがいログ（1もんで 1かいだけ）
+    if (voiceTarget) wrongOnce.current(`${step}-${idx}`, () => logError(voiceTarget, 'wrong', 'batchiri'))
+    retry.onMiss()
+  })
+  /** せんせいヘルプで ごうかくにした → 「よめなかった」として ログに のこす */
+  const teacherPass = () => {
+    if (isTest ? boss !== 'ready' || busy.current : busy.current) return
+    logError(char, 'unread', 'batchiri')
+    passOne()
+  }
   retry.bind(voice)
   const micOk = voice.status === 'listening'
 
@@ -198,7 +214,8 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
 
   const finish = () => {
     voice.stop()
-    kana.forEach(recordPracticed)
+    // カンペキテスト クリア！ この 3もじの いまの にがて度は はんぶんに
+    logCleared(kana)
     setPhase('perfect')
     setBurst((b) => b + 1)
     playFanfare()
@@ -243,7 +260,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
         ) : (
           <h2 className="min-w-0 flex-1 truncate text-2xl font-bold text-violet-700">これで ばっちり モード！</h2>
         )}
-        {phase === 'learn' && <TeacherHelp onPause={voice.pause} onResume={voice.resume} onPass={micStep ? passOne : undefined} onHome={onExit} />}
+        {phase === 'learn' && <TeacherHelp onPause={voice.pause} onResume={voice.resume} onPass={micStep ? teacherPass : undefined} onHome={onExit} />}
       </header>
 
       {/* はじめ：にがてな もじの しょうかい */}
@@ -270,9 +287,9 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
               さいごの <span className="font-bold text-amber-600">カンペキテスト</span>（9もん）が ぜんぶ よめたら おおきな はなまる！
             </li>
           </ul>
-          {pick.fromHistory < kana.length && (
+          {pick.fromLog < kana.length && (
             <p className="max-w-md rounded-2xl bg-white/80 px-4 py-2 text-sm text-stone-500">
-              {pick.fromHistory === 0 ? 'シューティングの きろくが まだ ないので、' : 'シューティングの きろくが まだ すくないので、'}まだ あまり よんでいない もじも えらんだよ
+              {pick.fromLog === 0 ? 'まちがえた もじの きろくが まだ ないので、' : 'まちがえた もじの きろくが まだ すくないので、'}まだ「よめたよ」に なっていない もじも えらんだよ
             </p>
           )}
           <ActionButton icon={<Play />} label="はじめる" onClick={start} strong />
@@ -386,7 +403,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
             <ActionButton icon={<RotateCcw />} label="もういちど テスト" onClick={retest} />
             <ActionButton icon={<House />} label="メニューへ" onClick={onExit} strong />
           </div>
-          <p className="mb-auto text-sm text-stone-400">シューティングで あそぶと、にがてな もじの きろくが かわっていくよ</p>
+          <p className="mb-auto text-sm text-stone-400">シューティングや アセスメントで まちがえた もじが、ここに でてくるよ</p>
         </main>
       )}
 

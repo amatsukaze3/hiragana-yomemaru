@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { BookOpen, History, House, Rocket, Sparkles, Trophy, Zap } from 'lucide-react'
+import { BookOpen, History, House, Lock, Rocket, Sparkles, Trophy, Zap } from 'lucide-react'
 import { Mascot } from '../components/Mascot'
 import { installUnlockListener } from '../lib/audio'
 import { CardsProvider } from '../lib/cards'
@@ -8,7 +8,8 @@ import { loadUserFont } from '../lib/font'
 import { Batchiri } from './Batchiri'
 import { Game } from './Game'
 import { GoalRoad } from './GoalRoad'
-import { pickWeak, type WeakPick } from './history'
+import { pickWeak, type WeakPick } from '../lib/errorLog'
+import { batchiriSeen, batchiriUnlocked, daysUntilBatchiri, installDayTracker, recordToday, setBatchiriSeen } from '../lib/loginDays'
 import { Zukan } from './Zukan'
 import { MODES, STAMP_TOTAL, getBestScore, loadSave, loadStamps, type ModeId, type SaveData } from './words'
 
@@ -21,6 +22,7 @@ export const MAIN_APP_URL = 'https://amatsukaze3.github.io/hiragana-yomemaru/'
 export default function ShootApp() {
   useEffect(() => {
     installUnlockListener()
+    installDayTracker()
     void loadUserFont()
   }, [])
   return (
@@ -54,7 +56,7 @@ export function ShootGame({ onExit }: { onExit?: () => void }) {
                 setScreen({ name: 'game', mode, resume })
               }}
               onZukan={() => setScreen({ name: 'zukan' })}
-                onBatchiri={(pick) => setScreen({ name: 'batchiri', pick })}
+              onBatchiri={(pick) => setScreen({ name: 'batchiri', pick })}
             />
           )}
           {screen.name === 'game' && <Game mode={MODES[screen.mode]} resume={screen.resume} onHome={() => setScreen({ name: 'menu' })} onZukan={() => setScreen({ name: 'zukan' })} />}
@@ -70,6 +72,12 @@ function Menu({ onPlay, onZukan, onBatchiri, onExit }: { onPlay: (m: ModeId, res
   const owned = loadStamps().size
   const save = loadSave()
   const [weak] = useState(() => pickWeak(3))
+  // ログイン 3日目から でてくる
+  const [unlocked] = useState(() => {
+    recordToday() // メニューを だす まえに きょうを かぞえる
+    return batchiriUnlocked()
+  })
+  const [isNew] = useState(() => !batchiriSeen())
   return (
     <div className="relative flex h-full flex-col bg-gradient-to-b from-sky-100 via-stone-50 to-amber-50">
       {onExit && (
@@ -152,29 +160,56 @@ function Menu({ onPlay, onZukan, onBatchiri, onExit }: { onPlay: (m: ModeId, res
 
         {save && <p className="-mt-2 text-sm text-stone-500">あたらしく はじめると、セーブした つづきは きえるよ</p>}
 
-        {/* これで ばっちり モード！（にがてな もじを 3つ れんしゅう） */}
-        <motion.button
-          type="button"
-          whileTap={{ scale: 0.96 }}
-          onClick={() => onBatchiri(weak)}
-          className="flex w-full items-center justify-center gap-4 rounded-[28px] bg-violet-500 px-5 py-4 text-white shadow-[0_6px_0_#6d28d9]"
-        >
-          <Sparkles size={34} className="shrink-0" />
-          <span className="flex flex-col items-start text-left">
-            <span className="text-3xl font-bold">これで ばっちり モード！</span>
-            <span className="text-lg leading-snug opacity-95">
-              <span className="whitespace-nowrap">にがてな もじを 3つ れんしゅうして、</span>
-              <span className="whitespace-nowrap">カンペキテストに ちょうせん！</span>
-            </span>
-          </span>
-          <span className="font-card hidden shrink-0 gap-1 sm:flex" aria-hidden>
-            {weak.kana.map((k) => (
-              <span key={k} className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-3xl text-violet-700">
-                {k}
+        {/* これで ばっちり モード！（にがてな もじを 3つ れんしゅう）… ログイン 3日目から でてくる */}
+        {unlocked ? (
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.96 }}
+            onClick={() => {
+              setBatchiriSeen()
+              onBatchiri(weak)
+            }}
+            className="relative flex w-full items-center justify-center gap-4 rounded-[28px] bg-violet-500 px-5 py-4 text-white shadow-[0_6px_0_#6d28d9]"
+            initial={isNew ? { scale: 0.6, opacity: 0 } : false}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 220, damping: 14 }}
+          >
+            {isNew && (
+              <motion.span
+                className="absolute -right-2 -top-3 rounded-full bg-rose-500 px-3 py-1 text-sm font-bold text-white shadow"
+                animate={{ scale: [1, 1.12, 1] }}
+                transition={{ duration: 1, repeat: Infinity }}
+              >
+                NEW！ あたらしい モード
+              </motion.span>
+            )}
+            <Sparkles size={34} className="shrink-0" />
+            <span className="flex flex-col items-start text-left">
+              <span className="text-3xl font-bold">これで ばっちり モード！</span>
+              <span className="text-lg leading-snug opacity-95">
+                <span className="whitespace-nowrap">にがてな もじを 3つ れんしゅうして、</span>
+                <span className="whitespace-nowrap">カンペキテストに ちょうせん！</span>
               </span>
-            ))}
-          </span>
-        </motion.button>
+            </span>
+            <span className="font-card hidden shrink-0 gap-1 sm:flex" aria-hidden>
+              {weak.kana.map((k) => (
+                <span key={k} className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-3xl text-violet-700">
+                  {k}
+                </span>
+              ))}
+            </span>
+          </motion.button>
+        ) : (
+          <div
+            className="flex w-full items-center justify-center gap-3 rounded-[28px] border-2 border-dashed border-violet-200 bg-white/60 px-5 py-3 text-violet-400"
+            aria-label={`あたらしい モードは あと ${daysUntilBatchiri()}にちで でてくるよ`}
+          >
+            <Lock size={26} className="shrink-0" />
+            <span className="text-lg font-bold">
+              ？？？ モード … あと <span className="text-2xl tabular-nums text-violet-600">{daysUntilBatchiri()}</span> にち あそぶと でてくるよ！
+            </span>
+          </div>
+        )}
 
         <motion.button
           type="button"
