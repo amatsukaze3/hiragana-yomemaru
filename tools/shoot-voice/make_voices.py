@@ -42,24 +42,57 @@ def wait_engine():
     sys.exit('VOICEVOX エンジンに つながりません: ' + ENGINE)
 
 
+def get(path: str) -> bytes:
+    with urllib.request.urlopen(ENGINE + path, timeout=60) as r:
+        return r.read()
+
+
+def find_style(speakers: list, name: str, style: str | None) -> tuple[int, dict]:
+    """キャラクター名（とスタイル名）から speaker（スタイル）ID を さがす"""
+    for sp in speakers:
+        if sp['name'] == name:
+            styles = sp['styles']
+            st = next((x for x in styles if style and x['name'] == style), styles[0])
+            return st['id'], sp
+    names = ', '.join(s['name'] for s in speakers)
+    sys.exit(f'キャラクター「{name}」が このエンジンに ありません。つかえる キャラクター: {names}')
+
+
 def main():
     wait_engine()
-    lines: dict[str, str] = json.load(open(os.path.join(HERE, 'lines.json'), encoding='utf-8'))
+    # lines.json の あたいは 文字列（ずんだもん）か {"text": ..., "speaker": "キャラクター名", "style": "スタイル名"}
+    lines: dict = json.load(open(os.path.join(HERE, 'lines.json'), encoding='utf-8'))
+    speakers = json.loads(get('/speakers'))
     os.makedirs(OUT, exist_ok=True)
-    for name, text in lines.items():
-        q = json.loads(post(f'/audio_query?speaker={SPEAKER}&text=' + urllib.parse.quote(text)))
+    used: dict[str, dict] = {}
+    for name, item in lines.items():
+        if isinstance(item, str):
+            text, sid = item, SPEAKER
+        else:
+            text = item['text']
+            sid, sp = find_style(speakers, item['speaker'], item.get('style'))
+            used[sp['name']] = sp
+        q = json.loads(post(f'/audio_query?speaker={sid}&text=' + urllib.parse.quote(text)))
         # こどもに ききとりやすいよう、すこし ゆっくり・まえうしろの むおんを みじかく
         q['speedScale'] = 0.95
         q['prePhonemeLength'] = 0.05
         q['postPhonemeLength'] = 0.1
-        wav = post(f'/synthesis?speaker={SPEAKER}', json.dumps(q).encode())
+        wav = post(f'/synthesis?speaker={sid}', json.dumps(q).encode())
         with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
             f.write(wav)
             tmp = f.name
         dst = os.path.join(OUT, name + '.mp3')
         subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', tmp, '-ar', '24000', '-ac', '1', '-b:a', '96k', dst], check=True)
         os.unlink(tmp)
-        print(name, text)
+        print(name, sid, text)
+    # ずんだもん いがいの キャラクターの 利用規約を のこす（クレジット表記などの 確認用）
+    for nm, sp in used.items():
+        info = json.loads(get('/speaker_info?speaker_uuid=' + sp['speaker_uuid']))
+        with open(os.path.join(HERE, f'terms_{sp["speaker_uuid"][:8]}.md'), 'w', encoding='utf-8') as f:
+            f.write(f'# {nm} の 利用規約（VOICEVOX エンジン {get("/version").decode()} の speaker_info より）\n\n')
+            f.write('スタイル: ' + ', '.join(f"{x['name']}({x['id']})" for x in sp['styles']) + '\n\n')
+            f.write(info.get('policy', ''))
+        print('terms saved for', nm)
     print(len(lines), 'files ->', OUT)
 
 
