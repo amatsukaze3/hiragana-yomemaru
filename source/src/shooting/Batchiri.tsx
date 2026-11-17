@@ -117,8 +117,11 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
     if (idx < count - 1) {
       setIdx(idx + 1)
       setTraceReset((r) => r + 1)
-    } else if (step < TEST_STEP) goStep(step + 1)
-    else finish()
+    } else if (step < TEST_STEP) {
+      // マイクは おいかけ よみ から つける（それまでは ずんだもんの こえを きれいに きかせる）
+      if (step + 1 === 2 && voice.status === 'idle') void voice.start()
+      goStep(step + 1)
+    } else finish()
   }
 
   const finish = () => {
@@ -133,7 +136,6 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
   const start = () => {
     setPhase('learn')
     goStep(0)
-    void voice.start()
   }
 
   const retest = () => {
@@ -226,9 +228,9 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
                   char={char}
                   resetSignal={traceReset}
                   onComplete={() => {
+                    // よみあげは なぞり おわった ときに TraceCanvas が する（ここで かさねて ならさない）
                     setTraceDone(true)
-                    playChime()
-                    window.setTimeout(() => sayKana(char), 300)
+                    setBurst((x) => x + 1)
                   }}
                 />
               )}

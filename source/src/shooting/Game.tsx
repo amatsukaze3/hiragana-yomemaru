@@ -6,7 +6,7 @@ import { MicBadge } from '../components/MicStatus'
 import { Mascot } from '../components/Mascot'
 import { VoiceRegister } from '../components/VoiceRegister'
 import type { Kana } from '../data/kana'
-import { getAudioContext, playBeam } from '../lib/audio'
+import { getAudioContext, getOutput, playBeam } from '../lib/audio'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
 import { TeacherHelp } from '../components/TeacherHelp'
 import { useRetryRegister } from '../components/RetryPrompt'
@@ -67,7 +67,7 @@ function playMiss() {
     gain.gain.setValueAtTime(0.0001, now)
     gain.gain.exponentialRampToValueAtTime(0.08, now + 0.02)
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.4)
-    osc.connect(gain).connect(c.destination)
+    osc.connect(gain).connect(getOutput())
     osc.start(now)
     osc.stop(now + 0.42)
   } catch {

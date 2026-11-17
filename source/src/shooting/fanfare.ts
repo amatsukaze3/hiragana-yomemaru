@@ -1,4 +1,4 @@
-import { getAudioContext } from '../lib/audio'
+import { getAudioContext, getOutput } from '../lib/audio'
 
 /**
  * おいわいの ファンファーレ（タタタ・ターン♪）と、きらきらの 音。
@@ -18,9 +18,9 @@ export function playFanfare() {
     const fb = c.createGain()
     fb.gain.value = 0.22
     delay.connect(fb).connect(delay)
-    master.connect(c.destination)
+    master.connect(getOutput())
     master.connect(delay)
-    delay.connect(c.destination)
+    delay.connect(getOutput())
 
     // ラッパの 音：のこぎり波 2つを すこし ずらして、ローパスで まるく。たちあがりは すこし ゆっくり
     const brass = (freq: number, start: number, dur: number, vol = 0.16) => {

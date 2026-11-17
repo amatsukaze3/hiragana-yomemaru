@@ -26,6 +26,26 @@ export function getAudioContext(): AudioContext {
   return ctx
 }
 
+let limiter: DynamicsCompressorNode | null = null
+
+/**
+ * すべての音の 出口。音が かさなっても 音われ（クリップ）しないよう、
+ * スピーカーの てまえに リミッター（つよい コンプレッサー）を はさむ。
+ */
+export function getOutput(): AudioNode {
+  const c = getAudioContext()
+  if (!limiter || limiter.context !== c) {
+    limiter = c.createDynamicsCompressor()
+    limiter.threshold.value = -4
+    limiter.knee.value = 4
+    limiter.ratio.value = 20
+    limiter.attack.value = 0.002
+    limiter.release.value = 0.12
+    limiter.connect(c.destination)
+  }
+  return limiter
+}
+
 function pickVoice() {
   if (!('speechSynthesis' in window)) return
   const voices = speechSynthesis.getVoices().filter((v) => v.lang?.toLowerCase().startsWith('ja'))
@@ -185,7 +205,7 @@ async function playClip(key: string, onEnd?: () => void, fallbackText?: string) 
     const gain = c.createGain()
     gain.gain.value = 1
     src.buffer = buf
-    src.connect(gain).connect(c.destination)
+    src.connect(gain).connect(getOutput())
     src.onended = () => {
       if (current === src) current = null
       onEnd?.()
@@ -279,7 +299,7 @@ export function playChime() {
       gain.gain.setValueAtTime(0.0001, now + t)
       gain.gain.exponentialRampToValueAtTime(0.35, now + t + 0.015)
       gain.gain.exponentialRampToValueAtTime(0.0001, now + t + 0.6)
-      osc.connect(gain).connect(c.destination)
+      osc.connect(gain).connect(getOutput())
       osc.start(now + t)
       osc.stop(now + t + 0.65)
     }
@@ -301,7 +321,7 @@ export function playTick() {
     gain.gain.setValueAtTime(0.0001, now)
     gain.gain.exponentialRampToValueAtTime(0.12, now + 0.01)
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15)
-    osc.connect(gain).connect(c.destination)
+    osc.connect(gain).connect(getOutput())
     osc.start(now)
     osc.stop(now + 0.16)
   } catch {
@@ -323,7 +343,7 @@ export function playBeam() {
     g.gain.setValueAtTime(0.0001, now)
     g.gain.exponentialRampToValueAtTime(0.12, now + 0.01)
     g.gain.exponentialRampToValueAtTime(0.0001, now + 0.2)
-    osc.connect(g).connect(c.destination)
+    osc.connect(g).connect(getOutput())
     osc.start(now)
     osc.stop(now + 0.22)
     // ボン（ノイズ）
@@ -338,7 +358,7 @@ export function playBeam() {
     lp.frequency.value = 1200
     const g2 = c.createGain()
     g2.gain.value = 0.35
-    src.connect(lp).connect(g2).connect(c.destination)
+    src.connect(lp).connect(g2).connect(getOutput())
     src.start(now + 0.16)
   } catch {
     /* noop */
@@ -358,7 +378,7 @@ export function playMiss() {
       g.gain.setValueAtTime(0.0001, now + t)
       g.gain.exponentialRampToValueAtTime(0.1, now + t + 0.02)
       g.gain.exponentialRampToValueAtTime(0.0001, now + t + 0.17)
-      osc.connect(g).connect(c.destination)
+      osc.connect(g).connect(getOutput())
       osc.start(now + t)
       osc.stop(now + t + 0.18)
     }

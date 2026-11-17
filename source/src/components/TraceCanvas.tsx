@@ -93,12 +93,14 @@ export function TraceCanvas({ char, resetSignal, onComplete }: Props) {
       c.style.width = `${size}px`
       c.style.height = `${size}px`
     }
-    // 字形の大きさをそろえる：外枠の高さが枠の 72% になるよう調整
+    // 字形の大きさをそろえる：外枠の高さが枠の 72% になるよう調整。
+    // ただし「へ」「つ」「く」のような 横長・平たい字は、高さで あわせると はみ出すので、はばも 80% までに おさえる
     const probe = document.createElement('canvas').getContext('2d')!
     probe.font = `600 100px ${CARD_FONT}`
     const m0 = probe.measureText(char)
     const h0 = m0.actualBoundingBoxAscent + m0.actualBoundingBoxDescent || 80
-    const fs = (100 * size * 0.72) / h0
+    const w0 = m0.actualBoundingBoxLeft + m0.actualBoundingBoxRight || 80
+    const fs = 100 * size * Math.min(0.72 / h0, 0.8 / w0)
     probe.font = `600 ${fs}px ${CARD_FONT}`
     const m = probe.measureText(char)
     const gw = m.actualBoundingBoxLeft + m.actualBoundingBoxRight
