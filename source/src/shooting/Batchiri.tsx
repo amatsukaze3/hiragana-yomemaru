@@ -12,7 +12,8 @@ import { KANA_INFO, smartShuffle, type Kana } from '../data/kana'
 import { playChime } from '../lib/audio'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
 import { ActionButton } from '../screens/Learn'
-import { playApplause } from './applause'
+import { playFanfare } from './fanfare'
+import { GoldMedal } from './GoldMedal'
 import { recordPracticed, type WeakPick } from './history'
 import { sayBt, sayKana, type BtLine } from './voices'
 
@@ -47,6 +48,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
   const [answered, setAnswered] = useState(false)
   const [burst, setBurst] = useState(0)
   const busy = useRef(false)
+  const [narrow] = useState(() => window.innerWidth < 560)
 
   const isTest = step === TEST_STEP
   const count = isTest ? TEST_N : kana.length
@@ -124,8 +126,8 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
     kana.forEach(recordPracticed)
     setPhase('perfect')
     setBurst((b) => b + 1)
-    playApplause()
-    window.setTimeout(() => sayBt('perfect'), 900)
+    playFanfare()
+    window.setTimeout(() => sayBt('perfect'), 2700)
   }
 
   const start = () => {
@@ -283,37 +285,26 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
 
       {/* カンペキ！ おおきな はなまる と はくしゅ */}
       {phase === 'perfect' && (
-        <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-y-auto px-4 py-4 text-center" style={{ touchAction: 'pan-y' }}>
-          <motion.div initial={{ scale: 0.2, rotate: -30 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 160, damping: 12 }}>
-            <Hanamaru size={300} />
-          </motion.div>
+        <main className="flex min-h-0 flex-1 flex-col items-center gap-3 overflow-y-auto px-4 py-4 text-center" style={{ touchAction: 'pan-y' }}>
+          {/* おおきな はなまる と よめ丸くんの きんメダル（ちいさい がめんでは すこし ちいさく、よこに ならべる） */}
+          <div className="mt-auto flex items-center justify-center gap-x-2 sm:gap-x-6">
+            <motion.div initial={{ scale: 0.2, rotate: -30 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 160, damping: 12 }}>
+              <Hanamaru size={narrow ? 170 : 260} />
+            </motion.div>
+            <GoldMedal size={narrow ? 150 : 220} />
+          </div>
           <motion.p className="text-5xl font-bold text-orange-500 drop-shadow-[0_3px_0_#fff]" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.5 }}>
             カンペキ！
           </motion.p>
           <p className="text-xl text-stone-600">
-            <span className="font-card text-3xl text-stone-800">{kana.join('・')}</span> が ばっちり よめたね！
+            <span className="font-card text-3xl text-stone-800">{kana.join('・')}</span> が <span className="whitespace-nowrap">ばっちり よめたね！</span>
           </p>
-          <div className="relative">
-            <Mascot size={120} mood="cheer" />
-            {/* よめ丸くんの はくしゅ */}
-            {[-1, 1].map((side) => (
-              <motion.span
-                key={side}
-                className="absolute top-8 text-5xl"
-                style={{ [side < 0 ? 'right' : 'left']: '100%' }}
-                animate={{ scale: [1, 1.35, 1], rotate: [0, side * 12, 0] }}
-                transition={{ duration: 0.32, repeat: 9 }}
-                aria-hidden
-              >
-                👏
-              </motion.span>
-            ))}
-          </div>
+          <p className="rounded-full bg-amber-100 px-4 py-1 text-lg font-bold text-amber-800">よめ丸くんの きんメダルを ゲット！</p>
           <div className="mt-2 flex flex-wrap justify-center gap-3">
             <ActionButton icon={<RotateCcw />} label="もういちど テスト" onClick={retest} />
             <ActionButton icon={<House />} label="メニューへ" onClick={onExit} strong />
           </div>
-          <p className="text-sm text-stone-400">シューティングで あそぶと、にがてな もじの きろくが かわっていくよ</p>
+          <p className="mb-auto text-sm text-stone-400">シューティングで あそぶと、にがてな もじの きろくが かわっていくよ</p>
         </main>
       )}
 
