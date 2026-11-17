@@ -8,13 +8,14 @@ import { Mascot } from '../components/Mascot'
 import { useRetryRegister } from '../components/RetryPrompt'
 import { TeacherHelp } from '../components/TeacherHelp'
 import { TraceCanvas } from '../components/TraceCanvas'
-import { KANA_INFO, smartShuffle, type Kana } from '../data/kana'
+import { KANA_INFO, type Kana } from '../data/kana'
 import { playChime } from '../lib/audio'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
 import { ActionButton } from '../screens/Learn'
 import { playFanfare } from './fanfare'
 import { GoldMedal } from './GoldMedal'
 import { recordPracticed, type WeakPick } from './history'
+import { makeTestOrder } from './testOrder'
 import { sayBt, sayKana, type BtLine } from './voices'
 
 /**
@@ -40,7 +41,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
   const [phase, setPhase] = useState<Phase>('intro')
   const [step, setStep] = useState(0)
   const [idx, setIdx] = useState(0)
-  const [testOrder, setTestOrder] = useState<Kana[]>(() => smartShuffle(TEST_N, kana))
+  const [testOrder, setTestOrder] = useState<Kana[]>(() => makeTestOrder(kana))
   /** ずんだもんが しゃべりおわって、マイクで きく じゅんびが できたか */
   const [ready, setReady] = useState(false)
   const [traceDone, setTraceDone] = useState(false)
@@ -110,7 +111,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
     setStep(s)
     setIdx(0)
     setTraceReset((r) => r + 1)
-    if (s === TEST_STEP) setTestOrder(smartShuffle(TEST_N, kana))
+    if (s === TEST_STEP) setTestOrder(makeTestOrder(kana))
   }
 
   function next() {
