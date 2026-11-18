@@ -114,7 +114,7 @@ export const KANA_INFO: Record<Kana, KanaInfo> = {
   ニ: { char: 'ニ', romaji: 'ni', word: 'ニワトリ', vowel: 'い', strokes: 2, strokeStarts: [[0.1, 0.1], [0.02, 0.9]], image: niImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 50.0, cy: 59.7, h: 43.0 } },
   ヌ: { char: 'ヌ', romaji: 'nu', word: 'ヌードル', vowel: 'う', strokes: 2, strokeStarts: [[0.1, 0.08], [0.3, 0.48]], image: nuImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 46.8, cy: 52.3, h: 43.0 } },
   ネ: { char: 'ネ', romaji: 'ne', word: 'ネクタイ', vowel: 'え', strokes: 4, strokeStarts: [[0.45, 0.03], [0.1, 0.3], [0.5, 0.52], [0.72, 0.56]], image: neImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 49.9, cy: 49.8, h: 43.0 } },
-  ノ: { char: 'ノ', romaji: 'no', word: 'ノート', vowel: 'お', strokes: 1, strokeStarts: [[0.9, 0.05]], image: noImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 50.6, cy: 51.6, h: 43.0 } },
+  ノ: { char: 'ノ', romaji: 'no', word: 'ノート', vowel: 'お', strokes: 1, strokeStarts: [[0.9, 0.05]], image: noImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 50.0, cy: 50.0, h: 43.0 } },
   ハ: { char: 'ハ', romaji: 'ha', word: 'ハンバーガー', vowel: 'あ', strokes: 2, strokeStarts: [[0.35, 0.06], [0.65, 0.06]], image: haImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 49.9, cy: 50.5, h: 43.0 } },
   ヒ: { char: 'ヒ', romaji: 'hi', word: 'ヒマワリ', vowel: 'い', strokes: 2, strokeStarts: [[0.15, 0.42], [0.1, 0.03]], image: hiImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 51.0, cy: 51.3, h: 43.0 } },
   フ: { char: 'フ', romaji: 'fu', word: 'フラミンゴ', vowel: 'う', strokes: 1, strokeStarts: [[0.05, 0.1]], image: fuImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 50.6, cy: 50.0, h: 43.0 } },
