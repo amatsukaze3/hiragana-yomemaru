@@ -112,34 +112,6 @@
   "text": "ひらがなは よませないぞー！",
   "speaker": "黒沢冴白"
  },
- "jm_t0": {
-  "text": "いくぞー！ えいっ！",
-  "speaker": "黒沢冴白"
- },
- "jm_throw0": {
-  "text": "これが よめるかなー？",
-  "speaker": "黒沢冴白"
- },
- "jm_throw1": {
-  "text": "えいっ！",
-  "speaker": "黒沢冴白"
- },
- "jm_throw2": {
-  "text": "まだまだー！",
-  "speaker": "黒沢冴白"
- },
- "jm_throw3": {
-  "text": "つぎは これだ！",
-  "speaker": "黒沢冴白"
- },
- "jm_throw4": {
-  "text": "これなら どうだ！",
-  "speaker": "黒沢冴白"
- },
- "jm_throw5": {
-  "text": "よめるもんかー！",
-  "speaker": "黒沢冴白"
- },
  "jm_hit0": {
   "text": "いててっ！",
   "speaker": "黒沢冴白"
@@ -158,14 +130,6 @@
  },
  "jm_hit4": {
   "text": "なにっ！？",
-  "speaker": "黒沢冴白"
- },
- "jm_slow": {
-  "text": "どうしたー？ よめないのかー？",
-  "speaker": "黒沢冴白"
- },
- "jm_danger": {
-  "text": "ま、まずい！",
   "speaker": "黒沢冴白"
  },
  "jm_defeat": {

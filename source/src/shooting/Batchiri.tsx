@@ -119,51 +119,21 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
       later(() => sayJama('enter', () => later(() => sayBt('boss', () => later(go, 250)), 150)), 700)
       later(go, 16000) // 音声が ない ときの ほけん
     } else if (boss === 'throw') {
-      // なげながら ひとこと。しゃべりおわってから マイクで きく（じゃままるくんの こえを よみと まちがえない ように）
-      let flown = false
-      let said = false
-      const ready = () => {
-        if (!flown || !said) return
+      // カードが ほぼ とどいたら すぐ マイクで きく（みえた しゅんかんに よむ子が おおいので）。
+      // じゃままるくんの「これが よめるかな〜？」などは ふきだし だけに して、よんでいる あいだは しゃべらない
+      // （ほかの モードと おなじ ききとりやすさに する。ボスだから むずかしく しない）
+      later(() => {
         setBoss('ready')
         setReady(true)
-      }
-      later(() => {
-        flown = true
-        ready()
-      }, 950)
-      later(
-        () =>
-          sayJama(jamaKey('throw', idx, TEST_N, false), () => {
-            said = true
-            ready()
-          }),
-        150,
-      )
-      later(() => {
-        said = true
-        ready()
-      }, 4000) // 音声が ない ときの ほけん
+      }, 500)
     } else if (boss === 'ready') {
-      // なかなか よめないとき：7びょうで「どうした〜？」（しゃべる あいだは マイクを とめる）
-      later(() => {
-        setSlow(true)
-        voice.pause()
-        let back = false
-        const resume = () => {
-          if (back) return
-          back = true
-          voice.resume()
-        }
-        sayJama('slow', resume)
-        later(resume, 4000)
-      }, 7000)
+      // なかなか よめないとき：8びょうで ふきだし「どうした〜？」（マイクは とめない・しゃべらない）
+      later(() => setSlow(true), 8000)
     }
     return () => {
       on = false
       timers.forEach((t) => window.clearTimeout(t))
     }
-    // voice の メソッドは かわらない（useCallback）ので いれない
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, isTest, boss, idx])
 
   /** よめた！ → よめ丸 スーパービーム */
@@ -171,7 +141,6 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
     if (busy.current || boss !== 'ready') return
     busy.current = true
     retry.reset()
-    voice.resume() // 「どうした〜？」で とめていたら もどす
     setReady(false)
     setSlow(false)
     setBoss('hit')

@@ -8,7 +8,11 @@
  */
 export type BossState = 'enter' | 'throw' | 'ready' | 'hit' | 'defeat'
 
-/** じゃままるくんの セリフ（こえ：VOICEVOX:黒沢冴白 … voice/shoot/jm_<key>.mp3） */
+/**
+ * じゃままるくんの セリフ。
+ * こえ（VOICEVOX:黒沢冴白 … voice/shoot/jm_<key>.mp3）が あるのは enter・hit0〜4・defeat だけ。
+ * なげる とき（t0・throw・danger）と「どうした〜？」（slow）は、こどもが よんでいる じかんなので ふきだし だけに する。
+ */
 export const JAMA_TEXT = {
   enter: 'ひらがなは よませないぞ〜！',
   t0: 'いくぞ〜！ えいっ！',
