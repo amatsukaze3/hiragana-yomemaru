@@ -7,6 +7,7 @@
 npm install
 npm run dev          # 開発サーバー（スマホからは https が必要：マイク利用のため）
 npm run build:single # dist-single/index.html の 1 ファイル版 → リポジトリの katakana/index.html に置く
+npm run build:single:shoot # dist-single-shoot/shooting.html（シューティングだけ）→ リポジトリの katakana/shooting/index.html に置く
 ```
 
 ## ひらがなよめ丸との ちがい

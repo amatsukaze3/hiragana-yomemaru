@@ -24,6 +24,7 @@
 公開ページ：https://amatsukaze3.github.io/hiragana-yomemaru/katakana/
 
 - `katakana/index.html` … 公開用（1ファイルで動きます）
+- `katakana/shooting/index.html` … はなちゃんシューティング だけの ページ（https://amatsukaze3.github.io/hiragana-yomemaru/katakana/shooting/ 。`npm run build:single:shoot` → `dist-single-shoot/shooting.html` をここに）
 - `katakana/source/` … ソース（`npm install` → `npm run build:single` → `dist-single/index.html` を `katakana/index.html` に）
 - `katakana/tools/voice/` … こえ（VOICEVOX:東北ずん子、じゃままるくんは VOICEVOX:黒沢冴白）の セリフと 生成スクリプト
 - `katakana/tools/cards/` … カード絵（いただいたPDFから文字を消した線画）の 作りかた
