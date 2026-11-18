@@ -16,3 +16,17 @@
 - `tools/shoot-voice/` … シューティングの ずんだもん音声の セリフと 生成スクリプト（VOICEVOX が うごいている状態で `python3 tools/shoot-voice/make_voices.py`。GitHub では `voice-gen` ブランチに push すると Actions で生成）
 
 こえ：VOICEVOX:ずんだもん／VOICEVOX:黒沢冴白（ひらがなじゃままるくん）
+
+## カタカナはなちゃん（`katakana/`）
+
+ひらがなよめ丸と同じしくみで、カタカナ（ア行〜ワ行・46文字）を読めるようにするアプリです。
+
+公開ページ：https://amatsukaze3.github.io/hiragana-yomemaru/katakana/
+
+- `katakana/index.html` … 公開用（1ファイルで動きます）
+- `katakana/source/` … ソース（`npm install` → `npm run build:single` → `dist-single/index.html` を `katakana/index.html` に）
+- `katakana/tools/voice/` … こえ（VOICEVOX:東北ずん子、じゃままるくんは VOICEVOX:黒沢冴白）の セリフと 生成スクリプト
+- `katakana/tools/cards/` … カード絵（いただいたPDFから文字を消した線画）の 作りかた
+- 端末に保存するきろくは `hanachan:` で始まるキーなので、ひらがなよめ丸のきろくとは まざりません
+
+こえ：VOICEVOX:東北ずん子／VOICEVOX:黒沢冴白（カタカナはなちゃん）
