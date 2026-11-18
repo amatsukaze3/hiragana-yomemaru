@@ -43,6 +43,42 @@ const UTT_END_FRAMES = 7 // 約160ms 声が止まったら、ひとつの発声�
 const UTT_MIN_FRAMES = 5 // 約0.12秒より短い音は判定しない
 const UTT_MAX_FRAMES = 50 // 約1.15秒より長い発声（おしゃべり・文）は不合格
 const UTT_MIN_PROB = 0.5
+/** 発声の なかで、いちばん大きい声より これだけ（-26dB）小さい音は「すきま」とみなす */
+const UTT_GAP_RATIO = 0.05
+/** 「いちばん大きい まとまり」に いれる 大きさ（-12dB）と、その そとに あっては いけない 大きさ（-10dB） */
+const RUN_CORE_RATIO = 0.25
+const RUN_OTHER_RATIO = 0.316
+/** まとまりの なかで ゆるす すきま（UTT_END_FRAMES より みじかい すきまは ひとつづき） */
+const RUN_MAX_GAP = 6
+
+/**
+ * 発声の なかの「いちばん大きい まとまり」（-12dB いないの フレームが 6フレームいかの すきまで つづく ところ）と、
+ * その そとに ある「おなじくらい 大きい（-10dB いない）」フレームの かず。
+ * まわりの 小さな音（おとなの こえ・いき・すすりなき）と つながった 発声でも、こどもが よんだ ところだけを とりだせる。
+ * おしゃべり（大きさの にた 音が いくつも ある）は others が 0 に ならないので 判定しない。
+ */
+export function loudRun(levels: number[]) {
+  const top = Math.max(0, ...levels)
+  const p = levels.indexOf(top)
+  const core = (i: number) => levels[i] >= top * RUN_CORE_RATIO
+  let a = p
+  let b = p
+  for (let i = p - 1, gap = 0; i >= 0; i--) {
+    if (core(i)) {
+      a = i
+      gap = 0
+    } else if (++gap > RUN_MAX_GAP) break
+  }
+  for (let i = p + 1, gap = 0; i < levels.length; i++) {
+    if (core(i)) {
+      b = i
+      gap = 0
+    } else if (++gap > RUN_MAX_GAP) break
+  }
+  let others = 0
+  for (let i = 0; i < levels.length; i++) if ((i < a || i > b) && levels[i] >= top * RUN_OTHER_RATIO) others++
+  return { a, b, others }
+}
 
 /**
  * ひとつの発声が、目標の母音を読んだものかどうか。
@@ -241,7 +277,7 @@ export class HybridVoiceJudge {
   private lockUntil = 0
   private targetSetAt = 0
   // ひとつの発声（声が出はじめてから止まるまで）のまとめ
-  private utt: { feats: number[][]; levels: number[]; silent: number; run: number } | null = null
+  private utt: { feats: number[][]; levels: number[]; silent: number; run: number; top: number } | null = null
   /** 登録した その子の「あいうえお」の形（なければ学習モデルで判定） */
   private voiceprint: number[][] | null = null
   private captureCb: ((shape: number[] | null) => void) | null = null
@@ -479,17 +515,26 @@ export class HybridVoiceJudge {
     const match = !!probs && tv >= 0 && probs.indexOf(Math.max(...probs)) === tv
     const listening = !this.paused && this.armed && now >= this.lockUntil && (!!this.target || !!this.captureCb)
 
+    // 発声の なかで いちばん大きい声より ずっと小さい音（-26dB）は、すきま として あつかう。
+    // こどもの こえの まわりに 小さな音（おとなの こえ・いき・すすりなき）が つづいていても、1もじずつ くぎれる
+    const inGap = !!this.utt && this.utt.top > 0 && rms < this.utt.top * UTT_GAP_RATIO
+
     // 発声ごとに判定する（声が止まったところで、その発声全体を見て決める）
-    if (listening && voiced) {
-      if (!this.utt) this.utt = { feats: [], levels: [], silent: 0, run: 0 }
+    if (listening && voiced && !inGap) {
+      if (!this.utt) this.utt = { feats: [], levels: [], silent: 0, run: 0, top: 0 }
       const u = this.utt
       u.silent = 0
       if (feat) {
         u.feats.push(feat)
         u.levels.push(rms)
+        u.top = Math.max(u.top, rms)
       }
-      // 長すぎる「声」は まわりの音なので、いったん捨てて 次の声を待つ
-      if (u.feats.length > UTT_MAX_FRAMES * 2) this.utt = null
+      // 長すぎる「声」は 古いほうから すてる（すてきると、まわりの音の あとに よんだ 声まで きれてしまうため）
+      if (u.feats.length > UTT_MAX_FRAMES * 2) {
+        u.feats.shift()
+        u.levels.shift()
+        u.top = Math.max(0, ...u.levels)
+      }
       u.run = match ? u.run + 1 : 0
     } else if (this.utt) {
       this.utt.silent++
@@ -498,13 +543,18 @@ export class HybridVoiceJudge {
         const u = this.utt
         this.utt = null
         this.uttCount++
+        // いちばん大きい まとまりだけを つかう（まわりの 小さな音は のぞく）
+        const r = loudRun(u.levels)
+        const runLen = r.b - r.a + 1
+        const runFeats = u.feats.slice(r.a, r.b + 1)
+        const runLevels = u.levels.slice(r.a, r.b + 1)
         // 声の大きさによらず同じに判定できるよう、その発声のいちばん大きいところから -12dB までの部分だけを使う
         const top = Math.max(0, ...u.levels)
-        const core = u.feats.filter((_, i) => u.levels[i] >= top * 0.25)
+        const core = runFeats.filter((_, i) => runLevels[i] >= top * RUN_CORE_RATIO)
         // 声の登録中：この発声の形を返す
         if (this.captureCb) {
           // まわりの子の声をひろわないよう、まわりの音より はっきり大きい声（約+14dB）だけを登録する
-          if (u.feats.length >= UTT_MIN_FRAMES && u.feats.length <= UTT_MAX_FRAMES * 2 && top >= this.noiseFloor * this.captureRatio) {
+          if (runLen >= UTT_MIN_FRAMES && runLen <= UTT_MAX_FRAMES * 2 && r.others === 0 && top >= this.noiseFloor * this.captureRatio) {
             const cb = this.captureCb
             this.captureCb = null
             cb(meanShape(core))
@@ -514,7 +564,8 @@ export class HybridVoiceJudge {
         // 登録があれば その子の声とくらべて 45%以上、なければ学習モデルで 50%以上
         // （音声認識が動いているときの学習モデルは、より はっきりした 60%以上）
         const thr = this.voiceprint ? 0.45 : this.asrAlive ? 0.6 : UTT_MIN_PROB
-        const lenOk = u.feats.length >= UTT_MIN_FRAMES && u.feats.length <= UTT_MAX_FRAMES
+        // ながさは「いちばん大きい まとまり」で みる。ほかに おなじくらい 大きい音が ある（おしゃべり）なら 判定しない
+        const lenOk = runLen >= UTT_MIN_FRAMES && runLen <= UTT_MAX_FRAMES && r.others === 0
         const nOk = this.target === 'ん' && lenOk && core.length >= 3 ? this.nMatches(core) : null
         if ((window as unknown as { __yomeDebug?: boolean }).__yomeDebug && this.voiceprint)
           console.log('UTT', this.target, u.feats.length, core.length, utteranceAvg(core.map((f) => personalProbs(f, this.voiceprint!))).map((v) => v.toFixed(2)).join(' '), nOk)
