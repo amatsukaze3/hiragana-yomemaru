@@ -2,8 +2,9 @@
 カタカナ 1もじの こえ（VOICEVOX:東北ずん子 ノーマル）
 - 「カマ」のように 2もじの ことばを よませ、1もじめ だけを きりだす（1もじだけ よませると 息っぽくなるため）
 - 弱い 子音（m・n・h・y など）は VOICEVOX で すこし ながめに よませる
-- 子音と、子音から 母音への うつりかわり（母音の はじめ 0.06びょう）は もとの 音を そのまま つかい、
-  そのあとの 母音だけ WORLD で 安定した ところを のばして、子音＋母音 を 約0.37びょうに そろえる
+- 無声の 子音（k・s・h など）は もとの 音を そのまま つかう。有声の ところ（m・n・y の 子音と 母音）は WORLD で つくりなおし、
+  子音から 母音への うつりかわり（母音の はじめ 0.06びょう）は そのまま、そのあとの 母音だけ 安定部を のばして、子音＋母音 を 約0.37びょうに そろえる
+- 出だしの 声の 高さの「すべりあがり」は おさえる（m・n・y を ながく すると ゆれて きこえるため）
 - 声の高さは「はじめ P0 → おわり すこし さがる」言い切りの 形（もとの こまかい ゆれは はんぶん のこす）
 - ファイルは 無音こみで 0.49びょう、24kHz モノラル 96kbps、ラウドネス -16.5 LUFS
 """
@@ -44,7 +45,7 @@ def make(kana, out_mp3, debug=False):
     if c and m0['consonant_length']:
         m0['consonant_length'] *= CONS_SCALE.get(c, 1.0)
     cons = m0['consonant_length'] or 0.0
-    m0['vowel_length'] = 0.2
+    m0['vowel_length'] = 0.32  # 母音を ながめに よませて、のばす もとに なる 安定部を ながく とる
     m0['pitch'] = math.log(P0)
     m1['pitch'] = math.log(P0 * 0.97)
     x, sr = sf.read(io.BytesIO(synth(q, SID)))
@@ -74,41 +75,43 @@ def make(kana, out_mp3, debug=False):
     stable = list(range(lo + best[0], lo + best[1]))
     if len(stable) < 4:
         stable = list(range(lo, hi))
-    # もとの 音：出はじめ 〜 母音の はじめ KEEP びょう（子音と うつりかわりは そのまま）
-    t_keep = t_v0 + KEEP
-    head = y[on:int(t_keep * SR)]
-    # のばす 母音：安定部を いったりきたり（つなぎめの ぶんも ふくめて つくる）
-    tail_sec = VOICED - len(head) / SR + XFADE + 0.012
-    need = max(8, int(round(tail_sec * 1000 / FP)))
+    # 有声に なる ところ（m・n・y などは 子音から、k・s・h などは 母音から）
+    j_keep = int(round((t_v0 + KEEP) * 1000 / FP))
+    vf = [j for j in range(int(on / hop), j_keep) if f0[j] > 0]
+    jv = vf[0] if vf else j_keep
+    # のばす 母音：安定部を いったりきたり
+    need = max(8, int(round((VOICED - (jv * hop - on) / SR) * 1000 / FP)) - (j_keep - jv))
     seq, i, d = [], 0, 1
     while len(seq) < need:
         seq.append(stable[i])
         if not 0 <= i + d < len(stable): d = -d
         i += d
-    sp2 = np.exp(uniform_filter1d(np.log(sp[seq] + 1e-12), 3, axis=0))
-    ap2 = ap[seq]
-    f0o = f0[seq]
-    sm = uniform_filter1d(np.where(f0o > 0, f0o, P0), 9)
-    jit = np.where(f0o > 0, f0o - sm, 0)
+    frames = list(range(jv, j_keep)) + seq
+    nh = j_keep - jv
+    sp2 = np.exp(uniform_filter1d(np.log(sp[frames] + 1e-12), 3, axis=0))
+    sp2[nh:] = np.exp(uniform_filter1d(np.log(sp[seq] + 1e-12), 5, axis=0))
+    ap2 = ap[frames]
+    f0o = f0[frames]
+    # 高さ：出だしの「すべりあがり」を おさえて（P0 の 0.93〜1.02 ばいに）、母音は はじめ P0 → おわり すこし さがる
+    head_f0 = np.clip(np.where(f0o[:nh] > 0, f0o[:nh], P0), P0 * 0.93, P0 * 1.02)
+    head_f0 = uniform_filter1d(head_f0, 5) if nh >= 5 else head_f0
     r = np.linspace(0, 1, len(seq))
-    shape = 1.0 - 0.08 * (np.clip(r - 0.5, 0, None) / 0.5) ** 1.5
-    # つなぎめの 高さを もとの 音に あわせる
-    j0 = int(t_keep * 1000 / FP)
-    p_start = f0[j0] if 0 <= j0 < len(f0) and f0[j0] > 0 else P0
-    tgt = P0 * shape + (p_start - P0) * np.clip(1 - r * 6, 0, 1)
-    f0n = tgt + 0.5 * jit
+    tail_f0 = P0 * (1.0 - 0.08 * (np.clip(r - 0.5, 0, None) / 0.5) ** 1.5)
+    sm = uniform_filter1d(np.where(f0[seq] > 0, f0[seq], P0), 5)
+    tail_f0 = tail_f0 + 0.3 * uniform_filter1d(np.where(f0[seq] > 0, f0[seq] - sm, 0), 3)
+    f0n = uniform_filter1d(np.concatenate([head_f0, tail_f0]), 3)
+    if nh:
+        f0n[:nh] = np.maximum(f0n[:nh], head_f0 * 0.98)
     z = pw.synthesize(np.ascontiguousarray(f0n), np.ascontiguousarray(sp2), np.ascontiguousarray(ap2), SR, frame_period=FP)
-    xf = int(XFADE * SR)
-    k = np.linspace(0, 1, xf)
-    # つなぎめで 波が うちけしあわないよう、いちばん よく かさなる ずらしかたを さがす（1周期ぶん）
-    ref = head[-xf:]
-    period = int(SR / max(p_start, 150)) + 2
-    shift = max(range(period), key=lambda s_: float(np.dot(ref, z[s_:s_ + xf])))
-    z = z[shift:]
-    # 大きさを もとの 音の おわりに あわせる
-    g = np.sqrt(np.mean(head[-xf:] ** 2)) / max(np.sqrt(np.mean(z[:xf] ** 2)), 1e-9)
-    z = z * g
-    joined = np.concatenate([head[:-xf], head[-xf:] * (1 - k) + z[:xf] * k, z[xf:]])
+    # 無声の 子音（k・s・h など）は もとの 音を そのまま つかい、有声に なる ところで つなぐ
+    pre = y[on:jv * hop]
+    xf = min(int(0.008 * SR), len(pre))
+    if len(pre) > 0:
+        k = np.linspace(0, 1, xf)
+        ref = pre[-xf:] if xf else pre
+        joined = np.concatenate([pre[:len(pre) - xf], pre[len(pre) - xf:] * (1 - k) + z[:xf] * k, z[xf:]])
+    else:
+        joined = z
     fi = int(0.006 * SR)
     joined[:fi] *= np.linspace(0, 1, fi)
     fade = int(0.05 * SR)

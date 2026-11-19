@@ -19,6 +19,7 @@ let unlocked = false
 let jaVoice: SpeechSynthesisVoice | null = null
 
 export function getAudioContext(): AudioContext {
+  if (ctx && ctx.state === 'closed') ctx = null
   if (!ctx) {
     const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
     ctx = new AC()
@@ -90,15 +91,55 @@ export function unlockAudio() {
 }
 
 export function installUnlockListener() {
+  // 1かいめの タップで アンロック。そのあとも タップの たびに、音の 出口が 止まっていたら 立てなおす
+  // （iPad/iPhone は マイクの あとや、ほかの 音が わりこんだ あとに 止まったままに なることが あるため）
   const handler = () => {
-    unlockAudio()
-    window.removeEventListener('pointerdown', handler, true)
-    window.removeEventListener('touchend', handler, true)
-    window.removeEventListener('keydown', handler, true)
+    if (!unlocked) unlockAudio()
+    else reviveAudio()
   }
   window.addEventListener('pointerdown', handler, true)
   window.addEventListener('touchend', handler, true)
   window.addEventListener('keydown', handler, true)
+}
+
+/** 音の 出口が 止まっていたら 立てなおす（タップの 中で よぶ） */
+function reviveAudio() {
+  try {
+    const c = getAudioContext()
+    if (c.state === 'running') return
+    setPlaybackSession()
+    c.resume().then(
+      () => {
+        if (c.state !== 'running') resetContext()
+      },
+      () => resetContext(),
+    )
+    // 無音を 1 サンプル鳴らして iOS のオーディオ経路を開きなおす
+    const src = c.createBufferSource()
+    src.buffer = c.createBuffer(1, 1, 22050)
+    src.connect(c.destination)
+    src.start(0)
+  } catch {
+    resetContext()
+  }
+}
+
+/** 音の 出口を 作りなおす（マイクを つかっている あいだは しない：マイクの 判定が 止まるため） */
+function resetContext() {
+  if (micActive || !ctx) return
+  try {
+    void ctx.close()
+  } catch {
+    /* noop */
+  }
+  ctx = null
+  limiter = null
+  try {
+    const c = getAudioContext()
+    if (c.state === 'suspended') void c.resume()
+  } catch {
+    /* noop */
+  }
 }
 
 /** iPad/iPhone：消音スイッチがオンでも声が出るようにする（Safari 16.4+） */
@@ -212,8 +253,28 @@ async function playClip(key: string, onEnd?: () => void, fallbackText?: string) 
     }
     current = src
     src.start()
+    // 見はり：鳴らしたのに 音の 時計が すすまないときは（iPad で 出口が 止まっている）、
+    // <audio> で 鳴らしなおし、つぎからは 出口を 作りなおす
+    const t0 = c.currentTime
+    window.setTimeout(() => {
+      if (current !== src || c.currentTime > t0 + 0.05) return
+      try {
+        src.onended = null
+        src.stop()
+      } catch {
+        /* noop */
+      }
+      current = null
+      resetContext()
+      void playElement(key, onEnd, fallbackText)
+    }, 450)
     return
   }
+  await playElement(key, onEnd, fallbackText)
+}
+
+/** <audio> で 鳴らす → だめなら 端末の 音声合成 */
+async function playElement(key: string, onEnd?: () => void, fallbackText?: string) {
   const url = CLIPS[key]
   if (url) {
     try {
