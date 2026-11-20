@@ -31,3 +31,17 @@
 - 端末に保存するきろくは `hanachan:` で始まるキーなので、ひらがなよめ丸のきろくとは まざりません
 
 こえ：VOICEVOX:東北ずん子／VOICEVOX:黒沢冴白（カタカナはなちゃん）
+
+## ひらがなデイジーちゃん（`daisy/`）
+
+英語だけを話す子むけの ひらがなアプリです（画面は英語、カードの絵は カタカナはなちゃん と同じ）。
+
+公開ページ：https://amatsukaze3.github.io/hiragana-yomemaru/daisy/
+
+- `daisy/index.html` … 公開用（1ファイルで動きます）
+- `daisy/shooting/index.html` … デイジーちゃんシューティング だけの ページ（https://amatsukaze3.github.io/hiragana-yomemaru/daisy/shooting/）
+- `daisy/source/` … ソース（`npm install` → `npm run build:single` → `dist-single/index.html` を `daisy/index.html` に）
+- `daisy/tools/voice/` … こえ（VOICEVOX:四国めたん、じゃままるくんは VOICEVOX:黒沢冴白）の セリフと 生成スクリプト
+- 端末に保存するきろくは `daisy:` で始まるキーなので、ほかの アプリの きろくとは まざりません
+
+こえ：VOICEVOX:四国めたん／VOICEVOX:黒沢冴白（ひらがなデイジーちゃん）

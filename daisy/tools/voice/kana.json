@@ -1,0 +1,232 @@
+[
+ {
+  "char": "あ",
+  "romaji": "a",
+  "word": "アイス"
+ },
+ {
+  "char": "い",
+  "romaji": "i",
+  "word": "インコ"
+ },
+ {
+  "char": "う",
+  "romaji": "u",
+  "word": "ウクレレ"
+ },
+ {
+  "char": "え",
+  "romaji": "e",
+  "word": "エプロン"
+ },
+ {
+  "char": "お",
+  "romaji": "o",
+  "word": "オレンジ"
+ },
+ {
+  "char": "か",
+  "romaji": "ka",
+  "word": "カメラ"
+ },
+ {
+  "char": "き",
+  "romaji": "ki",
+  "word": "キャベツ"
+ },
+ {
+  "char": "く",
+  "romaji": "ku",
+  "word": "クレヨン"
+ },
+ {
+  "char": "け",
+  "romaji": "ke",
+  "word": "ケーキ"
+ },
+ {
+  "char": "こ",
+  "romaji": "ko",
+  "word": "コアラ"
+ },
+ {
+  "char": "さ",
+  "romaji": "sa",
+  "word": "サンドイッチ"
+ },
+ {
+  "char": "し",
+  "romaji": "shi",
+  "word": "シーソー"
+ },
+ {
+  "char": "す",
+  "romaji": "su",
+  "word": "スプーン"
+ },
+ {
+  "char": "せ",
+  "romaji": "se",
+  "word": "セーター"
+ },
+ {
+  "char": "そ",
+  "romaji": "so",
+  "word": "ソーセージ"
+ },
+ {
+  "char": "た",
+  "romaji": "ta",
+  "word": "タクシー"
+ },
+ {
+  "char": "ち",
+  "romaji": "chi",
+  "word": "チーズ"
+ },
+ {
+  "char": "つ",
+  "romaji": "tsu",
+  "word": "ツバメ"
+ },
+ {
+  "char": "て",
+  "romaji": "te",
+  "word": "テレビ"
+ },
+ {
+  "char": "と",
+  "romaji": "to",
+  "word": "トマト"
+ },
+ {
+  "char": "な",
+  "romaji": "na",
+  "word": "ナイフ"
+ },
+ {
+  "char": "に",
+  "romaji": "ni",
+  "word": "ニワトリ"
+ },
+ {
+  "char": "ぬ",
+  "romaji": "nu",
+  "word": "ヌードル"
+ },
+ {
+  "char": "ね",
+  "romaji": "ne",
+  "word": "ネクタイ"
+ },
+ {
+  "char": "の",
+  "romaji": "no",
+  "word": "ノート"
+ },
+ {
+  "char": "は",
+  "romaji": "ha",
+  "word": "ハンバーガー"
+ },
+ {
+  "char": "ひ",
+  "romaji": "hi",
+  "word": "ヒマワリ"
+ },
+ {
+  "char": "ふ",
+  "romaji": "fu",
+  "word": "フラミンゴ"
+ },
+ {
+  "char": "へ",
+  "romaji": "he",
+  "word": "ヘルメット"
+ },
+ {
+  "char": "ほ",
+  "romaji": "ho",
+  "word": "ホットケーキ"
+ },
+ {
+  "char": "ま",
+  "romaji": "ma",
+  "word": "マフラー"
+ },
+ {
+  "char": "み",
+  "romaji": "mi",
+  "word": "ミルク"
+ },
+ {
+  "char": "む",
+  "romaji": "mu",
+  "word": "ムササビ"
+ },
+ {
+  "char": "め",
+  "romaji": "me",
+  "word": "メガネ"
+ },
+ {
+  "char": "も",
+  "romaji": "mo",
+  "word": "モンスター"
+ },
+ {
+  "char": "や",
+  "romaji": "ya",
+  "word": "ヤギ"
+ },
+ {
+  "char": "ゆ",
+  "romaji": "yu",
+  "word": "ユニコーン"
+ },
+ {
+  "char": "よ",
+  "romaji": "yo",
+  "word": "ヨーグルト"
+ },
+ {
+  "char": "ら",
+  "romaji": "ra",
+  "word": "ランドセル"
+ },
+ {
+  "char": "り",
+  "romaji": "ri",
+  "word": "リボン"
+ },
+ {
+  "char": "る",
+  "romaji": "ru",
+  "word": "ルーレット"
+ },
+ {
+  "char": "れ",
+  "romaji": "re",
+  "word": "レモン"
+ },
+ {
+  "char": "ろ",
+  "romaji": "ro",
+  "word": "ロケット"
+ },
+ {
+  "char": "わ",
+  "romaji": "wa",
+  "word": "ワッフル"
+ },
+ {
+  "char": "を",
+  "romaji": "wo",
+  "word": "パンヲタベル"
+ },
+ {
+  "char": "ん",
+  "romaji": "n",
+  "word": "プリン"
+ }
+]
