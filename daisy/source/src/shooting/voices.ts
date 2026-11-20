@@ -2,10 +2,10 @@ import { KANA_INFO, type Kana } from '../data/kana'
 import { hasClip, playVoice, registerClips, speak } from '../lib/audio'
 
 /**
- * はなちゃんシューティングの こえ（VOICEVOX:東北ずん子）
- * - カタカナ 1もじ … カタカナはなちゃん本体の 音声（src/assets/voice/*.mp3）
+ * デイジーちゃんシューティングの こえ（VOICEVOX:四国めたん）
+ * - カタカナ 1もじ … ひらがなデイジーちゃん本体の 音声（src/assets/voice/*.mp3）
  * - ことば・かけごえ … tools/voice で つくった 音声（src/assets/voice/shoot/*.mp3）
- * 音声ファイルが ないときは なにも ならさない（はなちゃん いがいの こえに しないため）。
+ * 音声ファイルが ないときは なにも ならさない（デイジーちゃん いがいの こえに しないため）。
  */
 const FILES = import.meta.glob('../assets/voice/shoot/*.mp3', { eager: true, import: 'default' }) as Record<string, string>
 const map: Record<string, string> = {}
@@ -25,7 +25,7 @@ export function sayLine(l: Line, onEnd?: () => void) {
   play(`sh_${l}`, onEnd)
 }
 
-/** カタカナ 1もじ */
+/** ひらがな 1もじ */
 export function sayKana(k: string, onEnd?: () => void) {
   speak(k, { onEnd })
 }

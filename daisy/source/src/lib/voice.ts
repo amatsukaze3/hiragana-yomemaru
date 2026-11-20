@@ -614,7 +614,7 @@ export class HybridVoiceJudge {
         this.onHeard?.(fresh(last, latest[0].transcript))
       }
       if (!this.target || this.paused || performance.now() < this.lockUntil) {
-        // ロック中に聞こえた分（はなちゃんの声・前の問題の声）も のぞく
+        // ロック中に聞こえた分（デイジーちゃんの声・前の問題の声）も のぞく
         this.asrSkip = Math.max(0, this.asrLastIdx)
         this.asrSkipText = this.asrLastText
         return

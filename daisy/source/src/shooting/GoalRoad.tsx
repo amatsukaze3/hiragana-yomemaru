@@ -7,7 +7,7 @@ const CHECKPOINTS = [10, 20, 30, 40]
 
 /**
  * ゴール（スタンプ 46こ コンプリート）までの みちのり。
- * はなちゃんが あつめた かずだけ みちを すすむ。10こごとに チェックポイントの ほし。
+ * デイジーちゃんが あつめた かずだけ みちを すすむ。10こごとに チェックポイントの ほし。
  */
 export function GoalRoad({ count, compact = false }: { count: number; compact?: boolean }) {
   const n = Math.min(count, STAMP_TOTAL)
@@ -51,7 +51,7 @@ export function GoalRoad({ count, compact = false }: { count: number; compact?: 
               </span>
             )
           })}
-          {/* はなちゃん */}
+          {/* デイジーちゃん */}
           <motion.img
             src={yomemaru}
             alt=""

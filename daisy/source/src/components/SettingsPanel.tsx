@@ -52,7 +52,7 @@ function ProgressReset() {
   return (
     <section className="flex flex-col gap-2 rounded-2xl border-2 border-amber-100 bg-white p-4 text-sm text-stone-700">
       <h3 className="text-base font-bold text-stone-800">よめたよ バー の きろく</h3>
-      <p className="leading-relaxed text-stone-500">「おぼえる」のステップ5で、マイクで読めた文字を記録しています（この端末の中だけ）。46文字そろうと「はなちゃんシューティング」が出ます。</p>
+      <p className="leading-relaxed text-stone-500">「おぼえる」のステップ5で、マイクで読めた文字を記録しています（この端末の中だけ）。46文字そろうと「Daisy Shooting（デイジーちゃんシューティング）」が出ます。</p>
       <p className="text-stone-600">いま {n} / 46 もじ</p>
       {ask ? (
         <div className="flex flex-wrap items-center gap-2">
@@ -128,7 +128,7 @@ export function SettingsPanel({ open, onClose, meter, setMeter }: { open: boolea
             onClick={(e) => e.stopPropagation()}
           >
             <header className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-stone-800">カード とうろく</h2>
+              <h2 className="text-xl font-bold text-stone-800">Settings（カード とうろく など）</h2>
               <button type="button" onClick={onClose} className="rounded-full p-2 text-stone-500 hover:bg-stone-200" aria-label="とじる">
                 <X size={26} />
               </button>
@@ -230,7 +230,7 @@ export function SettingsPanel({ open, onClose, meter, setMeter }: { open: boolea
               <section className="flex flex-col gap-2 rounded-2xl border-2 border-amber-100 bg-white p-4 text-sm text-stone-700">
                 <h3 className="text-base font-bold text-stone-800">こえの とうろく</h3>
                 <p className="leading-relaxed text-stone-500">
-                  つかう子の「ア・イ・ウ・エ・オ・ン」を とうろくすると、その子の声に あわせて判定するので、よく合格するようになります。つかう子が かわったら、とうろくしなおしてください。
+                  つかう子の「あ・い・う・え・お・ん」を とうろくすると、その子の声に あわせて判定するので、よく合格するようになります。つかう子が かわったら、とうろくしなおしてください。
                 </p>
                 <p className="text-stone-600">{print ? `とうろくずみ（${print.name ? `${print.name} さん・` : ''}${formatDate(print.date)}）` : 'まだ とうろくしていません'}</p>
                 <div className="flex flex-wrap gap-2">

@@ -1,4 +1,4 @@
-/** 「おぼえる」の ステップ5（マイクで よむ）で 読めた カタカナの記録（この端末の中だけ） */
+/** 「おぼえる」の ステップ5（マイクで よむ）で 読めた ひらがなの記録（この端末の中だけ） */
 import { KANA, type Kana } from '../data/kana'
 import { lsGet, lsSet } from './storage'
 

@@ -87,7 +87,7 @@ export function TeacherHelp({ onPause, onResume, onPass, onHome, passLabel = '�
                     </button>
                   )}
                 </div>
-                <p className="text-xs text-stone-400">暗証番号を忘れたときは、ホームの「カード とうろく」の中で 消せます。</p>
+                <p className="text-xs text-stone-400">暗証番号を忘れたときは、ホームの「Settings」の中で 消せます。</p>
               </>
             )}
           </div>

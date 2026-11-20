@@ -1,7 +1,7 @@
 import { motion } from 'motion/react'
 import yomemaru from '../assets/daisy.webp'
 
-/** マスコット「はなちゃん」（カタカナを よむ お姉さん） */
+/** マスコット「デイジーちゃん」（よめまるくんの ガールフレンド。英語を はなす 子と いっしょに ひらがなを よむ） */
 export function Mascot({ size = 140, mood = 'happy' }: { size?: number; mood?: 'happy' | 'cheer' }) {
   return (
     <motion.img

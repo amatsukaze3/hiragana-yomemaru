@@ -12,6 +12,7 @@ import { useVoiceJudge } from '../lib/useVoiceJudge'
 import { markMastered } from '../lib/progress'
 import { TeacherHelp } from '../components/TeacherHelp'
 import { useRetryRegister } from '../components/RetryPrompt'
+import { sayWord } from '../shooting/voices'
 
 const STEPS = [
   { title: 'Picture & letter', guide: 'Look and listen. Tap the card to hear it again.' },
@@ -36,11 +37,18 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
   const info = KANA_INFO[char]
 
   // ステップ1・3：表示したら自動で読み上げる（ステップ4は鳴らさない）
+  // ステップ1は もじの あとに 絵の ことば（「あ … あいす」）も よむ（英語圏の子が 絵と ことばを むすびつけられるように）
   useEffect(() => {
     setAnswered(false)
     if (step === 0 || step === 2) {
-      const t = window.setTimeout(() => speak(char), 350)
-      return () => window.clearTimeout(t)
+      let alive = true
+      let t2 = 0
+      const t = window.setTimeout(() => speak(char, { onEnd: () => { if (alive && step === 0) t2 = window.setTimeout(() => alive && sayWord(char), 250) } }), 350)
+      return () => {
+        alive = false
+        window.clearTimeout(t)
+        window.clearTimeout(t2)
+      }
     }
   }, [step, idx, char])
 
@@ -141,7 +149,7 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
       <main className="min-h-0 flex-1 px-4 py-4">
         {/* 前のカードが 消えるのを 待たずに 次を出す（待つと 止まることがあるため） */}
         <motion.div key={`${step}-${idx}-${char}`} className="mx-auto h-full w-full max-w-3xl" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22 }}>
-            {step === 0 && <Card char={char} variant="picture" onTap={() => speak(char)} />}
+            {step === 0 && <Card char={char} variant="picture" onTap={() => speak(char, { onEnd: () => window.setTimeout(() => sayWord(char), 250) })} />}
             {step === 1 && <TraceCanvas char={char} resetSignal={traceReset} />}
             {step === 2 && <Card char={char} variant="letter" onTap={() => speak(char)} />}
             {step === 3 && <Card char={char} variant="letter" />}
@@ -154,7 +162,7 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
         <NavButton dir="prev" onClick={prev} disabled={step === 0 && idx === 0} />
 
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-3">
-          {step === 0 && <ActionButton icon={<Volume2 />} label="Listen" onClick={() => speak(char)} />}
+          {step === 0 && <ActionButton icon={<Volume2 />} label="Listen" onClick={() => speak(char, { onEnd: () => window.setTimeout(() => sayWord(char), 250) })} />}
           {step === 1 && <ActionButton icon={<Eraser />} label="Again" onClick={() => setTraceReset((r) => r + 1)} />}
           {step === 2 && <ActionButton icon={<Volume2 />} label="Listen" onClick={() => speak(char)} />}
           {step === 3 && (

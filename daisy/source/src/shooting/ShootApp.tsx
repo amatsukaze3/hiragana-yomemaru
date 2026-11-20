@@ -15,10 +15,10 @@ import { MODES, STAMP_TOTAL, getBestScore, loadSave, loadStamps, type ModeId, ty
 
 type Screen = { name: 'menu' } | { name: 'game'; mode: ModeId; resume?: SaveData | null } | { name: 'zukan' } | { name: 'batchiri'; pick: WeakPick }
 
-/** カタカナはなちゃんの 本体 */
+/** ひらがなデイジーちゃんの 本体 */
 export const MAIN_APP_URL = 'https://amatsukaze3.github.io/hiragana-yomemaru/katakana/'
 
-/** 単体アプリ（はなちゃんシューティング だけの ページ） */
+/** 単体アプリ（デイジーちゃんシューティング だけの ページ） */
 export default function ShootApp() {
   useEffect(() => {
     installUnlockListener()
@@ -35,8 +35,8 @@ export default function ShootApp() {
 }
 
 /**
- * はなちゃんシューティング（メニュー・ゲーム・ずかん）
- * onExit を わたすと、カタカナはなちゃんの 中の 1画面として うごく（メニューに「もどる」が でる）。
+ * デイジーちゃんシューティング（メニュー・ゲーム・ずかん）
+ * onExit を わたすと、ひらがなデイジーちゃんの 中の 1画面として うごく（メニューに「もどる」が でる）。
  */
 export function ShootGame({ onExit }: { onExit?: () => void }) {
   const [screen, setScreen] = useState<Screen>({ name: 'menu' })

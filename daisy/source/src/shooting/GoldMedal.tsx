@@ -1,7 +1,7 @@
 import { motion } from 'motion/react'
 import yomemaru from '../assets/daisy.webp'
 
-/** はなちゃんの おおきな きんメダル（リボンつき・ひかりが はしる） */
+/** デイジーちゃんの おおきな きんメダル（リボンつき・ひかりが はしる） */
 export function GoldMedal({ size = 260 }: { size?: number }) {
   const W = size
   const H = size * 1.32
@@ -71,7 +71,7 @@ export function GoldMedal({ size = 260 }: { size?: number }) {
           />
         </g>
       </svg>
-      {/* まんなかの はなちゃん */}
+      {/* まんなかの デイジーちゃん */}
       <img
         src={yomemaru}
         alt=""

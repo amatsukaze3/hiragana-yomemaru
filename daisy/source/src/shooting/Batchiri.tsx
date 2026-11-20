@@ -45,7 +45,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
   const [step, setStep] = useState(0)
   const [idx, setIdx] = useState(0)
   const [testOrder, setTestOrder] = useState<Kana[]>(() => makeTestOrder(kana))
-  /** はなちゃんが しゃべりおわって、マイクで きく じゅんびが できたか */
+  /** デイジーちゃんが しゃべりおわって、マイクで きく じゅんびが できたか */
   const [ready, setReady] = useState(false)
   const [traceDone, setTraceDone] = useState(false)
   const [traceReset, setTraceReset] = useState(0)
@@ -77,7 +77,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
     return () => window.clearTimeout(t)
   }, [])
 
-  // ステップや もじが かわったら：はなちゃんの セリフ → もじの よみ（ステップによる）→ マイクで きく
+  // ステップや もじが かわったら：デイジーちゃんの セリフ → もじの よみ（ステップによる）→ マイクで きく
   useEffect(() => {
     if (phase !== 'learn') return
     setReady(false)
@@ -115,7 +115,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
         went = true
         setBoss('throw')
       }
-      // じゃままるくん「カタカナは よませないぞ〜！」→ はなちゃん「たいへん！…」→ なげる
+      // じゃままるくん「カタカナは よませないぞ〜！」→ デイジーちゃん「たいへん！…」→ なげる
       later(() => sayJama('enter', () => later(() => sayBt('boss', () => later(go, 250)), 150)), 700)
       later(go, 16000) // 音声が ない ときの ほけん
     } else if (boss === 'throw') {
@@ -136,7 +136,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
     }
   }, [phase, isTest, boss, idx])
 
-  /** よめた！ → はなちゃん スーパービーム */
+  /** よめた！ → デイジーちゃん スーパービーム */
   const passBoss = () => {
     if (busy.current || boss !== 'ready') return
     busy.current = true
@@ -161,7 +161,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
         setBoss('defeat')
         voice.stop()
         playDefeat()
-        // じゃままるくん「やられた〜！ おぼえてろ〜！」→ はなちゃん「やったね！…」→ はなまる
+        // じゃままるくん「やられた〜！ おぼえてろ〜！」→ デイジーちゃん「やったね！…」→ はなまる
         let done = false
         const end = () => {
           if (done || !alive.current) return
@@ -225,7 +225,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
       setIdx(idx + 1)
       setTraceReset((r) => r + 1)
     } else if (step < TEST_STEP) {
-      // マイクは おいかけ よみ から つける（それまでは はなちゃんの こえを きれいに きかせる）
+      // マイクは おいかけ よみ から つける（それまでは デイジーちゃんの こえを きれいに きかせる）
       if (step + 1 === 2 && voice.status === 'idle') void voice.start()
       goStep(step + 1)
     } else finish()
@@ -357,7 +357,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
                 )}
                 {step === 2 && <Card char={char} variant="letter" onTap={() => sayKana(char)} />}
                 {step >= 3 && <Card char={char} variant="letter" />}
-                {/* おいかけ よみ：はなちゃんが よんだら「つぎは きみの ばん！」 */}
+                {/* おいかけ よみ：デイジーちゃんが よんだら「つぎは きみの ばん！」 */}
                 <AnimatePresence>
                   {micStep && ready && (
                     <motion.span
@@ -410,7 +410,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
       {/* カンペキ！ おおきな はなまる と はくしゅ */}
       {phase === 'perfect' && (
         <main className="flex min-h-0 flex-1 flex-col items-center gap-3 overflow-y-auto px-4 py-4 text-center" style={{ touchAction: 'pan-y' }}>
-          {/* おおきな はなまる と はなちゃんの きんメダル（ちいさい がめんでは すこし ちいさく、よこに ならべる） */}
+          {/* おおきな はなまる と デイジーちゃんの きんメダル（ちいさい がめんでは すこし ちいさく、よこに ならべる） */}
           <div className="mt-auto flex items-center justify-center gap-x-2 sm:gap-x-6">
             <motion.div initial={{ scale: 0.2, rotate: -30 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 160, damping: 12 }}>
               <Hanamaru size={narrow ? 170 : 260} />

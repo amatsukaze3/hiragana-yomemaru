@@ -262,7 +262,7 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
       setStampPop({ task: w.task, isNew: isNew || newGold, gold, complete })
       setBurst((b) => b + 1)
       freezeUntil.current = performance.now() + STAMP_PAUSE_MS
-      // はなちゃんの こえを マイクが ひろわないように、しゃべりおわるまで 判定を とめる
+      // デイジーちゃんの こえを マイクが ひろわないように、しゃべりおわるまで 判定を とめる
       voice.hold(complete ? 11000 : gold ? 6000 : 4700)
       const id = w.task.id
       window.setTimeout(() => sayStamp(id, complete ? () => sayLine('complete') : gold ? () => sayLine('gold') : undefined), 500)
@@ -583,7 +583,7 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
             )
           })}
 
-          {/* はなちゃんから びーむ */}
+          {/* デイジーちゃんから びーむ */}
           <svg className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden>
             <AnimatePresence>
               {hits.map((h) => (
@@ -670,7 +670,7 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
         )}
       </main>
 
-      {/* じめん：はなちゃん と マイク */}
+      {/* じめん：デイジーちゃん と マイク */}
       <footer className="relative flex min-h-[64px] items-end justify-between gap-2 border-t-4 border-lime-300 bg-lime-100 px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-1">
         <div className="min-w-0 max-w-[calc(50%-52px)] text-sm">{(phase === 'playing' || phase === 'paused' || phase === 'countdown') && <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} heard={voice.heard} />}</div>
         <div className="pointer-events-none absolute bottom-[max(6px,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2">

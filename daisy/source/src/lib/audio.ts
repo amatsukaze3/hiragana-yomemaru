@@ -5,7 +5,7 @@
 
 import { KANA_INFO } from '../data/kana'
 
-/** はなちゃんの声（VOICEVOX:東北ずん子 で作成した音声ファイル。tools/voice/make_voices.py） */
+/** デイジーちゃんの声（VOICEVOX:四国めたん で作成した音声ファイル。tools/voice/make_voices.py） */
 const FILES = import.meta.glob('../assets/voice/*.mp3', { eager: true, import: 'default' }) as Record<string, string>
 const byName: Record<string, string> = {}
 for (const [path, url] of Object.entries(FILES)) byName[path.split('/').pop()!.replace('.mp3', '')] = url
@@ -291,7 +291,7 @@ async function playElement(key: string, onEnd?: () => void, fallbackText?: strin
   else onEnd?.()
 }
 
-/** 別のアプリ（はなちゃんシューティングなど）の音声ファイルを追加する */
+/** 別のアプリ（デイジーちゃんシューティングなど）の音声ファイルを追加する */
 export function registerClips(map: Record<string, string>) {
   Object.assign(CLIPS, map)
 }
@@ -305,13 +305,13 @@ export function playVoice(key: string, onEnd?: () => void) {
   void playClip(key, onEnd)
 }
 
-/** カタカナを読み上げる（はなちゃんの声） */
+/** ひらがなを読み上げる（デイジーちゃんの声） */
 export function speak(text: string, opts: { onEnd?: () => void } = {}) {
   if (CLIPS[text]) void playClip(text, opts.onEnd, text)
   else speakSynth(text, opts.onEnd)
 }
 
-/** ほめことば（はなちゃん） */
+/** ほめことば（デイジーちゃん） */
 export function sayVoice(name: ClipName, onEnd?: () => void) {
   void playClip(name, onEnd)
 }

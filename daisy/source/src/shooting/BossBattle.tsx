@@ -7,9 +7,9 @@ import { JAMA_TEXT, jamaKey, type BossState } from './jama'
 
 /**
  * カンペキテストの ボスバトル：じゃままるくん が なげてくる もじを よんで、
- * はなちゃん スーパービームで やっつける（じょうたいは jama.ts の BossState）。
+ * デイジーちゃん スーパービームで やっつける（じょうたいは jama.ts の BossState）。
  */
-// たての いち（%）：じゃままるくんの まんなか・カードが うかぶ ところ・はなちゃんの あたま
+// たての いち（%）：じゃままるくんの まんなか・カードが うかぶ ところ・デイジーちゃんの あたま
 const BOSS_Y = 26
 const CARD_Y = 57
 const HERO_TOP = 82
@@ -169,12 +169,12 @@ export function BossBattle({ state, char, idx, total, hitKey, slow }: { state: B
           )}
         </AnimatePresence>
 
-        {/* はなちゃん スーパービーム */}
+        {/* デイジーちゃん スーパービーム */}
         <AnimatePresence>{state === 'hit' && <SuperBeam key={`beam-${hitKey}`} />}</AnimatePresence>
         {/* さいごの いちげきの あとの だいばくはつ */}
         {state === 'defeat' && <Explosion key="final" x={50} y={BOSS_Y} size={70} delay={0} big />}
 
-        {/* はなちゃん */}
+        {/* デイジーちゃん */}
         <div className="absolute left-1/2 -translate-x-1/2" style={{ top: `${HERO_TOP}%`, height: '17%' }}>
           {state === 'hit' && (
             <motion.span
@@ -233,7 +233,7 @@ const STARS: [number, number, number][] = [
 ]
 
 /**
- * はなちゃん スーパービーム（はなちゃん → カード → じゃままるくん）
+ * デイジーちゃん スーパービーム（デイジーちゃん → カード → じゃままるくん）
  * 0〜0.25びょう ためる / 0.25びょう はっしゃ / 0.35びょう カードに めいちゅう / 0.45びょう じゃままるくんに めいちゅう
  */
 function SuperBeam() {

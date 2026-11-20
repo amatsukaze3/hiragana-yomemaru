@@ -119,7 +119,7 @@ export function Assessment({ onHome }: { onHome: () => void }) {
     setManual(0)
     busy.current = false
     await voice.start()
-    // はなちゃんが話しているあいだは きかない（声を まちがえて合格にしないため）
+    // デイジーちゃんが話しているあいだは きかない（声を まちがえて合格にしないため）
     voice.hold(6000)
     setStarting(true)
     let begun = false

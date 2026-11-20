@@ -36,7 +36,7 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, o
   })
   const shootBest = Math.max(getBestScore('normal'), getBestScore('fast'))
   const [registering, setRegistering] = useState(false)
-  // 先生用：はなちゃんを 5回つづけて タップすると アセスメントモード
+  // 先生用：デイジーちゃんを 5回つづけて タップすると アセスメントモード
   const taps = useRef<number[]>([])
   const tapMascot = () => {
     const now = Date.now()
