@@ -32,17 +32,24 @@ CONS_SCALE = {'k': 1.3, 't': 1.3, 'p': 1.3, 'm': 1.9, 'n': 1.9, 'h': 1.8, 'y': 1
               's': 1.25, 'sh': 1.25, 'ts': 1.2, 'ch': 1.2, 'f': 1.5, 'z': 1.2, 'j': 1.2}
 # 無声の 子音（もとの 音を そのまま つかう ところ）の 音量を あげる わりあい。破裂音（k・t）は 母音に くらべて とても 小さいため
 PRE_GAIN = {'k': 2.4, 't': 2.4, 'p': 2.2, 'ch': 1.7, 'ts': 1.7, 's': 1.3, 'sh': 1.3, 'h': 1.8, 'f': 1.8}
+# 無声の 子音（もとの 音を そのまま つかう）
+UNVOICED = {'k', 't', 'p', 's', 'sh', 'h', 'f', 'ch', 'ts'}
+# 息まじりの 成分（aperiodicity）を この わりあいに へらす
+AP_SCALE = float(os.environ.get('AP_SCALE', '0.4'))
 KEEP = 0.06   # 母音の はじめ（子音からの うつりかわり）は もとの 音を この ながさだけ のこす
 XFADE = 0.03  # もとの 音 → のばした 母音 の つなぎめ
 
 
-CARRIERS = ('タ', 'マ', 'ガ', 'コ')
+CARRIERS = ('タ', 'マ', 'パ', 'ガ', 'コ', 'ー')
+# 「エタ」の「エ」は 息まじりに なりやすいので「エパ」を さきに ためす
+CARRIER_FIRST = {'エ': ('パ',)}
 
 
-def build_query(kana, carriers=CARRIERS):
+def build_query(kana, carriers=None):
     """VOICEVOX に よませる 2もじの ことばの query（「カタ」など）"""
     # 2もじめは「タ」（「マ」だと 母音の おわりが はなに ぬけて、あ段が きこえづらかった）。
     # 2つの ことばに わかれたり、1もじめの よみが かわる（「ヘタ」→「エタ」など）ときは ほかの もじで
+    carriers = carriers or (CARRIER_FIRST.get(kana, ()) + CARRIERS)
     for carrier in carriers:
         q = query(kana + carrier, SID)
         mo = q['accent_phrases'][0]['moras']
@@ -73,14 +80,19 @@ def build_query(kana, carriers=CARRIERS):
 
 def make(kana, out_mp3, debug=False):
     kana = ''.join(chr(ord(c) + 0x60) if 'ぁ' <= c <= 'ゖ' else c for c in kana)  # ひらがな → カタカナ
-    # RAW_DIR を しているすると VOICEVOX の もとの 音を のこす。RAW_USE も しているすると、のこした 音で 加工だけ ためす（VOICEVOX なし）
+    # RAW_DIR を 指定すると VOICEVOX の もとの 音を のこす。RAW_USE も 指定すると、のこした 音で 加工だけ ためす（VOICEVOX なし）
     raw_dir = os.environ.get('RAW_DIR')
     raw = os.path.join(raw_dir, kana + os.environ.get('RAW_TAG', '')) if raw_dir else None
-    if raw and os.environ.get('RAW_USE') and os.path.exists(raw + '.wav'):
+    if raw and os.environ.get('RAW_USE'):
+        # のこした 候補（raw/カ_タ.wav など）から、ほんばんと おなじ じゅんで えらぶ
+        for cr in CARRIER_FIRST.get(kana, ()) + CARRIERS:
+            if os.path.exists(f'{raw}_{cr}.wav'):
+                raw = f'{raw}_{cr}'
+                break
         x, sr = sf.read(raw + '.wav')
         q = json.load(open(raw + '.json', encoding='utf-8'))
     else:
-        q = build_query(kana, tuple(os.environ['CARRIERS'].split(',')) if os.environ.get('CARRIERS') else CARRIERS)
+        q = build_query(kana)
         wav = synth({k: v for k, v in q.items() if not k.startswith('_')}, SID)
         x, sr = sf.read(io.BytesIO(wav))
         if raw:
@@ -94,12 +106,12 @@ def make(kana, out_mp3, debug=False):
     assert sr == SR
     t_v0 = 0.1 + cons                 # 母音の はじまり（よてい）
     t_v1 = t_v0 + m0['vowel_length']  # 母音の おわり
-    # 「ー」のときは 2もじめの はじめ（おなじ 母音）まで つかって、安定部を ながく とる
-    y = x[:int((t_v1 + (0.1 if long_v else 0.0)) * SR)].astype(np.float64)
+    y = x[:int(t_v1 * SR)].astype(np.float64)
     hop = int(SR * FP / 1000)
     # 声の 出はじめ（まえの 無音は のぞく）
     env = np.array([np.sqrt(np.mean(y[i:i + hop] ** 2)) for i in range(0, len(y) - hop, hop)])
-    on = int(np.argmax(env > 0.004 * max(env.max(), 1e-9))) * hop
+    # 無声の 子音は 小さな 破裂・こすれる 音から。母音だけ・有声の 子音は、出だしの 息だけの ところを のぞいて 声が たちあがる ところから
+    on = int(np.argmax(env > (0.004 if c in UNVOICED else 0.06) * max(env.max(), 1e-9))) * hop
     on = max(0, on - int(0.01 * SR))
     f0, t = pw.harvest(y, SR, f0_floor=150, f0_ceil=700, frame_period=FP)
     sp = pw.cheaptrick(y, f0, t, SR)
@@ -107,8 +119,12 @@ def make(kana, out_mp3, debug=False):
     fv0 = int(round(t_v0 * 1000 / FP))
     rms = np.array([np.sqrt(np.mean(y[j * hop:j * hop + hop] ** 2)) if j * hop < len(y) else 0 for j in range(len(f0))])
     # 母音の 安定した ところ：声が しっかり 出ている いちばん ながい ところ（おわりの 35ms は つぎの もじへの うつりかわりなので のぞく）
-    lo, hi = fv0 + int(KEEP * 1000 / FP) - 2, len(f0) - 7
-    ok = (f0[lo:hi] > 0) & (rms[lo:hi] >= 0.6 * rms[lo:hi].max())
+    # 「エ」のように 息まじりで 声の 高さが とれない ところが おおいときは、音の 大きさ だけで えらぶ
+    jv = fv0 if c in UNVOICED else int(on / hop)  # WORLD で つくりなおす ところの はじめ（下を 参照）
+    j_keep = max(int(round((t_v0 + KEEP) * 1000 / FP)), jv + int(KEEP * 1000 / FP))
+    lo, hi = j_keep - 2, len(f0) - 7
+    loud = rms[lo:hi] >= 0.6 * rms[lo:hi].max()
+    ok = loud & (f0[lo:hi] > 0) if (f0[lo:hi] > 0).mean() >= 0.7 else loud
     best, cur = (0, 0), None
     for j, o in enumerate(list(ok) + [False]):
         if o and cur is None: cur = j
@@ -118,17 +134,9 @@ def make(kana, out_mp3, debug=False):
     stable = list(range(lo + best[0], lo + best[1]))
     if len(stable) < 4:
         stable = list(range(lo, hi))
-    # 有声に なる ところ（m・n・y などは 子音から、k・s・h などは 母音から）
-    j_keep = int(round((t_v0 + KEEP) * 1000 / FP))
-    vf = [j for j in range(int(on / hop), j_keep) if f0[j] > 0]
-    jv = vf[0] if vf else j_keep
-    # のばす 母音：安定部を いったりきたり
+    # WORLD で つくりなおす ところ：無声の 子音（k・s・t・h など）は 母音から、それ いがい（母音だけ・m・n・y・r・w）は 出だしから
     need = max(8, int(round((VOICED - (jv * hop - on) / SR) * 1000 / FP)) - (j_keep - jv))
-    seq, i, d = [], 0, 1
-    while len(seq) < need:
-        seq.append(stable[i])
-        if not 0 <= i + d < len(stable): d = -d
-        i += d
+    seq = [stable[min(i, len(stable) - 1)] for i in range(need)]
     frames = list(range(jv, j_keep)) + seq
     nh = j_keep - jv
     sp2 = np.exp(uniform_filter1d(np.log(sp[frames] + 1e-12), 3, axis=0))
@@ -140,17 +148,16 @@ def make(kana, out_mp3, debug=False):
     sp2[nh:] = np.exp((1 - w) * np.log(sp[seq] + 1e-12) + w * lsp_mean)
     ap2 = ap[frames].copy()
     ap2[nh:] = (1 - w) * ap[seq] + w * lap_mean
+    # 息まじりの 成分を へらして、はっきりした 声に する（あ段・「え」が 息っぽく きこえづらかったため）
+    v_from = max(0, fv0 - jv)
+    ap2[v_from:] = np.minimum(ap2[v_from:] * AP_SCALE, 0.999)
+    # 高さ：46もじ おなじ P0。出だしは P0 の 0.97〜1.02 ばい、母音は はじめ P0 → おわり すこし さがる（こまかい ゆれは のこさない）
     f0o = f0[frames]
-    # 高さ：出だしの「すべりあがり」を おさえて（P0 の 0.93〜1.02 ばいに）、母音は はじめ P0 → おわり すこし さがる
-    head_f0 = np.clip(np.where(f0o[:nh] > 0, f0o[:nh], P0), P0 * 0.93, P0 * 1.02)
+    head_f0 = np.clip(np.where(f0o[:nh] > 0, f0o[:nh], P0), P0 * 0.97, P0 * 1.02)
     head_f0 = uniform_filter1d(head_f0, 5) if nh >= 5 else head_f0
     r = np.linspace(0, 1, len(seq))
     tail_f0 = P0 * (1.0 - 0.08 * (np.clip(r - 0.5, 0, None) / 0.5) ** 1.5)
-    sm = uniform_filter1d(np.where(f0[seq] > 0, f0[seq], P0), 5)
-    tail_f0 = tail_f0 + 0.1 * uniform_filter1d(np.where(f0[seq] > 0, f0[seq] - sm, 0), 3)
-    f0n = uniform_filter1d(np.concatenate([head_f0, tail_f0]), 3)
-    if nh:
-        f0n[:nh] = np.maximum(f0n[:nh], head_f0 * 0.98)
+    f0n = uniform_filter1d(np.concatenate([head_f0, tail_f0]), 5)
     z = pw.synthesize(np.ascontiguousarray(f0n), np.ascontiguousarray(sp2), np.ascontiguousarray(ap2), SR, frame_period=FP)
     # 無声の 子音（k・s・h など）は もとの 音を そのまま つかい、有声に なる ところで つなぐ
     pre = y[on:jv * hop] * PRE_GAIN.get(c or '', 1.0)
