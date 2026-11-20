@@ -2,12 +2,14 @@
 ひらがな 1もじの こえ（VOICEVOX:四国めたん ノーマル）
 - ひらがなデイジーちゃん用。カタカナはなちゃんの make_kana.py を もとに、声を 四国めたんに かえた
 - VOICEVOX には カタカナで わたす（ひらがなも おなじ よみ）
-- 「カマ」のように 2もじの ことばを よませ、1もじめ だけを きりだす（1もじだけ よませると 息っぽくなるため）
+- 「カー」のように 2もじの ことばを よませ、1もじめ だけを きりだす（1もじだけ よませると 息っぽくなるため）
 - 弱い 子音（m・n・h・y など）は VOICEVOX で すこし ながめに よませる
 - 無声の 子音（k・s・h など）は もとの 音を そのまま つかう。有声の ところ（m・n・y の 子音と 母音）は WORLD で つくりなおし、
   子音から 母音への うつりかわり（母音の はじめ 0.06びょう）は そのまま、そのあとの 母音だけ 安定部を のばして、子音＋母音 を 約0.37びょうに そろえる
 - 出だしの 声の 高さの「すべりあがり」は おさえる（m・n・y を ながく すると ゆれて きこえるため）
-- 声の高さは「はじめ P0 → おわり すこし さがる」言い切りの 形（もとの こまかい ゆれは はんぶん のこす）
+- 声の高さは 46もじ おなじ P0（350Hz）から「おわり すこし さがる」言い切りの 形（もとの こまかい ゆれは 1わりだけ のこす）
+- 2もじめは「ー」（「カー」）にして、母音が つぎの もじに ひっぱられないように する
+- 破裂音（k・t）などの 無声の 子音は 音量を あげ、まえの 無音を 0.08びょうに（鳴りはじめが きれないように）
 - ファイルは 無音こみで 0.49びょう、24kHz モノラル 96kbps、ラウドネス -16.5 LUFS
 """
 import io, math, os, subprocess, sys, tempfile
@@ -19,28 +21,31 @@ from vv import query, synth
 SID = int(os.environ.get('SID', '2'))  # 四国めたん ノーマル
 SR = 24000
 FP = 5.0  # WORLD の フレーム（ミリ秒）
-# 声の高さ（Hz）。しないときは VOICEVOX が つけた 高さから きめる
-P0_ENV = os.environ.get('P0')
+# 声の高さ（Hz）。46もじ ぜんぶ おなじ 高さに そろえる（文字ごとに かえると「う」だけ ひくく きこえたため）
+P0 = float(os.environ.get('P0', '350'))
 TOTAL = 0.49
-LEAD = 0.03
+LEAD = 0.08  # まえの 無音。みじかいと iPad などで 鳴りはじめが きれて「か」「た」の 破裂音が きこえなくなる
 VOICED = 0.37  # 子音＋母音 の ながさ
 
 # 子音を のばす わりあい（m・n・h・y・w などの 弱い 子音は、みじかいと 母音だけに きこえるため）
-CONS_SCALE = {'m': 1.9, 'n': 1.9, 'h': 1.8, 'y': 1.7, 'w': 1.7, 'r': 1.4, 'N': 1.0,
+CONS_SCALE = {'k': 1.3, 't': 1.3, 'p': 1.3, 'm': 1.9, 'n': 1.9, 'h': 1.8, 'y': 1.7, 'w': 1.7, 'r': 1.4, 'N': 1.0,
               's': 1.25, 'sh': 1.25, 'ts': 1.2, 'ch': 1.2, 'f': 1.5, 'z': 1.2, 'j': 1.2}
+# 無声の 子音（もとの 音を そのまま つかう ところ）の 音量を あげる わりあい。破裂音（k・t）は 母音に くらべて とても 小さいため
+PRE_GAIN = {'k': 2.4, 't': 2.4, 'p': 2.2, 'ch': 1.7, 'ts': 1.7, 's': 1.3, 'sh': 1.3, 'h': 1.8, 'f': 1.8}
 KEEP = 0.06   # 母音の はじめ（子音からの うつりかわり）は もとの 音を この ながさだけ のこす
 XFADE = 0.03  # もとの 音 → のばした 母音 の つなぎめ
 
 
 def make(kana, out_mp3, debug=False):
     kana = ''.join(chr(ord(c) + 0x60) if 'ぁ' <= c <= 'ゖ' else c for c in kana)  # ひらがな → カタカナ
-    # 「ネマ」のように 2つの ことばに わかれて しまうときは、ほかの 2もじめで ためす
-    for carrier in ('マ', 'タ', 'ガ', 'コ'):
+    # 2もじめは のばす ぼう「ー」（「カー」）。おなじ 母音が つづくので、つぎの もじへの うつりかわりで 母音が にごらない
+    # （「カマ」だと「ア」の おわりが「マ」に ひっぱられて、あ段が きこえづらかった）。「ン」や、2つの ことばに わかれるときは ほかの もじで
+    for carrier in (('ー',) if kana != 'ン' else ()) + ('マ', 'タ', 'ガ', 'コ'):
         q = query(kana + carrier, SID)
         if len(q['accent_phrases'][0]['moras']) >= 2:
             break
+    long_v = carrier == 'ー'
     q['outputSamplingRate'] = SR
-    P0 = float(P0_ENV) if P0_ENV else math.exp(max(m['pitch'] for ap in q['accent_phrases'] for m in ap['moras'] if m['pitch'] > 0))
     q['prePhonemeLength'] = 0.1
     q['postPhonemeLength'] = 0.1
     ap0 = q['accent_phrases'][0]
@@ -56,12 +61,13 @@ def make(kana, out_mp3, debug=False):
     cons = m0['consonant_length'] or 0.0
     m0['vowel_length'] = 0.32  # 母音を ながめに よませて、のばす もとに なる 安定部を ながく とる
     m0['pitch'] = math.log(P0)
-    m1['pitch'] = math.log(P0 * 0.97)
+    m1['pitch'] = math.log(P0 if long_v else P0 * 0.97)
     x, sr = sf.read(io.BytesIO(synth(q, SID)))
     assert sr == SR
     t_v0 = 0.1 + cons                 # 母音の はじまり（よてい）
     t_v1 = t_v0 + m0['vowel_length']  # 母音の おわり
-    y = x[:int(t_v1 * SR)].astype(np.float64)
+    # 「ー」のときは 2もじめの はじめ（おなじ 母音）まで つかって、安定部を ながく とる
+    y = x[:int((t_v1 + (0.1 if long_v else 0.0)) * SR)].astype(np.float64)
     hop = int(SR * FP / 1000)
     # 声の 出はじめ（まえの 無音は のぞく）
     env = np.array([np.sqrt(np.mean(y[i:i + hop] ** 2)) for i in range(0, len(y) - hop, hop)])
@@ -98,8 +104,14 @@ def make(kana, out_mp3, debug=False):
     frames = list(range(jv, j_keep)) + seq
     nh = j_keep - jv
     sp2 = np.exp(uniform_filter1d(np.log(sp[frames] + 1e-12), 3, axis=0))
-    sp2[nh:] = np.exp(uniform_filter1d(np.log(sp[seq] + 1e-12), 5, axis=0))
-    ap2 = ap[frames]
+    # のばす 母音の 声の 形（スペクトル）は 安定部の 平均に だんだん ちかづけて 一定に する
+    # （安定部を いったりきたり するだけだと 形が ゆれて、「え」などが ふるえて きこえたため）
+    lsp_mean = np.log(sp[stable] + 1e-12).mean(axis=0)
+    lap_mean = ap[stable].mean(axis=0)
+    w = np.clip(np.arange(len(seq)) / 8.0, 0, 1)[:, None]
+    sp2[nh:] = np.exp((1 - w) * np.log(sp[seq] + 1e-12) + w * lsp_mean)
+    ap2 = ap[frames].copy()
+    ap2[nh:] = (1 - w) * ap[seq] + w * lap_mean
     f0o = f0[frames]
     # 高さ：出だしの「すべりあがり」を おさえて（P0 の 0.93〜1.02 ばいに）、母音は はじめ P0 → おわり すこし さがる
     head_f0 = np.clip(np.where(f0o[:nh] > 0, f0o[:nh], P0), P0 * 0.93, P0 * 1.02)
@@ -107,13 +119,13 @@ def make(kana, out_mp3, debug=False):
     r = np.linspace(0, 1, len(seq))
     tail_f0 = P0 * (1.0 - 0.08 * (np.clip(r - 0.5, 0, None) / 0.5) ** 1.5)
     sm = uniform_filter1d(np.where(f0[seq] > 0, f0[seq], P0), 5)
-    tail_f0 = tail_f0 + 0.3 * uniform_filter1d(np.where(f0[seq] > 0, f0[seq] - sm, 0), 3)
+    tail_f0 = tail_f0 + 0.1 * uniform_filter1d(np.where(f0[seq] > 0, f0[seq] - sm, 0), 3)
     f0n = uniform_filter1d(np.concatenate([head_f0, tail_f0]), 3)
     if nh:
         f0n[:nh] = np.maximum(f0n[:nh], head_f0 * 0.98)
     z = pw.synthesize(np.ascontiguousarray(f0n), np.ascontiguousarray(sp2), np.ascontiguousarray(ap2), SR, frame_period=FP)
     # 無声の 子音（k・s・h など）は もとの 音を そのまま つかい、有声に なる ところで つなぐ
-    pre = y[on:jv * hop]
+    pre = y[on:jv * hop] * PRE_GAIN.get(c or '', 1.0)
     xf = min(int(0.008 * SR), len(pre))
     if len(pre) > 0:
         k = np.linspace(0, 1, xf)
