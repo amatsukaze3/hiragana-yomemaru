@@ -79,11 +79,25 @@ def to_mp3(x: np.ndarray, dst: str, lufs: float):
     os.unlink(tmp)
 
 
-def line(text: str, sid: int, dst: str):
+# ほめことば・かけごえ は テンション たかく、あかるく（声を すこし たかく・抑揚を おおきく・すこし はやく）
+CHEER = {'pass5', 'clear10', 'assess_r1', 'assess_r2', 'assess_r3', 'assess_r4', 'sh_start', 'sh_resume', 'sh_over', 'sh_record',
+         'sh_complete', 'sh_miss', 'sh_saved', 'sh_gold', 'bt_intro', 'bt_test', 'bt_perfect', 'bt_win'}
+
+
+def is_cheer(name: str) -> bool:
+    return name in CHEER or name.startswith('s_')
+
+
+def line(text: str, sid: int, dst: str, cheer: bool = False):
     q = query(text, sid)
     q['outputSamplingRate'] = SR
     # こどもに ききとりやすいよう、すこし ゆっくり・まえうしろの むおんを みじかく
     q['speedScale'] = 0.95
+    if cheer:
+        q['speedScale'] = 1.03
+        q['pitchScale'] = 0.07
+        q['intonationScale'] = 1.55
+        q['volumeScale'] = 1.1
     q['prePhonemeLength'] = 0.05
     q['postPhonemeLength'] = 0.1
     x, sr = sf.read(io.BytesIO(synth(q, sid)))
@@ -114,7 +128,9 @@ def lines_all():
     for name, item in lines.items():
         text, sid = (item, main) if isinstance(item, str) else (item['text'], ids.setdefault(item['speaker'], speaker_id(item['speaker'])))
         folder = SHOOT if name.split('_')[0] in ('w', 's', 'sh', 'bt', 'jm') else VOICE
-        line(text, sid, os.path.join(folder, name + '.mp3'))
+        if os.environ.get('ONLY') and name not in os.environ['ONLY'].split(','):
+            continue
+        line(text, sid, os.path.join(folder, name + '.mp3'), cheer=sid == main and is_cheer(name))
         print(name, sid, text, flush=True)
 
 
