@@ -36,15 +36,22 @@ KEEP = 0.06   # 母音の はじめ（子音からの うつりかわり）は �
 XFADE = 0.03  # もとの 音 → のばした 母音 の つなぎめ
 
 
-def make(kana, out_mp3, debug=False):
-    kana = ''.join(chr(ord(c) + 0x60) if 'ぁ' <= c <= 'ゖ' else c for c in kana)  # ひらがな → カタカナ
-    # 2もじめは のばす ぼう「ー」（「カー」）。おなじ 母音が つづくので、つぎの もじへの うつりかわりで 母音が にごらない
-    # （「カマ」だと「ア」の おわりが「マ」に ひっぱられて、あ段が きこえづらかった）。「ン」や、2つの ことばに わかれるときは ほかの もじで
-    for carrier in (('ー',) if kana != 'ン' else ()) + ('マ', 'タ', 'ガ', 'コ'):
+CARRIERS = ('タ', 'マ', 'ガ', 'コ')
+
+
+def build_query(kana, carriers=CARRIERS):
+    """VOICEVOX に よませる 2もじの ことばの query（「カタ」など）"""
+    # 2もじめは「タ」（「マ」だと 母音の おわりが はなに ぬけて、あ段が きこえづらかった）。
+    # 2つの ことばに わかれたり、1もじめの よみが かわる（「ヘタ」→「エタ」など）ときは ほかの もじで
+    for carrier in carriers:
         q = query(kana + carrier, SID)
-        if len(q['accent_phrases'][0]['moras']) >= 2:
+        mo = q['accent_phrases'][0]['moras']
+        if len(mo) >= 2 and mo[0]['text'] == kana:
             break
-    long_v = carrier == 'ー'
+    else:
+        return None
+    q['_long_v'] = carrier == 'ー'
+    q['_carrier'] = carrier
     q['outputSamplingRate'] = SR
     q['prePhonemeLength'] = 0.1
     q['postPhonemeLength'] = 0.1
@@ -58,25 +65,32 @@ def make(kana, out_mp3, debug=False):
     c = m0.get('consonant')
     if c and m0['consonant_length']:
         m0['consonant_length'] *= CONS_SCALE.get(c, 1.0)
-    cons = m0['consonant_length'] or 0.0
     m0['vowel_length'] = 0.32  # 母音を ながめに よませて、のばす もとに なる 安定部を ながく とる
     m0['pitch'] = math.log(P0)
-    m1['pitch'] = math.log(P0 if long_v else P0 * 0.97)
+    m1['pitch'] = math.log(P0 if q['_long_v'] else P0 * 0.97)
+    return q
+
+
+def make(kana, out_mp3, debug=False):
+    kana = ''.join(chr(ord(c) + 0x60) if 'ぁ' <= c <= 'ゖ' else c for c in kana)  # ひらがな → カタカナ
+    # RAW_DIR を しているすると VOICEVOX の もとの 音を のこす。RAW_USE も しているすると、のこした 音で 加工だけ ためす（VOICEVOX なし）
     raw_dir = os.environ.get('RAW_DIR')
-    raw = os.path.join(raw_dir, kana) if raw_dir else None
+    raw = os.path.join(raw_dir, kana + os.environ.get('RAW_TAG', '')) if raw_dir else None
     if raw and os.environ.get('RAW_USE') and os.path.exists(raw + '.wav'):
-        x, sr = sf.read(raw + '.wav')  # VOICEVOX なしで 加工だけ ためすとき
+        x, sr = sf.read(raw + '.wav')
         q = json.load(open(raw + '.json', encoding='utf-8'))
-        ap0 = q['accent_phrases'][0]; m0, m1 = ap0['moras'][0], ap0['moras'][1]
-        c = m0.get('consonant'); cons = m0['consonant_length'] or 0.0
-        long_v = q.get('_long_v', long_v)
     else:
-        wav = synth(q, SID)
+        q = build_query(kana, tuple(os.environ['CARRIERS'].split(',')) if os.environ.get('CARRIERS') else CARRIERS)
+        wav = synth({k: v for k, v in q.items() if not k.startswith('_')}, SID)
         x, sr = sf.read(io.BytesIO(wav))
         if raw:
             os.makedirs(raw_dir, exist_ok=True)
             open(raw + '.wav', 'wb').write(wav)
-            json.dump({**q, '_long_v': long_v}, open(raw + '.json', 'w', encoding='utf-8'), ensure_ascii=False)
+            json.dump(q, open(raw + '.json', 'w', encoding='utf-8'), ensure_ascii=False)
+    long_v = q.get('_long_v', False)
+    m0 = q['accent_phrases'][0]['moras'][0]
+    c = m0.get('consonant')
+    cons = m0['consonant_length'] or 0.0
     assert sr == SR
     t_v0 = 0.1 + cons                 # 母音の はじまり（よてい）
     t_v1 = t_v0 + m0['vowel_length']  # 母音の おわり
