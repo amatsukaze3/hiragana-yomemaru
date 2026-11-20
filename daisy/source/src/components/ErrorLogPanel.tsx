@@ -158,7 +158,7 @@ export function ErrorLogPanel() {
                 <li key={`${e.t}-${i}`} className="flex items-center gap-3 border-b border-stone-50 px-3 py-1 tabular-nums">
                   <span className="w-32 shrink-0 text-stone-500">{formatDate(new Date(e.t).toISOString())}</span>
                   <span className="font-card w-8 text-xl leading-none">{e.k}</span>
-                  <span className={e.y === 'w' ? 'text-orange-700' : 'text-sky-700'}>{KIND_LABEL[e.y === 'w' ? 'wrong' : 'unread']}</span>
+                  <span className={e.y === 'w' ? 'text-pink-700' : 'text-sky-700'}>{KIND_LABEL[e.y === 'w' ? 'wrong' : 'unread']}</span>
                   <span className="text-stone-400">{SOURCE_LABEL[e.s]}</span>
                 </li>
               ))}

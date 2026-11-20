@@ -74,7 +74,7 @@ export function TraceCanvas({ char, resetSignal, onComplete }: Props) {
     ctx.lineWidth = lineWidth
     const all = [...strokesRef.current, ...(currentRef.current ? [currentRef.current] : [])]
     all.forEach((s, i) => {
-      ctx.strokeStyle = i < strokesRef.current.length ? '#f97316' : '#fb923c'
+      ctx.strokeStyle = i < strokesRef.current.length ? '#ec4899' : '#f472b6'
       ctx.beginPath()
       s.forEach((p, j) => (j ? ctx.lineTo(p.x * size, p.y * size) : ctx.moveTo(p.x * size, p.y * size)))
       if (s.length === 1) ctx.lineTo(s[0].x * size + 0.1, s[0].y * size)
@@ -206,7 +206,7 @@ export function TraceCanvas({ char, resetSignal, onComplete }: Props) {
   return (
     <div className="flex h-full w-full flex-col items-center gap-3">
       {/* 書き順バッジ ①②③ */}
-      <ol className="flex items-center gap-2" aria-label={`${total}かく`}>
+      <ol className="flex items-center gap-2" aria-label={`${total} strokes`}>
         {Array.from({ length: total }, (_, i) => {
           const state = i < done ? 'done' : i === done ? 'now' : 'todo'
           return (
@@ -214,8 +214,8 @@ export function TraceCanvas({ char, resetSignal, onComplete }: Props) {
               <motion.span
                 className={[
                   'flex h-12 w-12 items-center justify-center rounded-full border-4 text-2xl font-bold',
-                  state === 'done' && 'border-orange-500 bg-orange-500 text-white',
-                  state === 'now' && 'border-orange-500 bg-white text-orange-600',
+                  state === 'done' && 'border-pink-500 bg-pink-500 text-white',
+                  state === 'now' && 'border-pink-500 bg-white text-pink-600',
                   state === 'todo' && 'border-stone-200 bg-white text-stone-300',
                 ]
                   .filter(Boolean)
@@ -229,7 +229,7 @@ export function TraceCanvas({ char, resetSignal, onComplete }: Props) {
           )
         })}
         <li className="ml-2 text-lg text-stone-500">
-          {finished ? 'できた！' : `${done + 1}かくめ`}
+          {finished ? 'Done!' : `Stroke ${done + 1}`}
         </li>
       </ol>
 
@@ -248,7 +248,7 @@ export function TraceCanvas({ char, resetSignal, onComplete }: Props) {
                   key={i}
                   className={[
                     'pointer-events-none absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full font-bold',
-                    i === done ? 'h-9 w-9 bg-orange-500 text-lg text-white shadow' : 'h-7 w-7 bg-amber-100 text-sm text-amber-700',
+                    i === done ? 'h-9 w-9 bg-pink-500 text-lg text-white shadow' : 'h-7 w-7 bg-amber-100 text-sm text-amber-700',
                   ].join(' ')}
                   style={{ left: `${(box.x + sx * box.w) * 100}%`, top: `${(box.y + sy * box.h) * 100}%` }}
                   animate={i === done ? { scale: [1, 1.18, 1] } : { scale: 1 }}
@@ -265,17 +265,17 @@ export function TraceCanvas({ char, resetSignal, onComplete }: Props) {
             onPointerMove={onMove}
             onPointerUp={onUp}
             onPointerCancel={onUp}
-            aria-label={`「${char}」をなぞる`}
+            aria-label={`Trace ${char}`}
           />
           <AnimatePresence>
             {hint && (
               <motion.p
-                className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-lg text-orange-700"
+                className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-lg text-pink-700"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
               >
-                もじの うえを なぞってね
+                Trace over the letter
               </motion.p>
             )}
           </AnimatePresence>

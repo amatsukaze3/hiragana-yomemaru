@@ -78,7 +78,7 @@ export function VoiceRegister({ name, onDone, onCancel }: { name?: string; onDon
     shapes.current = REG.map(() => null)
     await voice.start({ forRegister: true })
     setStep(0)
-    // 「わたしの こえを、そっくり まねしてね。」と 言ってから はじめる
+    // 「Listen to me,そっくり まねしてね。」と 言ってから はじめる
     let went = false
     const go = () => {
       if (went || !alive.current) return
@@ -92,13 +92,13 @@ export function VoiceRegister({ name, onDone, onCancel }: { name?: string; onDon
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-stone-50 pt-[env(safe-area-inset-top)]">
       <header className="flex items-center gap-3 px-3 pt-3 sm:px-5">
-        <button type="button" onClick={onCancel} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-amber-200 bg-white text-stone-600" aria-label="やめる">
+        <button type="button" onClick={onCancel} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-amber-200 bg-white text-stone-600" aria-label="Cancel">
           <X size={24} />
         </button>
-        <h2 className="min-w-0 flex-1 truncate text-xl font-bold text-stone-800 sm:text-2xl">こえの とうろく</h2>
+        <h2 className="min-w-0 flex-1 truncate text-xl font-bold text-stone-800 sm:text-2xl">My voice</h2>
         <div className="flex gap-1.5">
           {REG.map((v, i) => (
-            <span key={v} className={`font-card flex h-9 w-9 items-center justify-center rounded-full text-lg ${i < step || step === LASTSTEP ? 'bg-orange-400 text-white' : i === step ? 'bg-amber-300 text-stone-900' : 'bg-stone-200 text-stone-500'}`}>
+            <span key={v} className={`font-card flex h-9 w-9 items-center justify-center rounded-full text-lg ${i < step || step === LASTSTEP ? 'bg-pink-400 text-white' : i === step ? 'bg-amber-300 text-stone-900' : 'bg-stone-200 text-stone-500'}`}>
               {v}
             </span>
           ))}
@@ -109,17 +109,17 @@ export function VoiceRegister({ name, onDone, onCancel }: { name?: string; onDon
         <main className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-5 px-4 text-center">
           <Mascot size={120} />
           <p className="text-2xl font-bold leading-relaxed text-stone-800">
-            わたしの こえを、
+            Listen to me,
             <br />
-            そっくり まねしてね！
+            then say it just like me!
           </p>
           <p className="text-base leading-relaxed text-stone-500">
-            はなちゃんの「ア・イ・ウ・エ・オ・ン」の あとに、おなじように 1かいずつ よむよ。
+            Daisy says <span className="font-card">あ・い・う・え・お・ん</span> one at a time. Say each one after her.
             <br />
-            （おうちのかた・先生へ：その子の声を おぼえて、判定を その子に あわせます。保存するのは 声の特徴の数値だけで、声そのものは 保存しません。この端末の外にも おくられません）
+            (For parents & teachers: only numbers describing the voice are saved on this device — no recordings, and nothing is sent anywhere. 保存するのは声の特徴の数値だけで、声そのものは保存せず、端末の外にも送られません)
           </p>
-          <button type="button" onClick={() => void begin()} className="flex items-center gap-2 rounded-full bg-orange-500 px-8 py-4 text-2xl font-bold text-white shadow-[0_5px_0_#c2410c] active:translate-y-1 active:shadow-none">
-            <Mic size={28} /> はじめる
+          <button type="button" onClick={() => void begin()} className="flex items-center gap-2 rounded-full bg-pink-500 px-8 py-4 text-2xl font-bold text-white shadow-[0_5px_0_#be185d] active:translate-y-1 active:shadow-none">
+            <Mic size={28} /> Start
           </button>
         </main>
       )}
@@ -133,12 +133,12 @@ export function VoiceRegister({ name, onDone, onCancel }: { name?: string; onDon
           </main>
           <footer className="flex flex-wrap items-center justify-center gap-4 px-4 pb-[max(16px,env(safe-area-inset-bottom))]">
             <div className="flex flex-col items-center">
-              <p className="text-2xl font-bold text-orange-600">{waiting ? `「${REG[step]}」と まねしてね` : 'きいてね…'}</p>
-              {slow && <p className="text-base text-stone-500">マイクに ちかづいて よんでね（おおきな こえで なくて だいじょうぶ）</p>}
+              <p className="text-2xl font-bold text-pink-600">{waiting ? <>Now you say <span className="font-card">「{REG[step]}」</span></> : 'Listen…'}</p>
+              {slow && <p className="text-base text-stone-500">Move closer to the mic (you don't need to be loud)</p>}
             </div>
             <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void begin()} />
             <button type="button" onClick={() => ask(step)} className="flex h-12 items-center gap-1 rounded-full border-2 border-stone-300 bg-white px-4 text-base font-bold text-stone-600">
-              <RotateCcw size={18} /> もういちど
+              <RotateCcw size={18} /> Again
             </button>
           </footer>
         </>
@@ -147,7 +147,7 @@ export function VoiceRegister({ name, onDone, onCancel }: { name?: string; onDon
       {step === LASTSTEP && (
         <main className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-4 px-4 text-center">
           <Mascot size={120} mood="cheer" />
-          <p className="text-3xl font-bold text-orange-500">とうろく できたよ！</p>
+          <p className="text-3xl font-bold text-pink-500">Done! Daisy knows your voice.</p>
         </main>
       )}
     </div>

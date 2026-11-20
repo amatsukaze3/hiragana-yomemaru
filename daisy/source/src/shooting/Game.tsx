@@ -459,13 +459,13 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
     <div className="flex h-full flex-col bg-gradient-to-b from-sky-50 via-stone-50 to-amber-50">
       {/* ヘッダー */}
       <header className="flex items-center gap-2 px-3 pt-3 sm:gap-3 sm:px-5">
-        <button type="button" onClick={leave} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-amber-200 bg-white text-stone-600" aria-label="メニューへ（セーブされます）">
+        <button type="button" onClick={leave} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-amber-200 bg-white text-stone-600" aria-label="Menu (your game is saved)">
           <House size={24} />
         </button>
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
           <span className="hidden whitespace-nowrap rounded-full bg-white px-3 py-1 text-sm font-bold text-stone-600 shadow-sm sm:inline sm:text-base">{mode.name}</span>
           {playing && (
-            <span className="flex items-center gap-0.5" aria-label={`スピード ${level}`}>
+            <span className="flex items-center gap-0.5" aria-label={`Speed ${level}`}>
               {Array.from({ length: 5 }, (_, i) => (
                 <Star key={i} size={18} className={i < level ? 'fill-amber-400 text-amber-400' : 'text-stone-300'} />
               ))}
@@ -474,17 +474,17 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
         </div>
         {playing && (
           <>
-            <span className="flex items-center gap-0.5" aria-label={`のこり ${lives}`}>
+            <span className="flex items-center gap-0.5" aria-label={`Lives ${lives}`}>
               {Array.from({ length: LIVES }, (_, i) => (
                 <Heart key={i} size={26} className={i < lives ? 'fill-rose-400 text-rose-400' : 'text-stone-300'} />
               ))}
             </span>
-            <span className="min-w-[4.5rem] rounded-full bg-white px-3 py-1 text-right text-2xl font-bold tabular-nums text-orange-500 shadow-sm">{score}</span>
+            <span className="min-w-[4.5rem] rounded-full bg-white px-3 py-1 text-right text-2xl font-bold tabular-nums text-pink-500 shadow-sm">{score}</span>
             <button
               type="button"
               onClick={() => setPhase(phase === 'paused' ? 'playing' : 'paused')}
               className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-amber-200 bg-white text-stone-600"
-              aria-label={phase === 'paused' ? 'つづける' : 'いちじ ていし'}
+              aria-label={phase === 'paused' ? 'Resume' : 'Pause'}
             >
               {phase === 'paused' ? <Play size={22} /> : <Pause size={22} />}
             </button>
@@ -529,14 +529,14 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
                     <span
                       key={i}
                       className={`font-card flex h-11 w-9 items-center justify-center rounded-lg text-2xl leading-none sm:h-12 sm:w-10 sm:text-3xl ${
-                        !l.play ? 'bg-stone-100 text-stone-400' : w.got[i] ? 'bg-orange-100 text-orange-600' : 'border-2 border-dashed border-stone-300 text-transparent'
+                        !l.play ? 'bg-stone-100 text-stone-400' : w.got[i] ? 'bg-pink-100 text-pink-600' : 'border-2 border-dashed border-stone-300 text-transparent'
                       }`}
                     >
                       {l.ch}
                     </span>
                   ))}
                 </div>
-                {w.state === 'failed' && <span className="text-sm font-bold text-rose-500">ざんねん</span>}
+                {w.state === 'failed' && <span className="text-sm font-bold text-rose-500">Missed</span>}
               </motion.div>
             ))}
           </AnimatePresence>
@@ -565,7 +565,7 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
                   className={`relative flex h-full w-full items-center justify-center rounded-[22%] bg-white transition-[box-shadow,transform] duration-150 ${isTarget ? 'scale-110' : 'opacity-90'}`}
                   style={{
                     border: `5px solid ${colorOf(c.wordUid)}`,
-                    boxShadow: isTarget ? '0 0 0 5px #fff, 0 0 0 10px #f97316, 0 8px 18px rgba(249,115,22,.35)' : '0 5px 0 rgba(0,0,0,.08)',
+                    boxShadow: isTarget ? '0 0 0 5px #fff, 0 0 0 10px #ec4899, 0 8px 18px rgba(236,72,153,.35)' : '0 5px 0 rgba(0,0,0,.08)',
                   }}
                 >
                   <span className="font-card leading-none text-stone-900" style={{ fontSize: '0.62em' }}>
@@ -573,7 +573,7 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
                   </span>
                   {isTarget && (
                     <motion.span
-                      className="pointer-events-none absolute -inset-4 rounded-full border-4 border-dashed border-orange-400"
+                      className="pointer-events-none absolute -inset-4 rounded-full border-4 border-dashed border-pink-400"
                       animate={{ rotate: 360 }}
                       transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
                     />
@@ -614,7 +614,7 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
                 transition={{ duration: 0.7 }}
               >
                 <span className="text-5xl">✨</span>
-                <span className="text-3xl font-bold text-orange-500 drop-shadow-[0_2px_0_#fff]">GET!</span>
+                <span className="text-3xl font-bold text-pink-500 drop-shadow-[0_2px_0_#fff]">GET!</span>
               </motion.div>
             ))}
           </AnimatePresence>
@@ -622,18 +622,18 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
 
         {phase === 'countdown' && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <motion.span key={count} initial={{ scale: 2, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-9xl font-bold text-orange-500 drop-shadow-[0_4px_0_#fff]">
+            <motion.span key={count} initial={{ scale: 2, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-9xl font-bold text-pink-500 drop-shadow-[0_4px_0_#fff]">
               {count}
             </motion.span>
           </div>
         )}
         {phase === 'paused' && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-white/70 backdrop-blur-sm">
-            <p className="text-3xl font-bold text-stone-700">ひとやすみ</p>
-            <ActionButton icon={<Play />} label="つづける" onClick={() => setPhase('playing')} strong />
-            <ActionButton icon={<Save />} label="セーブして やめる" onClick={saveAndQuit} />
-            <ActionButton label="ここで おしまい" onClick={gameOver} />
-            <p className="px-4 text-center text-base text-stone-500">セーブすると、メニューの「つづきから」で また あそべるよ</p>
+            <p className="text-3xl font-bold text-stone-700">Break time</p>
+            <ActionButton icon={<Play />} label="Resume" onClick={() => setPhase('playing')} strong />
+            <ActionButton icon={<Save />} label="Save & quit" onClick={saveAndQuit} />
+            <ActionButton label="End game" onClick={gameOver} />
+            <p className="px-4 text-center text-base text-stone-500">If you save, you can pick up again with “Continue” on the menu.</p>
           </div>
         )}
 
@@ -641,30 +641,30 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 overflow-y-auto px-4 text-center">
             <Mascot size={120} />
             <p className="text-2xl font-bold leading-relaxed text-stone-800 sm:text-3xl">
-              おちてくる カードを
+              Read the falling cards
               <br />
-              こえに だして よもう！
+              out loud!
             </p>
             <ul className="space-y-1 text-lg leading-relaxed text-stone-600">
               <li>
-                <span className="font-bold text-orange-500">オレンジの わく</span>の カードを よむと GET！
+                Read the card with the <span className="font-bold text-pink-500">pink frame</span> to GET it!
               </li>
-              <li>ことばの カードを ぜんぶ あつめると スタンプが もらえるよ</li>
-              <li>カードが したまで おちると ハートが へるよ</li>
+              <li>Collect all the cards of a word to win a stamp</li>
+              <li>If a card hits the bottom, you lose a heart</li>
             </ul>
             {resume && (
               <p className="rounded-2xl bg-white px-4 py-2 text-lg font-bold text-stone-700 shadow-sm">
-                つづきから：{resume.score}てん ・ ハート {resume.lives} ・ スタンプ {resume.round.length}こ
+                Continue: {resume.score} pts · ♥ {resume.lives} · {resume.round.length} stamps
               </p>
             )}
-            <ActionButton icon={<Play />} label={resume ? 'つづきから スタート' : 'スタート'} onClick={() => void start(resume)} strong />
+            <ActionButton icon={<Play />} label={resume ? 'Continue' : 'Start'} onClick={() => void start(resume)} strong />
             {voiceprintUseful() && (
               <button type="button" onClick={() => setRegistering(true)} className="flex items-center gap-1.5 rounded-full border-2 border-amber-300 bg-white px-4 py-2 text-base font-bold text-stone-700">
-                <AudioLines size={18} /> {hasPrint ? 'こえを とうろくしなおす' : 'こえを とうろくすると よく きこえるよ'}
+                <AudioLines size={18} /> {hasPrint ? 'Teach Daisy my voice again' : 'Teach Daisy your voice so she can hear you better'}
               </button>
             )}
             <p className="flex items-center gap-1 text-sm text-stone-400">
-              <Mic size={14} /> マイクが つかえないときは、カードを タッチしても GET できるよ
+              <Mic size={14} /> No mic? Tap a card to GET it
             </p>
           </div>
         )}
@@ -677,7 +677,7 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
           <Mascot size={84} mood={hits.length ? 'cheer' : 'happy'} />
         </div>
         <div className="flex min-w-0 max-w-[calc(50%-52px)] justify-end">
-          {phase === 'playing' && !micOk && voice.status !== 'starting' && <span className="rounded-full bg-white px-3 py-1.5 text-sm font-bold text-stone-500">カードを タッチで GET</span>}
+          {phase === 'playing' && !micOk && voice.status !== 'starting' && <span className="rounded-full bg-white px-3 py-1.5 text-sm font-bold text-stone-500">Tap a card to GET</span>}
         </div>
       </footer>
 
@@ -692,7 +692,7 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
               transition={{ type: 'spring', stiffness: 260, damping: 14 }}
             >
               <p className={`text-xl font-bold ${stampPop.gold ? 'text-amber-600' : 'text-rose-500'}`}>
-                {stampPop.complete ? '46こ コンプリート！！' : stampPop.gold ? (stampPop.isNew ? '✨ あたらしい きんの スタンプ！ ✨' : '✨ きんの スタンプ ゲット！ ✨') : stampPop.isNew ? 'あたらしい スタンプ！' : 'スタンプ ゲット！'}
+                {stampPop.complete ? 'All 46 complete!!' : stampPop.gold ? (stampPop.isNew ? '✨ New gold stamp! ✨' : '✨ Gold stamp GET! ✨') : stampPop.isNew ? 'New stamp!' : 'Stamp GET!'}
               </p>
               <motion.div initial={{ scale: 2.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.15, duration: 0.25, ease: 'easeIn' }}>
                 <Stamp id={stampPop.task.id} size={150} tilt={-8} gold={stampPop.gold} />
@@ -727,12 +727,12 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
               transition={{ type: 'spring', stiffness: 240, damping: 18 }}
             >
               <Mascot size={90} mood="cheer" />
-              <p className="text-3xl font-bold text-stone-800">おしまい！</p>
-              <p className="text-5xl font-bold tabular-nums text-orange-500">{result.score}てん</p>
-              {result.record ? <p className="rounded-full bg-orange-100 px-4 py-1 text-lg font-bold text-orange-700">あたらしい さいこう きろく！</p> : result.best > 0 && <p className="text-base text-stone-500">さいこう きろく {result.best}てん</p>}
+              <p className="text-3xl font-bold text-stone-800">Finish!</p>
+              <p className="text-5xl font-bold tabular-nums text-pink-500">{result.score} pts</p>
+              {result.record ? <p className="rounded-full bg-pink-100 px-4 py-1 text-lg font-bold text-pink-700">New high score!</p> : result.best > 0 && <p className="text-base text-stone-500">High score {result.best} pts</p>}
 
               <div className="w-full rounded-2xl bg-white p-3">
-                <p className="mb-2 text-lg font-bold text-stone-700">きょう ゲットした スタンプ</p>
+                <p className="mb-2 text-lg font-bold text-stone-700">Stamps you got today</p>
                 {roundStamps.length ? (
                   <div className="flex flex-wrap justify-center gap-4 p-1">
                     {roundStamps.map((s, i) => (
@@ -745,7 +745,7 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
                     ))}
                   </div>
                 ) : (
-                  <p className="text-stone-500">こんどは スタンプを ねらおう！</p>
+                  <p className="text-stone-500">Go for a stamp next time!</p>
                 )}
                 <div className="mt-3">
                   <GoalRoad count={result.total} />
@@ -753,9 +753,9 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
               </div>
 
               <div className="flex flex-wrap justify-center gap-3">
-                <ActionButton icon={<Play />} label="もういちど" onClick={() => void start()} strong />
-                <ActionButton icon={<BookOpen />} label="ずかん" onClick={onZukan} />
-                <ActionButton label="メニュー" onClick={onHome} />
+                <ActionButton icon={<Play />} label="Again" onClick={() => void start()} strong />
+                <ActionButton icon={<BookOpen />} label="Stamp book" onClick={onZukan} />
+                <ActionButton label="Menu" onClick={onHome} />
               </div>
             </motion.div>
           </motion.div>

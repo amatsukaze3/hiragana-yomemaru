@@ -28,7 +28,7 @@ export function formatTime(ms: number) {
   const s = ms / 1000
   const m = Math.floor(s / 60)
   const rest = (s % 60).toFixed(1)
-  return m > 0 ? `${m}ふん ${rest}びょう` : `${rest}びょう`
+  return m > 0 ? `${m} min ${rest} sec` : `${rest} sec`
 }
 
 type Phase = 'ready' | 'playing' | 'finished'
@@ -111,10 +111,10 @@ export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-3 px-3 pt-3 sm:px-5">
-        <button type="button" onClick={onHome} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-amber-200 bg-white text-stone-600" aria-label="ホームへ">
+        <button type="button" onClick={onHome} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-amber-200 bg-white text-stone-600" aria-label="Home">
           <House size={24} />
         </button>
-        <h2 className="min-w-0 flex-1 truncate text-xl font-bold text-stone-800 sm:text-2xl">② チャレンジ おんどく（{row.name}）</h2>
+        <h2 className="min-w-0 flex-1 truncate text-xl font-bold text-stone-800 sm:text-2xl">② Reading challenge ({row.name})</h2>
         {phase === 'playing' && <Stopwatch startAt={startAt} pausedAt={pausedAt} />}
         {phase === 'playing' && (
           <TeacherHelp
@@ -136,24 +136,24 @@ export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void
         <main className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-5 px-4 text-center">
           <Mascot size={130} />
           <p className="text-2xl font-bold leading-relaxed text-stone-800">
-            でてくる もじを
+            Read each letter
             <br />
-            マイクに むかって よもう！
+            out loud into the mic!
           </p>
-          <p className="text-lg text-stone-500">ぜんぶで {TOTAL}もん。はやく よめるかな？</p>
+          <p className="text-lg text-stone-500">{TOTAL} letters. How fast can you read them?</p>
           {getBest(row.id) && (
             <p className="flex items-center gap-2 rounded-full bg-amber-100 px-4 py-1.5 text-lg text-amber-800">
-              <Trophy size={20} /> さいこう きろく {formatTime(getBest(row.id)!)}
+              <Trophy size={20} /> Best time {formatTime(getBest(row.id)!)}
             </p>
           )}
-          <ActionButton icon={<Play />} label="スタート" onClick={() => void start()} strong />
+          <ActionButton icon={<Play />} label="Start" onClick={() => void start()} strong />
           {voiceprintUseful() && (
             <button type="button" onClick={() => setRegistering(true)} className="flex items-center gap-1.5 rounded-full border-2 border-amber-300 bg-white px-4 py-2 text-base font-bold text-stone-700">
-              <AudioLines size={18} /> {hasPrint ? 'こえを とうろくしなおす' : 'こえを とうろくすると よく きこえるよ'}
+              <AudioLines size={18} /> {hasPrint ? 'Teach Daisy my voice again' : 'Teach Daisy your voice so she can hear you better'}
             </button>
           )}
           <p className="flex items-center gap-1 text-sm text-stone-400">
-            <Mic size={14} /> はじめに マイクの きょかを きかれたら「きょか」を おしてね
+            <Mic size={14} /> If asked to use the microphone, tap “Allow”
           </p>
         </main>
       )}
@@ -162,11 +162,11 @@ export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void
         <>
           <div className="flex justify-center gap-1.5 px-4 pt-3" aria-label={`${idx + 1} / ${TOTAL}`}>
             {questions.map((_, i) => (
-              <span key={i} className={`h-3 w-6 rounded-full sm:w-8 ${i < idx ? 'bg-orange-400' : i === idx ? 'bg-amber-400' : 'bg-stone-200'}`} />
+              <span key={i} className={`h-3 w-6 rounded-full sm:w-8 ${i < idx ? 'bg-pink-400' : i === idx ? 'bg-amber-400' : 'bg-stone-200'}`} />
             ))}
           </div>
           <p className="pt-1 text-center text-lg text-stone-500">
-            {idx + 1} / {TOTAL} もんめ
+            {idx + 1} / {TOTAL}
           </p>
 
           <main className="relative min-h-0 flex-1 px-4 py-3">
@@ -178,12 +178,12 @@ export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void
               {flash > 0 && (
                 <motion.p
                   key={flash}
-                  className="pointer-events-none absolute inset-x-0 top-1/2 z-10 -translate-y-1/2 text-center text-6xl font-bold text-orange-500 drop-shadow-[0_3px_0_#fff]"
+                  className="pointer-events-none absolute inset-x-0 top-1/2 z-10 -translate-y-1/2 text-center text-6xl font-bold text-pink-500 drop-shadow-[0_3px_0_#fff]"
                   initial={{ scale: 0.4, opacity: 0 }}
                   animate={{ scale: 1, opacity: [0, 1, 1, 0] }}
                   transition={{ duration: 0.65, times: [0, 0.2, 0.7, 1] }}
                 >
-                  ピンポン♫
+                  Ding-dong ♫
                 </motion.p>
               )}
             </AnimatePresence>
@@ -193,7 +193,7 @@ export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void
             <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} heard={voice.heard} />
             {meter && micOk && <BandMeter frame={voice.frame} />}
             {!micOk && voice.status !== 'starting' && (
-              <ActionButton icon={<Hand />} label="できた" onClick={() => correct('manual')} strong />
+              <ActionButton icon={<Hand />} label="I did it" onClick={() => correct('manual')} strong />
             )}
           </footer>
         </>
@@ -215,19 +215,19 @@ export function Challenge({ row, onHome, meter }: { row: Row; onHome: () => void
         {result && (
           <>
             <Hanamaru size={150} />
-            <p className="text-3xl font-bold text-stone-800">{TOTAL}もん クリア！</p>
-            <p className="text-5xl font-bold tabular-nums text-orange-500">{formatTime(result.time)}</p>
+            <p className="text-3xl font-bold text-stone-800">All {TOTAL} cleared!</p>
+            <p className="text-5xl font-bold tabular-nums text-pink-500">{formatTime(result.time)}</p>
             {result.record ? (
-              <p className="flex items-center gap-2 rounded-full bg-orange-100 px-4 py-1.5 text-xl font-bold text-orange-700">
-                <Trophy size={22} /> あたらしい さいこう きろく！
+              <p className="flex items-center gap-2 rounded-full bg-pink-100 px-4 py-1.5 text-xl font-bold text-pink-700">
+                <Trophy size={22} /> New best time!
               </p>
             ) : result.best ? (
-              <p className="text-lg text-stone-500">さいこう きろく {formatTime(result.best)}</p>
+              <p className="text-lg text-stone-500">Best time {formatTime(result.best)}</p>
             ) : null}
-            {result.manual > 0 && <p className="text-sm text-stone-400">「できた」で すすんだ もんだいが あるので、きろくには のこりません</p>}
+            {result.manual > 0 && <p className="text-sm text-stone-400">Some letters were passed with “I did it”, so this time is not saved as a record.</p>}
             <div className="flex flex-wrap justify-center gap-3">
-              <ActionButton label="もういちど" onClick={() => void start()} strong />
-              <ActionButton label="ホームへ" onClick={onHome} />
+              <ActionButton label="Again" onClick={() => void start()} strong />
+              <ActionButton label="Home" onClick={onHome} />
             </div>
           </>
         )}
@@ -252,7 +252,7 @@ function Stopwatch({ startAt, pausedAt }: { startAt: React.RefObject<number>; pa
       <span ref={ref} className="text-2xl font-bold tabular-nums">
         0.0
       </span>
-      <span className="text-sm">びょう</span>
+      <span className="text-sm">sec</span>
     </span>
   )
 }

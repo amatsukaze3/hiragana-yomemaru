@@ -6,7 +6,7 @@ export function Mascot({ size = 140, mood = 'happy' }: { size?: number; mood?: '
   return (
     <motion.img
       src={yomemaru}
-      alt="はなちゃん"
+      alt="Daisy"
       draggable={false}
       style={{ height: size, width: 'auto' }}
       className="select-none"

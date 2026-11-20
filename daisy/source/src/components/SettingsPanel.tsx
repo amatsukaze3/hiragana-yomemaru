@@ -160,7 +160,7 @@ export function SettingsPanel({ open, onClose, meter, setMeter }: { open: boolea
                           <ImagePlus size={16} /> 画像をえらぶ
                         </button>
                         <label className="flex items-center gap-1 text-sm text-stone-600">
-                          <input id={`overlay-${k}`} type="checkbox" checked={a.overlay} onChange={(e) => void setOverlay(k, e.target.checked)} className="h-4 w-4 accent-orange-500" />
+                          <input id={`overlay-${k}`} type="checkbox" checked={a.overlay} onChange={(e) => void setOverlay(k, e.target.checked)} className="h-4 w-4 accent-pink-500" />
                           文字を重ねる
                         </label>
                         {a.custom && (
@@ -254,7 +254,7 @@ export function SettingsPanel({ open, onClose, meter, setMeter }: { open: boolea
             )}
 
             <label className="flex items-center gap-3 rounded-2xl border-2 border-amber-100 bg-white p-4 text-sm text-stone-700">
-              <input id="meter" type="checkbox" checked={meter} onChange={(e) => setMeter(e.target.checked)} className="h-5 w-5 accent-orange-500" />
+              <input id="meter" type="checkbox" checked={meter} onChange={(e) => setMeter(e.target.checked)} className="h-5 w-5 accent-pink-500" />
               おんどくの画面に、声の帯域メーター（保護者向け）を出す
             </label>
           </motion.aside>

@@ -28,8 +28,8 @@ function useFit(ratio: number) {
 export function MasuGrid() {
   return (
     <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
-      <line x1="50" y1="3" x2="50" y2="97" stroke="#fdba74" strokeWidth="0.6" strokeDasharray="2 2" vectorEffect="non-scaling-stroke" />
-      <line x1="3" y1="50" x2="97" y2="50" stroke="#fdba74" strokeWidth="0.6" strokeDasharray="2 2" vectorEffect="non-scaling-stroke" />
+      <line x1="50" y1="3" x2="50" y2="97" stroke="#f9a8d4" strokeWidth="0.6" strokeDasharray="2 2" vectorEffect="non-scaling-stroke" />
+      <line x1="3" y1="50" x2="97" y2="50" stroke="#f9a8d4" strokeWidth="0.6" strokeDasharray="2 2" vectorEffect="non-scaling-stroke" />
     </svg>
   )
 }
@@ -59,7 +59,7 @@ export function Card({ char, variant, onTap, hideLetter, children }: CardProps) 
       <motion.button
         type="button"
         onClick={onTap}
-        aria-label={`${char}（${info.word}）`}
+        aria-label={`${char} (${info.word}, ${info.en})`}
         className="relative overflow-hidden rounded-[28px] border-4 border-amber-200 bg-white shadow-[0_6px_0_#fde68a]"
         style={{ width: size.w, height: size.h }}
         whileTap={{ scale: 0.97 }}
@@ -94,6 +94,16 @@ export function Card({ char, variant, onTap, hideLetter, children }: CardProps) 
               {lb.text}
             </span>
           ))}
+        {/* 絵の なまえ（ひらがな ＋ 英語）。英語圏の子が 絵と ことばを むすびつけられるように */}
+        {variant === 'picture' && !a.custom && !hideLetter && (
+          <span
+            className="pointer-events-none absolute bottom-[3%] left-1/2 flex -translate-x-1/2 items-baseline gap-2 whitespace-nowrap rounded-full bg-white/85 px-3 py-0.5 leading-tight"
+            style={{ fontSize: Math.max(12, size.h * 0.06) }}
+          >
+            <span className="font-card text-stone-800">{info.word}</span>
+            <span className="text-stone-500" style={{ fontSize: '0.8em' }}>{info.en}</span>
+          </span>
+        )}
         {children}
       </motion.button>
     </div>

@@ -55,8 +55,8 @@ export function BossBattle({ state, char, idx, total, hitKey, slow }: { state: B
       >
         {/* じゃままるくんの HP */}
         <div className="absolute inset-x-3 top-3 flex items-center gap-2 sm:inset-x-5">
-          <span className="shrink-0 rounded-full bg-white/90 px-3 py-0.5 text-sm font-bold text-violet-800 sm:text-base">じゃままるくん</span>
-          <div className="flex min-w-0 flex-1 gap-1" aria-label={`じゃままるくんの たいりょく ${hpShown}`}>
+          <span className="shrink-0 rounded-full bg-white/90 px-3 py-0.5 text-sm font-bold text-violet-800 sm:text-base">Jamamaru</span>
+          <div className="flex min-w-0 flex-1 gap-1" aria-label={`Jamamaru HP ${hpShown}`}>
             {Array.from({ length: total }, (_, i) => (
               <motion.span
                 key={i}
@@ -83,7 +83,7 @@ export function BossBattle({ state, char, idx, total, hitKey, slow }: { state: B
                 <motion.img
                   key={`b-${hitKey}`}
                   src={jamamaru}
-                  alt="じゃままるくん"
+                  alt="Jamamaru"
                   draggable={false}
                   className="h-full w-full object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,.35)]"
                   animate={state === 'hit' ? { x: [0, 0, -14, 14, -9, 9, 0], rotate: [0, 0, -8, 8, -4, 0, 0] } : undefined}
@@ -150,7 +150,7 @@ export function BossBattle({ state, char, idx, total, hitKey, slow }: { state: B
             >
               <motion.div
                 className="flex h-full w-full items-center justify-center rounded-[22%] border-[6px] border-fuchsia-400 bg-white"
-                style={{ boxShadow: state === 'ready' ? '0 0 0 6px #fff, 0 0 0 12px #f97316, 0 0 30px 10px rgba(251,191,36,.6)' : '0 8px 0 rgba(0,0,0,.2)' }}
+                style={{ boxShadow: state === 'ready' ? '0 0 0 6px #fff, 0 0 0 12px #ec4899, 0 0 30px 10px rgba(251,191,36,.6)' : '0 8px 0 rgba(0,0,0,.2)' }}
                 animate={state === 'ready' ? { rotate: [-4, 4, -4], y: [0, -6, 0] } : undefined}
                 transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
               >
@@ -189,7 +189,7 @@ export function BossBattle({ state, char, idx, total, hitKey, slow }: { state: B
           <motion.div className="relative h-full" animate={state === 'hit' ? { y: [0, 6, -4, 0] } : { y: 0 }} transition={{ duration: 0.5 }}>
             <motion.img
               src={yomemaru}
-              alt="はなちゃん"
+              alt="Daisy"
               draggable={false}
               className="h-full w-auto select-none drop-shadow-[0_4px_8px_rgba(0,0,0,.3)]"
               animate={state === 'defeat' ? { y: [0, -14, 0], rotate: [0, -6, 6, 0] } : { y: [0, -5, 0] }}
@@ -311,7 +311,7 @@ function Explosion({ x, y, size, delay, damage = false, big = false }: { x: numb
     <>
       <motion.span
         className="pointer-events-none absolute aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full"
-        style={{ left: `${x}%`, top: `${y}%`, height: `${size}%`, background: 'radial-gradient(circle, #fff 0%, #fef08a 25%, #fb923c 50%, rgba(244,63,94,.5) 65%, transparent 72%)' }}
+        style={{ left: `${x}%`, top: `${y}%`, height: `${size}%`, background: 'radial-gradient(circle, #fff 0%, #fef08a 25%, #f472b6 50%, rgba(244,63,94,.5) 65%, transparent 72%)' }}
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: big ? [0, 1.6, 2.4] : [0, 1.2, 1.6], opacity: [0, 1, 0] }}
         transition={{ duration: big ? 0.9 : 0.55, delay, ease: 'easeOut' }}
@@ -347,12 +347,12 @@ function Explosion({ x, y, size, delay, damage = false, big = false }: { x: numb
       {!damage && (
         <motion.span
           className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-4xl font-black text-yellow-300 sm:text-6xl"
-          style={{ left: `${x}%`, top: `${y}%`, WebkitTextStroke: '3px #7c2d12', paintOrder: 'stroke' }}
+          style={{ left: `${x}%`, top: `${y}%`, WebkitTextStroke: '3px #831843', paintOrder: 'stroke' }}
           initial={{ opacity: 0, scale: 0.3, rotate: -12 }}
           animate={{ opacity: [0, 1, 1, 0], scale: [0.3, 1.25, 1.1, 1.2], rotate: -8 }}
           transition={{ duration: big ? 1.2 : 0.8, delay: delay + 0.02 }}
         >
-          {big ? 'ドカーーン！' : 'ズバーン！'}
+          {big ? 'KA-BOOM!' : 'ZAP!'}
         </motion.span>
       )}
     </>

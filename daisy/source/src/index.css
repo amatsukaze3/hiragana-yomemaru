@@ -18,7 +18,7 @@
 }
 
 @theme {
-  --font-ui: "BIZ UDPMincho", "BIZ UDMincho", serif;
+  --font-ui: "Nunito", "BIZ UDPMincho", "BIZ UDMincho", sans-serif;
   --font-card: "YomemaruCardUser", "YomemaruNKB", "UD Digi Kyokasho NK-B", "Klee One", "BIZ UDMincho", serif;
 }
 

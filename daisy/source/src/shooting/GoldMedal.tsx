@@ -12,7 +12,7 @@ export function GoldMedal({ size = 260 }: { size?: number }) {
       initial={{ y: -size, rotate: -25, opacity: 0 }}
       animate={{ y: 0, rotate: 0, opacity: 1 }}
       transition={{ delay: 0.6, type: 'spring', stiffness: 140, damping: 11 }}
-      aria-label="はなちゃんの きんメダル"
+      aria-label="Daisy gold medal"
       role="img"
     >
       <svg viewBox="0 0 200 264" width={W} height={H} className="absolute inset-0 drop-shadow-[0_8px_14px_rgba(180,83,9,.35)]">
@@ -48,9 +48,9 @@ export function GoldMedal({ size = 260 }: { size?: number }) {
         <circle cx="100" cy="164" r="70" fill="none" stroke="#fffbeb" strokeWidth="2.5" opacity=".7" />
         {/* カンペキ の もじ（うえに アーチ） */}
         <path id="gm-arc" d="M44 164 A56 56 0 0 1 156 164" fill="none" />
-        <text fontSize="17" fontWeight="700" fill="#92400e" letterSpacing="3">
+        <text fontSize="17" fontWeight="700" fill="#92400e" letterSpacing="2">
           <textPath href="#gm-arc" startOffset="50%" textAnchor="middle">
-            カンペキ
+            PERFECT
           </textPath>
         </text>
         {/* ほし */}

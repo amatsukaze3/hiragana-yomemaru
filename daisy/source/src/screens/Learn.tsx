@@ -14,11 +14,11 @@ import { TeacherHelp } from '../components/TeacherHelp'
 import { useRetryRegister } from '../components/RetryPrompt'
 
 const STEPS = [
-  { title: 'え と もじ', guide: 'えを みて、きいてみよう。カードを おすと もういちど きけるよ' },
-  { title: 'なぞりよみ', guide: '① から じゅんばんに なぞってね' },
-  { title: 'もじ だけ', guide: 'もじを みて、きいてみよう' },
-  { title: 'じぶんで よむ', guide: 'こえに だして よんでみよう。「こたえ」で たしかめられるよ' },
-  { title: 'ばらばらに よむ', guide: 'でてきた もじを よんでみよう' },
+  { title: 'Picture & letter', guide: 'Look and listen. Tap the card to hear it again.' },
+  { title: 'Trace', guide: 'Trace the strokes in order, starting from ①.' },
+  { title: 'Letter only', guide: 'Look at the letter and listen.' },
+  { title: 'Read it yourself', guide: 'Read it out loud. Tap “Answer” to check.' },
+  { title: 'Mixed up', guide: 'Read each letter you see.' },
 ]
 
 export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
@@ -107,7 +107,7 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
     <div className="flex h-full flex-col">
       {/* 上：ステップのプログレスバー */}
       <header className="flex items-center gap-3 px-3 pt-3 sm:px-5">
-        <button type="button" onClick={onHome} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-amber-200 bg-white text-stone-600" aria-label="ホームへ">
+        <button type="button" onClick={onHome} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-amber-200 bg-white text-stone-600" aria-label="Home">
           <House size={24} />
         </button>
         <span className="font-card shrink-0 rounded-full bg-amber-100 px-3 py-1.5 text-lg text-amber-900">{row.name}</span>
@@ -115,8 +115,8 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
           {STEPS.map((s, i) => (
             <li key={s.title}>
               <button type="button" onClick={() => goStep(i)} className="flex w-full flex-col items-stretch gap-1" aria-current={i === step ? 'step' : undefined}>
-                <span className={`h-3 rounded-full ${i < step ? 'bg-orange-400' : i === step ? 'bg-amber-400' : 'bg-stone-200'}`} />
-                <span className={`truncate text-center text-xs sm:text-sm ${i === step ? 'font-bold text-stone-800' : 'text-stone-400'}`}>ステップ{i + 1}</span>
+                <span className={`h-3 rounded-full ${i < step ? 'bg-pink-400' : i === step ? 'bg-amber-400' : 'bg-stone-200'}`} />
+                <span className={`truncate text-center text-xs sm:text-sm ${i === step ? 'font-bold text-stone-800' : 'text-stone-400'}`}>Step {i + 1}</span>
               </button>
             </li>
           ))}
@@ -127,12 +127,12 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
 
       <div className="flex flex-col items-center gap-1 px-4 pt-3 text-center">
         <h2 className="text-2xl font-bold text-stone-800 sm:text-3xl">
-          <span className="text-orange-500">ステップ{step + 1}</span>　{STEPS[step].title}
+          <span className="text-pink-500">Step {step + 1}</span>&nbsp;&nbsp;{STEPS[step].title}
         </h2>
         <p className="text-base text-stone-500 sm:text-lg">{STEPS[step].guide}</p>
         <div className="mt-1 flex gap-2" aria-label={`${idx + 1} / ${N}`}>
           {Array.from({ length: N }, (_, i) => (
-            <span key={i} className={`h-2.5 w-2.5 rounded-full ${i < idx ? 'bg-orange-400' : i === idx ? 'bg-amber-500 ring-4 ring-amber-200' : 'bg-stone-200'}`} />
+            <span key={i} className={`h-2.5 w-2.5 rounded-full ${i < idx ? 'bg-pink-400' : i === idx ? 'bg-amber-500 ring-4 ring-amber-200' : 'bg-stone-200'}`} />
           ))}
         </div>
       </div>
@@ -154,13 +154,13 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
         <NavButton dir="prev" onClick={prev} disabled={step === 0 && idx === 0} />
 
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-3">
-          {step === 0 && <ActionButton icon={<Volume2 />} label="きく" onClick={() => speak(char)} />}
-          {step === 1 && <ActionButton icon={<Eraser />} label="もういちど" onClick={() => setTraceReset((r) => r + 1)} />}
-          {step === 2 && <ActionButton icon={<Volume2 />} label="きく" onClick={() => speak(char)} />}
+          {step === 0 && <ActionButton icon={<Volume2 />} label="Listen" onClick={() => speak(char)} />}
+          {step === 1 && <ActionButton icon={<Eraser />} label="Again" onClick={() => setTraceReset((r) => r + 1)} />}
+          {step === 2 && <ActionButton icon={<Volume2 />} label="Listen" onClick={() => speak(char)} />}
           {step === 3 && (
             <ActionButton
               icon={<Volume2 />}
-              label={answered ? `「${char}」` : 'こたえ'}
+              label={answered ? `「${char}」` : 'Answer'}
               onClick={() => {
                 setAnswered(true)
                 speak(char)
@@ -170,11 +170,11 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
           {step === 4 && (
             <>
               {voice.status === 'idle' ? (
-                <ActionButton icon={<Mic />} label="マイクで よむ" onClick={() => void voice.start()} />
+                <ActionButton icon={<Mic />} label="Read with mic" onClick={() => void voice.start()} />
               ) : (
                 <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} heard={voice.heard} />
               )}
-              <ActionButton label="できた" onClick={() => passOne(false)} strong />
+              <ActionButton label="I did it" onClick={() => passOne(false)} strong />
             </>
           )}
         </div>
@@ -188,12 +188,12 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
 
       <Modal open={hanamaru}>
         <Hanamaru />
-        <p className="text-3xl font-bold text-stone-800">ごうかく！</p>
-        <p className="text-lg text-stone-600">{row.kana.join('・')} が よめたね</p>
+        <p className="text-3xl font-bold text-stone-800">You passed!</p>
+        <p className="text-lg text-stone-600">You can read <span className="font-card">{row.kana.join('・')}</span></p>
         <Mascot size={90} mood="cheer" />
         <div className="flex flex-wrap justify-center gap-3">
-          <ActionButton label="もういちど" onClick={restart5} />
-          <ActionButton label="ホームへ" onClick={onHome} strong />
+          <ActionButton label="Again" onClick={restart5} />
+          <ActionButton label="Home" onClick={onHome} strong />
         </div>
       </Modal>
     </div>
@@ -212,7 +212,7 @@ function NavButton({ dir, onClick, disabled }: { dir: 'prev' | 'next'; onClick: 
       }`}
     >
       {dir === 'prev' && <ChevronLeft size={26} />}
-      {dir === 'prev' ? 'まえへ' : 'つぎへ'}
+      {dir === 'prev' ? 'Back' : 'Next'}
       {dir === 'next' && <ChevronRight size={26} />}
     </motion.button>
   )
@@ -225,7 +225,7 @@ export function ActionButton({ icon, label, onClick, strong }: { icon?: React.Re
       onClick={onClick}
       whileTap={{ scale: 0.94 }}
       className={`flex h-16 items-center gap-2 rounded-full px-6 text-xl font-bold ${
-        strong ? 'bg-orange-500 text-white shadow-[0_5px_0_#c2410c]' : 'border-2 border-amber-300 bg-white text-stone-700 shadow-[0_4px_0_#fde68a]'
+        strong ? 'bg-pink-500 text-white shadow-[0_5px_0_#be185d]' : 'border-2 border-amber-300 bg-white text-stone-700 shadow-[0_4px_0_#fde68a]'
       }`}
     >
       {icon}

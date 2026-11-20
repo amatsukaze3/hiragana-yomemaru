@@ -83,8 +83,8 @@ export interface Mode {
 }
 
 export const MODES: Record<ModeId, Mode> = {
-  normal: { id: 'normal', name: 'ふつう モード', sub: ['ゆっくり はじまって', 'だんだん はやくなるよ'], startSec: 12, minSec: 5, halfLife: 150 },
-  fast: { id: 'fast', name: 'はやい モード', sub: ['まんなかの はやさから', 'ぐんぐん はやくなるよ！'], startSec: 7.5, minSec: 2.6, halfLife: 75 },
+  normal: { id: 'normal', name: 'Normal', sub: ['Starts slow,', 'then gets faster'], startSec: 12, minSec: 5, halfLife: 150 },
+  fast: { id: 'fast', name: 'Fast', sub: ['Starts at medium speed,', 'then gets really fast!'], startSec: 7.5, minSec: 2.6, halfLife: 75 },
 }
 
 /** あそんだ時間（秒）から、いまの おちる秒数 */

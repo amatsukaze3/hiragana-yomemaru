@@ -48,8 +48,8 @@ export function formatDate(iso: string) {
 /** 結果に応じたほめことば（どの結果も前向きに） */
 export function remark(correct: number, total: number) {
   const r = correct / total
-  if (correct === total) return { text: 'ぜんぶ よめたね！ ほんとうに すごい！', voice: 'assess_r1' as const }
-  if (r >= 0.75) return { text: 'たくさん よめたね！ すばらしい！', voice: 'assess_r2' as const }
-  if (r >= 0.4) return { text: 'よく がんばったね！ どんどん よめるように なっているよ！', voice: 'assess_r3' as const }
-  return { text: 'さいごまで よく がんばったね！ いっしょに れんしゅうしようね！', voice: 'assess_r4' as const }
+  if (correct === total) return { text: 'You read all of them! Amazing!', voice: 'assess_r1' as const }
+  if (r >= 0.75) return { text: 'You read so many! Great job!', voice: 'assess_r2' as const }
+  if (r >= 0.4) return { text: "Good job! You're getting better and better!", voice: 'assess_r3' as const }
+  return { text: "Nice try! Let's practice together!", voice: 'assess_r4' as const }
 }

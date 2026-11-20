@@ -32,31 +32,31 @@ export function MicBadge({ status, frame, onRetry, error, heard }: { status: Mic
 
   const listening = status === 'listening'
   const text =
-    status === 'listening' ? 'きいてるよ' : status === 'starting' ? 'じゅんびちゅう' : status === 'denied' ? 'マイクが つかえません' : status === 'unsupported' ? 'マイクが ありません' : status === 'error' ? 'マイクが うごきません' : 'マイク おやすみ'
+    status === 'listening' ? 'Listening' : status === 'starting' ? 'Getting ready' : status === 'denied' ? 'Mic not allowed' : status === 'unsupported' ? 'No mic' : status === 'error' ? 'Mic not working' : 'Mic off'
 
   return (
     <div className="flex items-center gap-3">
       <span className="relative flex h-14 w-14 items-center justify-center">
-        <span ref={ring} className="absolute inset-0 rounded-full bg-orange-300 transition-transform duration-75" />
+        <span ref={ring} className="absolute inset-0 rounded-full bg-pink-300 transition-transform duration-75" />
         <motion.span
-          className={`relative flex h-12 w-12 items-center justify-center rounded-full ${listening ? 'bg-orange-500 text-white' : 'bg-stone-200 text-stone-500'}`}
+          className={`relative flex h-12 w-12 items-center justify-center rounded-full ${listening ? 'bg-pink-500 text-white' : 'bg-stone-200 text-stone-500'}`}
         >
           {listening ? <Mic size={26} /> : <MicOff size={26} />}
         </motion.span>
       </span>
       <span className="flex flex-col leading-tight">
         <span className="text-lg text-stone-600">{text}</span>
-        {listening && heard ? <span className="font-card max-w-[12em] truncate text-sm text-stone-400">きこえた：{heard}</span> : null}
+        {listening && heard ? <span className="font-card max-w-[12em] truncate text-sm text-stone-400">Heard: {heard}</span> : null}
       </span>
       {(status === 'denied' || status === 'error' || status === 'unsupported') && (
         <>
           {onRetry && (
             <button type="button" onClick={onRetry} className="flex items-center gap-1 rounded-full border-2 border-amber-300 bg-white px-3 py-1.5 text-sm font-bold text-stone-700">
-              <RotateCcw size={16} /> もういちど
+              <RotateCcw size={16} /> Retry
             </button>
           )}
           <button type="button" onClick={() => setHelp(true)} className="flex items-center gap-1 text-sm text-stone-500 underline">
-            <CircleHelp size={16} /> おうちのかたへ
+            <CircleHelp size={16} /> For grown-ups
           </button>
         </>
       )}
@@ -65,7 +65,7 @@ export function MicBadge({ status, frame, onRetry, error, heard }: { status: Mic
   )
 }
 
-/** マイクが使えないときの案内（保護者向け） */
+/** If the microphone does not workの案内（保護者向け） */
 function MicHelp({ error, onClose }: { error?: string; onClose: () => void }) {
   const ua = navigator.userAgent
   const ios = /iPhone|iPad|iPod/.test(ua) || (ua.includes('Macintosh') && navigator.maxTouchPoints > 1)
@@ -74,24 +74,24 @@ function MicHelp({ error, onClose }: { error?: string; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/30 p-4" onClick={onClose}>
       <div className="flex w-full max-w-md flex-col gap-3 rounded-3xl bg-stone-50 p-6 text-left text-stone-700 shadow-xl" style={{ touchAction: 'pan-y' }} onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-bold text-stone-800">マイクが使えないとき</h3>
+        <h3 className="text-lg font-bold text-stone-800">If the microphone does not work</h3>
         {insecure ? (
-          <p className="text-sm leading-relaxed">このページは https で開いていないため、マイクが使えません。https:// から始まるアドレスで開いてください。</p>
+          <p className="text-sm leading-relaxed">This page is not opened over https, so the microphone cannot be used. Please open an address that starts with https://.</p>
         ) : ios ? (
           <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm leading-relaxed">
-            <li>iPhone/iPad の「設定」アプリ →「{app}」→「マイク」をオンにします。</li>
-            <li>{app === 'Safari' ? 'Safari でこのページを開き、アドレスバーの「ぁあ」→「Webサイトの設定」→「マイク」を「許可」にします。' : `${app} でこのページを開きなおし、「マイクの使用を許可しますか？」と出たら「許可」を押します。`}</li>
-            <li>ページを読みこみなおして、もう一度「マイクで よむ」/「スタート」を押します。</li>
+            <li>Open the iPhone/iPad Settings app → “{app}” → turn on “Microphone”.</li>
+            <li>{app === 'Safari' ? 'In Safari, tap “AA” in the address bar → “Website Settings” → set “Microphone” to “Allow”.' : `Reopen this page in ${app} and tap “Allow” when asked about the microphone.`}</li>
+            <li>Reload the page and tap “Read with mic” / “Start” again.</li>
           </ol>
         ) : (
           <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm leading-relaxed">
-            <li>アドレスバー左のアイコンを押し、「マイク」を「許可」にします。</li>
-            <li>パソコンの設定で、ブラウザのマイク利用が許可されているか確かめます。</li>
-            <li>ページを読みこみなおして、もう一度ためします。</li>
+            <li>Click the icon at the left of the address bar and set “Microphone” to “Allow”.</li>
+            <li>Check that the computer's settings allow the browser to use the microphone.</li>
+            <li>Reload the page and try again.</li>
           </ol>
         )}
-        <p className="text-xs text-stone-400">マイクが使えなくても「できた」ボタンで進めます。{error ? `（エラー：${error}）` : ''}</p>
-        <button type="button" onClick={onClose} className="self-end rounded-full bg-amber-400 px-5 py-2 font-bold text-stone-900">とじる</button>
+        <p className="text-xs text-stone-400">Without a microphone, the “I did it” button still lets you move on.{error ? ` (error: ${error})` : ''}</p>
+        <button type="button" onClick={onClose} className="self-end rounded-full bg-amber-400 px-5 py-2 font-bold text-stone-900">Close</button>
       </div>
     </div>
   )
@@ -109,7 +109,7 @@ export function BandMeter({ frame }: { frame: React.RefObject<FrameInfo | null> 
         const el = bars.current[i]
         if (el) {
           el.style.height = `${((f?.bands[k] ?? 0) / 255) * 100}%`
-          el.style.background = f?.match ? '#f97316' : '#fcd34d'
+          el.style.background = f?.match ? '#ec4899' : '#fcd34d'
         }
       })
       raf = requestAnimationFrame(loop)

@@ -29,10 +29,10 @@ import { sayBt, sayJama, sayKana, type BtLine } from './voices'
  */
 
 const STEPS: { title: string; guide: string; line: BtLine }[] = [
-  { title: 'イラスト よみ', guide: 'えを みて、きいて、よんでみよう', line: 's1' },
-  { title: 'なぞり よみ', guide: '① から なぞりながら よんでみよう', line: 's2' },
-  { title: 'おいかけ よみ', guide: 'はなちゃんの あとに つづけて よもう', line: 's3' },
-  { title: 'マイク テスト', guide: 'ひとりで こえに だして よんでみよう', line: 's4' },
+  { title: 'Picture', guide: 'Look, listen, and read', line: 's1' },
+  { title: 'Trace', guide: 'Trace from ① and read', line: 's2' },
+  { title: 'Repeat', guide: 'Say it after Daisy', line: 's3' },
+  { title: 'Mic test', guide: 'Read it out loud by yourself', line: 's4' },
 ]
 const TEST_STEP = STEPS.length // 4 = カンペキテスト
 const TEST_N = 9
@@ -263,13 +263,13 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
             onExit()
           }}
           className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-amber-200 bg-white text-stone-600"
-          aria-label="メニューへ"
+          aria-label="Menu"
         >
           <House size={24} />
         </button>
         {phase === 'learn' ? (
           <ol className="grid min-w-0 flex-1 grid-cols-5 gap-1.5">
-            {[...STEPS.map((s) => s.title), 'カンペキテスト'].map((t, i) => (
+            {[...STEPS.map((s) => s.title), 'Perfect Test'].map((t, i) => (
               <li key={t} className="flex flex-col items-stretch gap-1" aria-current={i === step ? 'step' : undefined}>
                 <span className={`h-3 rounded-full ${i < step ? 'bg-violet-400' : i === step ? (i === TEST_STEP ? 'bg-amber-400' : 'bg-violet-500') : 'bg-stone-200'}`} />
                 <span className={`truncate text-center text-xs sm:text-sm ${i === step ? 'font-bold text-stone-800' : 'text-stone-400'}`}>{t}</span>
@@ -277,7 +277,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
             ))}
           </ol>
         ) : (
-          <h2 className="min-w-0 flex-1 truncate text-2xl font-bold text-violet-700">これで ばっちり モード！</h2>
+          <h2 className="min-w-0 flex-1 truncate text-2xl font-bold text-violet-700">Perfect mode!</h2>
         )}
         {phase === 'learn' && <TeacherHelp onPause={voice.pause} onResume={voice.resume} onPass={micStep ? teacherPass : undefined} onHome={onExit} />}
       </header>
@@ -286,7 +286,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
       {phase === 'intro' && (
         <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-5 overflow-y-auto px-4 py-4 text-center" style={{ touchAction: 'pan-y' }}>
           <Mascot size={110} mood="cheer" />
-          <p className="text-3xl font-bold text-stone-800">にがてな もじは これ！</p>
+          <p className="text-3xl font-bold text-stone-800">Your tricky letters!</p>
           <div className="flex gap-4">
             {kana.map((k, i) => (
               <motion.span
@@ -301,17 +301,17 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
             ))}
           </div>
           <ul className="space-y-1 text-lg text-stone-600">
-            <li>イラスト よみ → なぞり よみ → おいかけ よみ → マイク テスト</li>
+            <li>Picture → Trace → Repeat → Mic test</li>
             <li>
-              さいごの <span className="font-bold text-amber-600">カンペキテスト</span>（9もん）が ぜんぶ よめたら おおきな はなまる！
+              Read all 9 in the final <span className="font-bold text-amber-600">Perfect Test</span> to win a big gold medal!
             </li>
           </ul>
           {pick.fromLog < kana.length && (
             <p className="max-w-md rounded-2xl bg-white/80 px-4 py-2 text-sm text-stone-500">
-              {pick.fromLog === 0 ? 'まちがえた もじの きろくが まだ ないので、' : 'まちがえた もじの きろくが まだ すくないので、'}まだ「よめたよ」に なっていない もじも えらんだよ
+              {pick.fromLog === 0 ? 'There are no mistakes saved yet, ' : 'There are only a few mistakes saved, '}so Daisy also picked letters you haven't learned yet.
             </p>
           )}
-          <ActionButton icon={<Play />} label="はじめる" onClick={start} strong />
+          <ActionButton icon={<Play />} label="Start" onClick={start} strong />
         </main>
       )}
 
@@ -322,13 +322,13 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
             <h2 className="text-2xl font-bold text-stone-800 sm:text-3xl">
               {isTest ? (
                 <span className="text-violet-700">
-                  <span className="hidden sm:inline">カンペキテスト：</span>じゃままるくんを やっつけろ！
+                  <span className="hidden sm:inline">Perfect Test: </span>Beat Jamamaru!
                 </span>
               ) : (
                 <span className="text-violet-600">{STEPS[step].title}</span>
               )}
             </h2>
-            <p className="text-base text-stone-500 sm:text-lg">{isTest ? 'なげてきた もじを こえに だして よむと、はなちゃん スーパービーム！' : STEPS[step].guide}</p>
+            <p className="text-base text-stone-500 sm:text-lg">{isTest ? 'Read the letter he throws to fire Daisy’s Super Beam!' : STEPS[step].guide}</p>
             <div className={`mt-1 flex gap-2 ${isTest ? 'hidden' : ''}`} aria-label={`${idx + 1} / ${count}`}>
               {Array.from({ length: count }, (_, i) => (
                 <span key={i} className={`h-2.5 w-2.5 rounded-full ${i < idx ? (isTest ? 'bg-amber-400' : 'bg-violet-400') : i === idx ? 'bg-amber-500 ring-4 ring-amber-200' : 'bg-stone-200'}`} />
@@ -366,7 +366,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0 }}
                     >
-                      {step === 2 ? 'つぎは きみの ばん！' : 'よんでみよう！'}
+                      {step === 2 ? 'Your turn!' : 'Read it!'}
                     </motion.span>
                   )}
                 </AnimatePresence>
@@ -375,12 +375,12 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
           </main>
 
           <footer className="flex flex-wrap items-center justify-center gap-3 px-3 pb-[max(16px,env(safe-area-inset-bottom))] sm:px-6">
-            {step <= 2 && <ActionButton icon={<Volume2 />} label="きく" onClick={() => sayKana(char)} />}
-            {step === 1 && <ActionButton icon={<Eraser />} label="もういちど" onClick={() => setTraceReset((r) => r + 1)} />}
+            {step <= 2 && <ActionButton icon={<Volume2 />} label="Listen" onClick={() => sayKana(char)} />}
+            {step === 1 && <ActionButton icon={<Eraser />} label="Again" onClick={() => setTraceReset((r) => r + 1)} />}
             {step === 3 && (
               <ActionButton
                 icon={<Volume2 />}
-                label={answered ? `「${char}」` : 'こたえ'}
+                label={answered ? `「${char}」` : 'Answer'}
                 onClick={() => {
                   setAnswered(true)
                   voice.hold(1000)
@@ -390,7 +390,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
             )}
             {micStep && <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} heard={voice.heard} />}
             {/* マイクが つかえないとき・こえで うまく いかないときの 「できた」 */}
-            {micStep && !micOk && voice.status !== 'starting' && (!isTest || boss === 'ready') && <ActionButton label="できた" onClick={passOne} strong />}
+            {micStep && !micOk && voice.status !== 'starting' && (!isTest || boss === 'ready') && <ActionButton label="I did it" onClick={passOne} strong />}
             {!micStep && (
               <motion.button
                 type="button"
@@ -400,7 +400,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
                 transition={{ duration: 0.8, repeat: step === 1 && traceDone ? Infinity : 0 }}
                 className="flex h-16 items-center gap-1 rounded-full bg-violet-500 px-7 text-xl font-bold text-white shadow-[0_5px_0_#6d28d9]"
               >
-                つぎへ <ChevronRight size={26} />
+                Next <ChevronRight size={26} />
               </motion.button>
             )}
           </footer>
@@ -417,18 +417,18 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
             </motion.div>
             <GoldMedal size={narrow ? 150 : 220} />
           </div>
-          <motion.p className="text-5xl font-bold text-orange-500 drop-shadow-[0_3px_0_#fff]" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.5 }}>
-            カンペキ！
+          <motion.p className="text-5xl font-bold text-pink-500 drop-shadow-[0_3px_0_#fff]" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.5 }}>
+            PERFECT!
           </motion.p>
           <p className="text-xl text-stone-600">
-            <span className="font-card text-3xl text-stone-800">{kana.join('・')}</span> が <span className="whitespace-nowrap">ばっちり よめたね！</span>
+            You can read <span className="font-card text-3xl text-stone-800">{kana.join('・')}</span> <span className="whitespace-nowrap">perfectly!</span>
           </p>
-          <p className="rounded-full bg-amber-100 px-4 py-1 text-lg font-bold text-amber-800">じゃままるくんを やっつけて、はなちゃんの きんメダルを ゲット！</p>
+          <p className="rounded-full bg-amber-100 px-4 py-1 text-lg font-bold text-amber-800">You beat Jamamaru and won Daisy's gold medal!</p>
           <div className="mt-2 flex flex-wrap justify-center gap-3">
-            <ActionButton icon={<RotateCcw />} label="もういちど テスト" onClick={retest} />
-            <ActionButton icon={<House />} label="メニューへ" onClick={onExit} strong />
+            <ActionButton icon={<RotateCcw />} label="Test again" onClick={retest} />
+            <ActionButton icon={<House />} label="Menu" onClick={onExit} strong />
           </div>
-          <p className="mb-auto text-sm text-stone-400">シューティングや アセスメントで まちがえた もじが、ここに でてくるよ</p>
+          <p className="mb-auto text-sm text-stone-400">Letters you missed in Shooting or the check will show up here.</p>
         </main>
       )}
 

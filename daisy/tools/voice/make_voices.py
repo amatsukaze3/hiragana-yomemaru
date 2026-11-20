@@ -92,8 +92,8 @@ def line(text: str, sid: int, dst: str):
 
 
 def kana_all():
-    import make_kana
-    make_kana.SID = speaker_id(MAIN)
+    import make_kana as mk
+    mk.SID = speaker_id(MAIN)
     items = json.load(open(os.path.join(HERE, 'kana.json'), encoding='utf-8'))
     os.makedirs(VOICE, exist_ok=True)
     for it in items:

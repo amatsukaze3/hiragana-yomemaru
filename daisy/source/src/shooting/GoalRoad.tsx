@@ -17,17 +17,17 @@ export function GoalRoad({ count, compact = false }: { count: number; compact?: 
   const head = compact ? 30 : 46
 
   return (
-    <div className="w-full" aria-label={`ゴールまで あと ${left}こ`}>
+    <div className="w-full" aria-label={`${left} more to the goal`}>
       {!compact && (
         <div className="mb-1 flex items-baseline justify-between px-1 text-stone-600">
-          <span className="text-base font-bold">ゴールまでの みちのり</span>
+          <span className="text-base font-bold">Road to the goal</span>
           <span className="text-base">
             {left > 0 ? (
               <>
-                あと <span className="text-2xl font-bold tabular-nums text-rose-500">{left}</span> こ
+                <span className="text-2xl font-bold tabular-nums text-rose-500">{left}</span> more
               </>
             ) : (
-              <span className="font-bold text-rose-500">ゴール！</span>
+              <span className="font-bold text-rose-500">Goal!</span>
             )}
           </span>
         </div>
@@ -37,7 +37,7 @@ export function GoalRoad({ count, compact = false }: { count: number; compact?: 
           {/* みち */}
           <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 overflow-hidden rounded-full bg-stone-200" style={{ height: h }}>
             <div className="absolute inset-0 opacity-60" style={{ backgroundImage: 'repeating-linear-gradient(90deg, transparent 0 10px, #fff 10px 14px)' }} />
-            <motion.div className="relative h-full rounded-full bg-gradient-to-r from-amber-300 via-orange-400 to-rose-400" initial={false} animate={{ width: `${pct}%` }} transition={{ type: 'spring', stiffness: 60, damping: 16 }} />
+            <motion.div className="relative h-full rounded-full bg-gradient-to-r from-amber-300 via-pink-400 to-rose-400" initial={false} animate={{ width: `${pct}%` }} transition={{ type: 'spring', stiffness: 60, damping: 16 }} />
           </div>
           {/* チェックポイント */}
           {CHECKPOINTS.map((c) => {

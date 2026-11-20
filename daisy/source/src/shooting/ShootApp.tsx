@@ -85,21 +85,21 @@ function Menu({ onPlay, onZukan, onBatchiri, onExit }: { onPlay: (m: ModeId, res
           type="button"
           onClick={onExit}
           className="absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-full border-2 border-amber-200 bg-white px-4 py-2 text-base font-bold text-stone-600"
-          aria-label="カタカナはなちゃんに もどる"
+          aria-label="Back to Hiragana Daisy"
         >
-          <House size={20} /> もどる
+          <House size={20} /> Back
         </button>
       )}
       <main className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col items-center justify-center gap-5 overflow-y-auto px-4 py-4" style={{ touchAction: 'pan-y' }}>
         <div className="flex items-center gap-3">
           <Mascot size={110} mood="cheer" />
           <h1 className="text-4xl font-bold leading-tight tracking-wide text-stone-800 sm:text-5xl">
-            はなちゃん
+            Daisy
             <br />
-            <span className="text-orange-500">シューティング</span>
+            <span className="text-pink-500">Shooting</span>
           </h1>
         </div>
-        <p className="text-center text-lg text-stone-600">おちてくる カタカナを よんで、スタンプを あつめよう！</p>
+        <p className="text-center text-lg text-stone-600">Read the falling hiragana and collect stamps!</p>
 
         <div className="w-full rounded-3xl bg-white/80 px-4 pb-5 pt-3 shadow-sm">
           <GoalRoad count={owned} />
@@ -114,9 +114,9 @@ function Menu({ onPlay, onZukan, onBatchiri, onExit }: { onPlay: (m: ModeId, res
           >
             <History size={32} />
             <span className="flex flex-col items-start">
-              <span className="text-3xl font-bold">つづきから</span>
+              <span className="text-3xl font-bold">Continue</span>
               <span className="text-base opacity-90">
-                {MODES[save.mode].name} ・ {save.score}てん ・ ハート {save.lives}
+                {MODES[save.mode].name} · {save.score} pts · ♥ {save.lives}
               </span>
             </span>
           </motion.button>
@@ -132,7 +132,7 @@ function Menu({ onPlay, onZukan, onBatchiri, onExit }: { onPlay: (m: ModeId, res
                 type="button"
                 whileTap={{ scale: 0.96 }}
                 onClick={() => onPlay(id)}
-                className={`flex flex-col items-center gap-1 rounded-[28px] px-5 py-5 text-white ${id === 'normal' ? 'bg-orange-500 shadow-[0_6px_0_#c2410c]' : 'bg-rose-500 shadow-[0_6px_0_#be123c]'}`}
+                className={`flex flex-col items-center gap-1 rounded-[28px] px-5 py-5 text-white ${id === 'normal' ? 'bg-pink-500 shadow-[0_6px_0_#be185d]' : 'bg-rose-500 shadow-[0_6px_0_#be123c]'}`}
               >
                 <span className="flex items-center gap-2 text-3xl font-bold">
                   {id === 'normal' ? <Rocket size={30} /> : <Zap size={30} />}
@@ -146,11 +146,11 @@ function Menu({ onPlay, onZukan, onBatchiri, onExit }: { onPlay: (m: ModeId, res
                   ))}
                 </span>
                 {id === 'fast' && (
-                  <span className="mt-1 rounded-full bg-gradient-to-b from-amber-200 to-amber-400 px-3 py-0.5 text-sm font-bold text-amber-900 shadow-sm">✦ きんの スタンプが もらえる！</span>
+                  <span className="mt-1 rounded-full bg-gradient-to-b from-amber-200 to-amber-400 px-3 py-0.5 text-sm font-bold text-amber-900 shadow-sm">✦ Win gold stamps!</span>
                 )}
                 {best > 0 && (
                   <span className="mt-1 flex items-center gap-1 rounded-full bg-white/25 px-3 py-0.5 text-sm">
-                    <Trophy size={14} /> さいこう {best}てん
+                    <Trophy size={14} /> Best {best} pts
                   </span>
                 )}
               </motion.button>
@@ -158,7 +158,7 @@ function Menu({ onPlay, onZukan, onBatchiri, onExit }: { onPlay: (m: ModeId, res
           })}
         </div>
 
-        {save && <p className="-mt-2 text-sm text-stone-500">あたらしく はじめると、セーブした つづきは きえるよ</p>}
+        {save && <p className="-mt-2 text-sm text-stone-500">Starting a new game erases your saved game.</p>}
 
         {/* これで ばっちり モード！（にがてな もじを 3つ れんしゅう）… ログイン 3日目から でてくる */}
         {unlocked ? (
@@ -180,15 +180,15 @@ function Menu({ onPlay, onZukan, onBatchiri, onExit }: { onPlay: (m: ModeId, res
                 animate={{ scale: [1, 1.12, 1] }}
                 transition={{ duration: 1, repeat: Infinity }}
               >
-                NEW！ あたらしい モード
+                NEW! New mode
               </motion.span>
             )}
             <Sparkles size={34} className="shrink-0" />
             <span className="flex flex-col items-start text-left">
-              <span className="text-3xl font-bold">これで ばっちり モード！</span>
+              <span className="text-3xl font-bold">Perfect mode!</span>
               <span className="text-lg leading-snug opacity-95">
-                <span className="whitespace-nowrap">にがてな もじを 3つ れんしゅうして、</span>
-                <span className="whitespace-nowrap">カンペキテストに ちょうせん！</span>
+                <span className="whitespace-nowrap">Practice 3 tricky letters,</span>
+                <span className="whitespace-nowrap">then take the Perfect Test!</span>
               </span>
             </span>
             <span className="font-card hidden shrink-0 gap-1 sm:flex" aria-hidden>
@@ -202,11 +202,11 @@ function Menu({ onPlay, onZukan, onBatchiri, onExit }: { onPlay: (m: ModeId, res
         ) : (
           <div
             className="flex w-full items-center justify-center gap-3 rounded-[28px] border-2 border-dashed border-violet-200 bg-white/60 px-5 py-3 text-violet-400"
-            aria-label={`あたらしい モードは あと ${daysUntilBatchiri()}にちで でてくるよ`}
+            aria-label={`A new mode appears in ${daysUntilBatchiri()} days`}
           >
             <Lock size={26} className="shrink-0" />
             <span className="text-lg font-bold">
-              ？？？ モード … あと <span className="text-2xl tabular-nums text-violet-600">{daysUntilBatchiri()}</span> にち あそぶと でてくるよ！
+              ??? mode … play <span className="text-2xl tabular-nums text-violet-600">{daysUntilBatchiri()}</span> more days to unlock it!
             </span>
           </div>
         )}
@@ -217,7 +217,7 @@ function Menu({ onPlay, onZukan, onBatchiri, onExit }: { onPlay: (m: ModeId, res
           onClick={onZukan}
           className="flex items-center gap-3 rounded-full border-2 border-rose-200 bg-white px-6 py-3 text-xl font-bold text-stone-700 shadow-[0_4px_0_#fecdd3]"
         >
-          <BookOpen className="text-rose-500" /> スタンプ ずかん
+          <BookOpen className="text-rose-500" /> Stamp book
           <span className="rounded-full bg-rose-100 px-3 py-0.5 tabular-nums text-rose-600">
             {owned} / {STAMP_TOTAL}
           </span>
@@ -226,10 +226,10 @@ function Menu({ onPlay, onZukan, onBatchiri, onExit }: { onPlay: (m: ModeId, res
       <footer className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-3 pb-[max(8px,env(safe-area-inset-bottom))] text-center text-xs text-stone-400">
         {!onExit && (
           <a href={MAIN_APP_URL} className="text-sm text-sky-600 underline underline-offset-2">
-            カタカナはなちゃんで れんしゅうする
+            Practice in Hiragana Daisy
           </a>
         )}
-        <span>こえ：VOICEVOX:東北ずん子／VOICEVOX:黒沢冴白</span>
+        <span>Voices: VOICEVOX:四国めたん / VOICEVOX:黒沢冴白</span>
       </footer>
     </div>
   )

@@ -14,22 +14,22 @@ export type BossState = 'enter' | 'throw' | 'ready' | 'hit' | 'defeat'
  * なげる とき（t0・throw・danger）と「どうした〜？」（slow）は、こどもが よんでいる じかんなので ふきだし だけに する。
  */
 export const JAMA_TEXT = {
-  enter: 'カタカナは よませないぞ〜！',
-  t0: 'いくぞ〜！ えいっ！',
-  throw0: 'これが よめるかな〜？',
-  throw1: 'えいっ！',
-  throw2: 'まだまだ〜！',
-  throw3: 'つぎは これだ！',
-  throw4: 'これなら どうだ！',
-  throw5: 'よめるもんか〜！',
-  hit0: 'いててっ！',
-  hit1: 'ぐぬぬ…',
-  hit2: 'やるな〜！',
-  hit3: 'うわっ！',
-  hit4: 'なにっ！？',
-  slow: 'どうした〜？ よめないのか〜？',
-  danger: 'ま、まずい…！',
-  defeat: 'やられた〜！ おぼえてろ〜！',
+  enter: 'No hiragana for you!',
+  t0: 'Here I go! Take that!',
+  throw0: 'Can you read THIS?',
+  throw1: 'Hyah!',
+  throw2: 'Not done yet!',
+  throw3: 'Try this one!',
+  throw4: 'How about this?',
+  throw5: 'You can’t read it!',
+  hit0: 'Ouch!',
+  hit1: 'Grrr…',
+  hit2: 'No way!',
+  hit3: 'Whoa!',
+  hit4: 'What?!',
+  slow: 'What’s wrong? Can’t read it?',
+  danger: 'Uh-oh…!',
+  defeat: 'You win… I’ll be back!',
 } as const
 export type JamaKey = keyof typeof JAMA_TEXT
 

@@ -48,7 +48,7 @@ export async function userFontName(): Promise<string | null> {
 export async function detectFontStatus(): Promise<FontStatus> {
   if (userFace?.status === 'loaded') return 'user'
   try {
-    const faces = await document.fonts.load('600 48px YomemaruNKB', 'アイウエオ')
+    const faces = await document.fonts.load('600 48px YomemaruNKB', 'あいうえお')
     if (faces.length > 0) return 'system'
   } catch {
     /* noop */

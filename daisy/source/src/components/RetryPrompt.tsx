@@ -21,25 +21,25 @@ export function RetryPrompt({ open, onRegister, onContinue }: { open: boolean; o
           <button
             type="button"
             onClick={() => sayVoice('retry_register')}
-            aria-label="もういちど きく"
-            className="absolute -right-14 top-6 flex h-12 w-12 items-center justify-center rounded-full border-2 border-amber-300 bg-white text-orange-600 shadow-sm"
+            aria-label="Listen again"
+            className="absolute -right-14 top-6 flex h-12 w-12 items-center justify-center rounded-full border-2 border-amber-300 bg-white text-pink-600 shadow-sm"
           >
             <Volume2 size={24} />
           </button>
         </div>
         <p className="text-2xl font-bold leading-relaxed text-stone-800">
-          うまく ききとれなくて ごめんね。
+          Sorry, I couldn't hear you.
           <br />
-          もういちど きみの こえを
+          Can you let me hear
           <br />
-          きかせてね。
+          your voice again?
         </p>
         <div className="flex w-full flex-col gap-3">
-          <button type="button" onClick={onRegister} className="flex items-center justify-center gap-2 rounded-full bg-orange-500 py-3 text-xl font-bold text-white shadow-[0_5px_0_#c2410c]">
-            <AudioLines size={24} /> こえを とうろくする
+          <button type="button" onClick={onRegister} className="flex items-center justify-center gap-2 rounded-full bg-pink-500 py-3 text-xl font-bold text-white shadow-[0_5px_0_#be185d]">
+            <AudioLines size={24} /> Teach Daisy my voice
           </button>
           <button type="button" onClick={onContinue} className="flex items-center justify-center gap-2 rounded-full border-2 border-amber-300 bg-white py-2.5 text-lg font-bold text-stone-700">
-            <Play size={20} /> このまま つづける
+            <Play size={20} /> Keep going
           </button>
         </div>
       </div>

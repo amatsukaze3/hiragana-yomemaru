@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 
-const COLORS = ['#f59e0b', '#f97316', '#fb7185', '#34d399', '#60a5fa', '#facc15']
+const COLORS = ['#f59e0b', '#ec4899', '#fb7185', '#34d399', '#60a5fa', '#facc15']
 
 /** 紙吹雪。burst が変わるたびに 1 回ふる */
 export function Confetti({ burst }: { burst: number }) {
@@ -42,7 +42,7 @@ export function Confetti({ burst }: { burst: number }) {
 export function Hanamaru({ size = 220 }: { size?: number }) {
   const petals = Array.from({ length: 9 }, (_, i) => (i / 9) * Math.PI * 2)
   return (
-    <svg width={size} height={size} viewBox="0 0 200 200" aria-label="はなまる" role="img">
+    <svg width={size} height={size} viewBox="0 0 200 200" aria-label="Great job" role="img">
       {petals.map((a, i) => {
         const cx = 100 + Math.cos(a) * 74
         const cy = 100 + Math.sin(a) * 74

@@ -18,7 +18,7 @@ import { ActionButton } from './Learn'
 
 type Phase = 'menu' | 'name' | 'test' | 'result'
 
-const HIRAGANA = /^[ぁ-ゖァ-ヶー]+$/ // なまえは ひらがな・カタカナ
+const HIRAGANA = /^[ぁ-ゖァ-ヶーA-Za-z][ぁ-ゖァ-ヶーA-Za-z .'-]*$/ // なまえは ひらがな・カタカナ・ローマ字
 
 export function Assessment({ onHome }: { onHome: () => void }) {
   const [phase, setPhase] = useState<Phase>('menu')
@@ -143,7 +143,7 @@ export function Assessment({ onHome }: { onHome: () => void }) {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-3 px-3 pt-3 sm:px-5">
-        <button type="button" onClick={phase === 'test' ? quit : onHome} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-amber-200 bg-white text-stone-600" aria-label={phase === 'test' ? 'やめる' : 'ホームへ'}>
+        <button type="button" onClick={phase === 'test' ? quit : onHome} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-amber-200 bg-white text-stone-600" aria-label={phase === 'test' ? 'Stop' : 'Home'}>
           {phase === 'test' ? <X size={24} /> : <House size={24} />}
         </button>
         <h2 className="min-w-0 flex-1 truncate text-xl font-bold text-stone-800 sm:text-2xl">アセスメントモード</h2>
@@ -160,7 +160,7 @@ export function Assessment({ onHome }: { onHome: () => void }) {
       {phase === 'menu' && (
         <main className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col gap-5 overflow-y-auto px-4 py-4" style={{ touchAction: 'pan-y' }}>
           <section className="flex flex-col items-center gap-3 text-center">
-            <p className="text-lg leading-relaxed text-stone-600">46文字を ランダムに 1文字ずつ よんで、カタカナの 修得率を しらべます。</p>
+            <p className="text-lg leading-relaxed text-stone-600">46文字を ランダムに 1文字ずつ よんで、ひらがなの 修得率を しらべます。<br />The child reads all 46 letters, one at a time in random order, to check how many hiragana they know.</p>
             <ActionButton icon={<Play />} label="アセスメントを はじめる" onClick={goName} strong />
           </section>
 
@@ -234,9 +234,9 @@ export function Assessment({ onHome }: { onHome: () => void }) {
       {phase === 'name' && (
         <main className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-5 px-4 text-center">
           <Mascot size={110} />
-          <p className="text-2xl font-bold leading-relaxed text-stone-800">したの なまえを いれてね</p>
+          <p className="text-2xl font-bold leading-relaxed text-stone-800">Type your first name</p>
           <button type="button" onClick={() => sayVoice('assess_name')} className="flex items-center gap-1 text-stone-500 underline">
-            <Volume2 size={18} /> もういちど きく
+            <Volume2 size={18} /> Listen again
           </button>
           <input
             id="assess-name"
@@ -246,18 +246,18 @@ export function Assessment({ onHome }: { onHome: () => void }) {
               setNameError(false)
             }}
             onKeyDown={(e) => e.key === 'Enter' && void start()}
-            placeholder="れい：はなこ"
+            placeholder="e.g. Emma"
             autoComplete="off"
-            className="font-card w-full max-w-sm rounded-2xl border-4 border-amber-200 bg-white px-4 py-3 text-center text-3xl text-stone-900 outline-none focus:border-orange-400"
+            className="font-card w-full max-w-sm rounded-2xl border-4 border-amber-200 bg-white px-4 py-3 text-center text-3xl text-stone-900 outline-none focus:border-pink-400"
             style={{ touchAction: 'auto', userSelect: 'text', WebkitUserSelect: 'text' }}
           />
-          {nameError && <p className="text-lg text-red-700">ひらがな か カタカナで いれてね</p>}
+          {nameError && <p className="text-lg text-red-700">Please use letters only</p>}
           {starting ? (
-            <p className="text-xl font-bold text-orange-600">はなちゃんの おはなしを きいてね</p>
+            <p className="text-xl font-bold text-pink-600">Listen to Daisy</p>
           ) : (
-            <ActionButton icon={<Play />} label="スタート" onClick={() => void start()} strong />
+            <ActionButton icon={<Play />} label="Start" onClick={() => void start()} strong />
           )}
-          <p className="text-sm text-stone-400">スタートを おすと マイクが つきます</p>
+          <p className="text-sm text-stone-400">The mic turns on when you tap Start</p>
         </main>
       )}
 
@@ -271,10 +271,10 @@ export function Assessment({ onHome }: { onHome: () => void }) {
           <footer className="flex flex-wrap items-center justify-center gap-3 px-4 pb-[max(16px,env(safe-area-inset-bottom))]">
             <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} heard={voice.heard} />
             <button type="button" onClick={() => answer(false, 'skip')} className="flex h-14 items-center gap-1 rounded-full border-2 border-stone-300 bg-white px-5 text-lg font-bold text-stone-600">
-              <SkipForward size={20} /> よめない
+              <SkipForward size={20} /> I don't know
             </button>
             <button type="button" onClick={() => answer(true, 'manual')} className="flex h-14 items-center gap-1 rounded-full border-2 border-amber-300 bg-white px-5 text-lg font-bold text-stone-700">
-              <Check size={20} /> よめた（先生）
+              <Check size={20} /> よめた（先生 / teacher）
             </button>
           </footer>
         </>
@@ -283,9 +283,9 @@ export function Assessment({ onHome }: { onHome: () => void }) {
       {phase === 'result' && last && (
         <main className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col items-center justify-center gap-3 overflow-y-auto px-4 py-4 text-center" style={{ touchAction: 'pan-y' }}>
           <Hanamaru size={140} />
-          <p className="font-card text-2xl text-stone-700">{last.name} さん</p>
-          <p className="text-5xl font-bold tabular-nums text-orange-500">
-            {last.correct} <span className="text-2xl text-stone-500">/ {last.total} もじ</span>
+          <p className="font-card text-2xl text-stone-700">{last.name}</p>
+          <p className="text-5xl font-bold tabular-nums text-pink-500">
+            {last.correct} <span className="text-2xl text-stone-500">/ {last.total}</span>
           </p>
           <p className="text-lg text-stone-600">修得率 {Math.round((last.correct / last.total) * 100)}%</p>
           <p className="text-xl font-bold leading-relaxed text-stone-800">{remark(last.correct, last.total).text}</p>
@@ -299,7 +299,7 @@ export function Assessment({ onHome }: { onHome: () => void }) {
           {last.manual > 0 && <p className="text-xs text-stone-400">先生の「よめた」ボタンで○にした文字：{last.manual}こ</p>}
           <div className="mt-2 flex flex-wrap justify-center gap-3">
             <ActionButton label="きろくを みる" onClick={() => setPhase('menu')} />
-            <ActionButton label="ホームへ" onClick={onHome} strong />
+            <ActionButton label="Home" onClick={onHome} strong />
           </div>
         </main>
       )}

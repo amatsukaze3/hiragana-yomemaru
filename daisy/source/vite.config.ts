@@ -4,8 +4,8 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { viteSingleFile } from 'vite-plugin-singlefile'
 
-// `npm run build:single`        … カタカナはなちゃん（dist-single/index.html → リポジトリの katakana/index.html）
-// `npm run build:single:shoot`  … はなちゃんシューティング だけの ページ（dist-single-shoot/shooting.html → リポジトリの katakana/shooting/index.html）
+// `npm run build:single`        … ひらがなデイジーちゃん（dist-single/index.html → リポジトリの daisy/index.html）
+// `npm run build:single:shoot`  … デイジーちゃんシューティング だけの ページ（dist-single-shoot/shooting.html → リポジトリの daisy/shooting/index.html）
 const single = process.env.SINGLE === '1'
 const app = process.env.APP === 'shoot' ? 'shoot' : 'main'
 

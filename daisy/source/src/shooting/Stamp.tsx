@@ -23,7 +23,7 @@ export function Stamp({ id, size = 96, owned = true, gold = false, tilt = 0 }: {
         background: isGold ? 'conic-gradient(from 200deg, #f59e0b, #fde68a, #fbbf24, #fff7d6, #f59e0b, #fcd34d, #f59e0b)' : undefined,
         boxShadow: owned ? ring : 'inset 0 0 0 2px #e7e5e4',
       }}
-      aria-label={owned ? `${info.word}の ${isGold ? 'きんの ' : ''}スタンプ` : 'まだ もっていない スタンプ'}
+      aria-label={owned ? `${isGold ? 'Gold ' : ''}${info.en} stamp` : 'Not yet'}
     >
       {isGold ? (
         // きんの ふちの うちがわは クリームいろに して、絵を はっきり みせる

@@ -54,34 +54,34 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, o
         <button
           type="button"
           onClick={() => setRegistering(true)}
-          className="flex items-center gap-2 rounded-full border-2 border-orange-200 bg-white px-4 py-2 text-sm font-bold text-orange-700 shadow-sm"
+          className="flex items-center gap-2 rounded-full border-2 border-pink-200 bg-white px-4 py-2 text-sm font-bold text-pink-700 shadow-sm"
         >
-          <AudioLines size={20} /> こえの とうろく
+          <AudioLines size={20} /> My voice
         </button>
         <button
           type="button"
           onClick={onSettings}
           className="flex items-center gap-2 rounded-full border-2 border-amber-200 bg-white px-4 py-2 text-sm font-bold text-stone-600 shadow-sm"
         >
-          <ImagePlus size={20} /> カード とうろく
+          <ImagePlus size={20} /> Settings
         </button>
       </header>
 
       <main className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col items-center justify-center gap-3 overflow-y-auto px-4 pb-3 sm:pt-3" style={{ touchAction: 'pan-y' }}>
         <div className="flex items-center gap-3">
-          <button type="button" onClick={tapMascot} aria-label="はなちゃん" className="rounded-full">
+          <button type="button" onClick={tapMascot} aria-label="Daisy" className="rounded-full">
             <Mascot size={84} />
           </button>
           <h1 className="text-4xl font-bold tracking-wide text-stone-800 sm:text-5xl">
-            カタカナ<span className="text-orange-500">はなちゃん</span>
+            <span className="font-card">ひらがな</span> <span className="text-pink-500">Daisy</span>
           </h1>
         </div>
 
         <KanaProgress mastered={mastered} row={row} onRow={onRow} />
 
         {/* 行えらび */}
-        <section className="w-full" aria-label="ぎょうを えらぶ">
-          <p className="mb-2 text-center text-lg text-stone-500">どの ぎょうに する？</p>
+        <section className="w-full" aria-label="Choose a row">
+          <p className="mb-2 text-center text-lg text-stone-500">Which row?</p>
           <ul className="grid grid-cols-5 gap-2">
             {ROWS.map((r) => {
               const on = r.id === row.id
@@ -93,7 +93,7 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, o
                     whileTap={{ scale: 0.94 }}
                     aria-pressed={on}
                     className={`font-card flex h-12 w-full items-center justify-center rounded-2xl text-2xl sm:h-14 sm:text-3xl ${
-                      on ? 'bg-orange-500 text-white shadow-[0_4px_0_#c2410c]' : 'border-2 border-amber-200 bg-white text-stone-700'
+                      on ? 'bg-pink-500 text-white shadow-[0_4px_0_#be185d]' : 'border-2 border-amber-200 bg-white text-stone-700'
                     }`}
                   >
                     {r.kana[0]}
@@ -114,29 +114,29 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, o
         </p>
 
         <div className="grid w-full gap-4 sm:grid-cols-2">
-          <ModeButton onClick={onLearn} num="①" title="おぼえる" sub="5つの ステップ" icon={<BookOpen size={34} />} tone="bg-amber-400 shadow-[0_8px_0_#d97706]" />
+          <ModeButton onClick={onLearn} num="①" title="Learn" sub="5 easy steps" icon={<BookOpen size={34} />} tone="bg-amber-400 shadow-[0_8px_0_#d97706]" />
           <ModeButton
             onClick={onChallenge}
             num="②"
-            title="チャレンジ おんどく"
-            sub={best ? `10もん タイムアタック ・ さいこう ${formatTime(best)}` : '10もん タイムアタック'}
+            title="Reading challenge"
+            sub={best ? `10 letters, beat the clock · Best ${formatTime(best)}` : '10 letters, beat the clock'}
             icon={
               <span className="flex">
                 <Mic size={30} />
                 <Timer size={30} />
               </span>
             }
-            tone="bg-orange-400 shadow-[0_8px_0_#c2410c]"
+            tone="bg-pink-400 shadow-[0_8px_0_#be185d]"
           />
           {/* おまけ（オプション）なので、ひかえめに */}
           <div className="flex justify-center sm:col-span-2">
             {unlocked ? (
               <button type="button" onClick={onShoot} className="flex items-center gap-1.5 rounded-full border border-sky-200 bg-white px-4 py-1.5 text-sm text-sky-700">
-                <Rocket size={16} /> はなちゃんシューティング{shootBest ? `（さいこう ${shootBest}てん）` : ''}
+                <Rocket size={16} /> Daisy Shooting{shootBest ? ` (best ${shootBest})` : ''}
               </button>
             ) : (
               <p className="flex items-center gap-1 text-xs text-stone-400">
-                <Lock size={13} /> ぜんぶの カタカナを おぼえられたら「はなちゃんシューティング」が できるように なるよ。
+                <Lock size={13} /> Learn all the hiragana to unlock “Daisy Shooting”!
               </p>
             )}
           </div>
@@ -145,12 +145,12 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, o
       {registering && <VoiceRegister onCancel={() => setRegistering(false)} onDone={() => setRegistering(false)} />}
       <Modal open={announce}>
         <Rocket size={72} className="text-sky-500" />
-        <p className="text-3xl font-bold text-stone-800">46もじ ぜんぶ よめたね！</p>
-        <p className="text-xl text-stone-600">「はなちゃんシューティング」が あらわれた！</p>
+        <p className="text-3xl font-bold text-stone-800">You can read all 46 letters!</p>
+        <p className="text-xl text-stone-600">“Daisy Shooting” is unlocked!</p>
         <Mascot size={100} mood="cheer" />
         <div className="flex flex-wrap justify-center gap-3">
           <button type="button" onClick={() => setAnnounce(false)} className="rounded-full border-2 border-amber-300 bg-white px-6 py-3 text-xl font-bold text-stone-700">
-            あとで
+            Later
           </button>
           <button
             type="button"
@@ -160,7 +160,7 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, o
             }}
             className="rounded-full bg-sky-500 px-6 py-3 text-xl font-bold text-white shadow-[0_5px_0_#0369a1]"
           >
-            あそぶ！
+            Play!
           </button>
         </div>
       </Modal>
@@ -168,11 +168,11 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, o
         <span>
           © 2026 TOSS中丹教育サークル 大松幹生 /{' '}
           <a href="./terms.html" target="_blank" rel="noopener" className="text-stone-500 underline">
-            アセスメントモードの利用および利用規約
+            Terms of use / 利用規約
           </a>
-          （商用利用不可）
+          (non-commercial / 商用利用不可)
         </span>
-        <span>こえ：VOICEVOX:東北ずん子／VOICEVOX:黒沢冴白</span>
+        <span>Voices: VOICEVOX:四国めたん / VOICEVOX:黒沢冴白</span>
       </footer>
     </div>
   )

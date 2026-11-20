@@ -74,7 +74,7 @@ export function TeacherHelp({ onPause, onResume, onPass, onHome, passLabel = '„Å
                 </p>
                 <div className="flex w-full flex-col gap-3">
                   {onPass && (
-                    <button type="button" onClick={() => close(onPass)} className="flex items-center justify-center gap-2 rounded-full bg-orange-500 py-3 text-xl font-bold text-white shadow-[0_5px_0_#c2410c]">
+                    <button type="button" onClick={() => close(onPass)} className="flex items-center justify-center gap-2 rounded-full bg-pink-500 py-3 text-xl font-bold text-white shadow-[0_5px_0_#be185d]">
                       <CircleCheck size={24} /> {passLabel}
                     </button>
                   )}
