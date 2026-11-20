@@ -19,7 +19,7 @@ jobs:
       - run: pip install numpy scipy pyworld pyloudnorm soundfile
       - name: wait for engine
         run: for i in $(seq 60); do curl -sf http://127.0.0.1:50021/version && break; sleep 5; done
-      - run: python3 daisy/tools/voice/make_voices.py
+      - run: RAW_DIR=daisy/tools/voice/raw python3 daisy/tools/voice/make_voices.py kana
       - name: commit voices to daisy-voice-gen
         run: |
           git config user.name "github-actions[bot]"

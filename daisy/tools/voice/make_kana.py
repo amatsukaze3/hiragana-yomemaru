@@ -12,7 +12,7 @@
 - 破裂音（k・t）などの 無声の 子音は 音量を あげ、まえの 無音を 0.08びょうに（鳴りはじめが きれないように）
 - ファイルは 無音こみで 0.49びょう、24kHz モノラル 96kbps、ラウドネス -16.5 LUFS
 """
-import io, math, os, subprocess, sys, tempfile
+import io, json, math, os, subprocess, sys, tempfile
 import numpy as np, soundfile as sf, pyworld as pw, pyloudnorm as pyln
 from scipy.ndimage import uniform_filter1d
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -62,7 +62,21 @@ def make(kana, out_mp3, debug=False):
     m0['vowel_length'] = 0.32  # 母音を ながめに よませて、のばす もとに なる 安定部を ながく とる
     m0['pitch'] = math.log(P0)
     m1['pitch'] = math.log(P0 if long_v else P0 * 0.97)
-    x, sr = sf.read(io.BytesIO(synth(q, SID)))
+    raw_dir = os.environ.get('RAW_DIR')
+    raw = os.path.join(raw_dir, kana) if raw_dir else None
+    if raw and os.environ.get('RAW_USE') and os.path.exists(raw + '.wav'):
+        x, sr = sf.read(raw + '.wav')  # VOICEVOX なしで 加工だけ ためすとき
+        q = json.load(open(raw + '.json', encoding='utf-8'))
+        ap0 = q['accent_phrases'][0]; m0, m1 = ap0['moras'][0], ap0['moras'][1]
+        c = m0.get('consonant'); cons = m0['consonant_length'] or 0.0
+        long_v = q.get('_long_v', long_v)
+    else:
+        wav = synth(q, SID)
+        x, sr = sf.read(io.BytesIO(wav))
+        if raw:
+            os.makedirs(raw_dir, exist_ok=True)
+            open(raw + '.wav', 'wb').write(wav)
+            json.dump({**q, '_long_v': long_v}, open(raw + '.json', 'w', encoding='utf-8'), ensure_ascii=False)
     assert sr == SR
     t_v0 = 0.1 + cons                 # 母音の はじまり（よてい）
     t_v1 = t_v0 + m0['vowel_length']  # 母音の おわり
