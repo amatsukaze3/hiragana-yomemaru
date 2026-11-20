@@ -56,16 +56,16 @@ export interface Row {
 }
 
 export const ROWS: Row[] = [
-  { id: 'a', name: 'あ行', kana: ['あ', 'い', 'う', 'え', 'お'] },
-  { id: 'ka', name: 'か行', kana: ['か', 'き', 'く', 'け', 'こ'] },
-  { id: 'sa', name: 'さ行', kana: ['さ', 'し', 'す', 'せ', 'そ'] },
-  { id: 'ta', name: 'た行', kana: ['た', 'ち', 'つ', 'て', 'と'] },
-  { id: 'na', name: 'な行', kana: ['な', 'に', 'ぬ', 'ね', 'の'] },
-  { id: 'ha', name: 'は行', kana: ['は', 'ひ', 'ふ', 'へ', 'ほ'] },
-  { id: 'ma', name: 'ま行', kana: ['ま', 'み', 'む', 'め', 'も'] },
-  { id: 'ya', name: 'や行', kana: ['や', 'ゆ', 'よ'] },
-  { id: 'ra', name: 'ら行', kana: ['ら', 'り', 'る', 'れ', 'ろ'] },
-  { id: 'wa', name: 'わ行', kana: ['わ', 'を', 'ん'] },
+  { id: 'a', name: 'あ row', kana: ['あ', 'い', 'う', 'え', 'お'] },
+  { id: 'ka', name: 'か row', kana: ['か', 'き', 'く', 'け', 'こ'] },
+  { id: 'sa', name: 'さ row', kana: ['さ', 'し', 'す', 'せ', 'そ'] },
+  { id: 'ta', name: 'た row', kana: ['た', 'ち', 'つ', 'て', 'と'] },
+  { id: 'na', name: 'な row', kana: ['な', 'に', 'ぬ', 'ね', 'の'] },
+  { id: 'ha', name: 'は row', kana: ['は', 'ひ', 'ふ', 'へ', 'ほ'] },
+  { id: 'ma', name: 'ま row', kana: ['ま', 'み', 'む', 'め', 'も'] },
+  { id: 'ya', name: 'や row', kana: ['や', 'ゆ', 'よ'] },
+  { id: 'ra', name: 'ら row', kana: ['ら', 'り', 'る', 'れ', 'ろ'] },
+  { id: 'wa', name: 'わ row', kana: ['わ', 'を', 'ん'] },
 ]
 
 export const KANA: Kana[] = ROWS.flatMap((r) => r.kana)
@@ -94,11 +94,11 @@ export interface KanaInfo {
 }
 
 export const KANA_INFO: Record<Kana, KanaInfo> = {
-  あ: { char: 'あ', romaji: 'a', word: 'あいす', en: 'ice cream', say: 'アイス', vowel: 'あ', strokes: 3, strokeStarts: [[0.27, 0.3], [0.44, 0.17], [0.62, 0.4]], image: aImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 50.1, cy: 52.0, h: 43.0 } },
-  い: { char: 'い', romaji: 'i', word: 'いんこ', en: 'parakeet', say: 'インコ', vowel: 'い', strokes: 2, strokeStarts: [[0.3, 0.26], [0.66, 0.34]], image: iImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 49.0, cy: 48.7, h: 43.0 } },
-  う: { char: 'う', romaji: 'u', word: 'うくれれ', en: 'ukulele', say: 'ウクレレ', vowel: 'う', strokes: 2, strokeStarts: [[0.4, 0.16], [0.3, 0.42]], image: uImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 50.6, cy: 50.4, h: 43.0 } },
-  え: { char: 'え', romaji: 'e', word: 'えぷろん', en: 'apron', say: 'エプロン', vowel: 'え', strokes: 2, strokeStarts: [[0.41, 0.16], [0.28, 0.42]], image: eImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 50.0, cy: 57.5, h: 43.0 } },
-  お: { char: 'お', romaji: 'o', word: 'おれんじ', en: 'orange', say: 'オレンジ', vowel: 'お', strokes: 3, strokeStarts: [[0.24, 0.32], [0.44, 0.16], [0.68, 0.27]], image: oImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 49.4, cy: 53.4, h: 43.0 } },
+  あ: { char: 'あ', romaji: 'a', word: 'あいす', en: 'ice cream', say: 'アイス', vowel: 'あ', strokes: 3, strokeStarts: [[0.05, 0.15], [0.4, 0.02], [0.72, 0.3]], image: aImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 50.1, cy: 52.0, h: 43.0 } },
+  い: { char: 'い', romaji: 'i', word: 'いんこ', en: 'parakeet', say: 'インコ', vowel: 'い', strokes: 2, strokeStarts: [[0.08, 0.05], [0.78, 0.12]], image: iImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 49.0, cy: 48.7, h: 43.0 } },
+  う: { char: 'う', romaji: 'u', word: 'うくれれ', en: 'ukulele', say: 'ウクレレ', vowel: 'う', strokes: 2, strokeStarts: [[0.25, 0.04], [0.06, 0.36]], image: uImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 50.6, cy: 50.4, h: 43.0 } },
+  え: { char: 'え', romaji: 'e', word: 'えぷろん', en: 'apron', say: 'エプロン', vowel: 'え', strokes: 2, strokeStarts: [[0.25, 0.03], [0.1, 0.38]], image: eImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 50.0, cy: 57.5, h: 43.0 } },
+  お: { char: 'お', romaji: 'o', word: 'おれんじ', en: 'orange', say: 'オレンジ', vowel: 'お', strokes: 3, strokeStarts: [[0.03, 0.22], [0.32, 0.02], [0.8, 0.17]], image: oImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 49.4, cy: 53.4, h: 43.0 } },
   か: { char: 'か', romaji: 'ka', word: 'かめら', en: 'camera', say: 'カメラ', vowel: 'あ', strokes: 3, strokeStarts: [[0.1, 0.3], [0.38, 0.05], [0.8, 0.28]], image: kaImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 49.6, cy: 50.8, h: 43.0 } },
   き: { char: 'き', romaji: 'ki', word: 'きゃべつ', en: 'cabbage', say: 'キャベツ', vowel: 'い', strokes: 4, strokeStarts: [[0.2, 0.2], [0.15, 0.42], [0.4, 0.02], [0.25, 0.75]], image: kiImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 50.8, cy: 44.6, h: 43.0 } },
   く: { char: 'く', romaji: 'ku', word: 'くれよん', en: 'crayon', say: 'クレヨン', vowel: 'う', strokes: 1, strokeStarts: [[0.75, 0.02]], image: kuImg, imageAspect: 1000 / 760, framed: true, letter: { cx: 48.9, cy: 46.9, h: 43.0 } },

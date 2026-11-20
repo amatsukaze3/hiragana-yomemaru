@@ -1,6 +1,6 @@
 import { motion } from 'motion/react'
 import { Trophy } from 'lucide-react'
-import yomemaru from '../assets/hanachan.webp'
+import yomemaru from '../assets/daisy.webp'
 import { STAMP_TOTAL } from './words'
 
 const CHECKPOINTS = [10, 20, 30, 40]

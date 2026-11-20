@@ -46,6 +46,10 @@ def make(kana, out_mp3, debug=False):
     ap0 = q['accent_phrases'][0]
     ap0['accent'] = 1
     m0, m1 = ap0['moras'][0], ap0['moras'][1]
+    # 「フマ」の「フ」のように 母音が 無声化（大文字の U など）すると 息だけに なるので、声を だす 母音に もどす
+    for m in (m0, m1):
+        if m['vowel'] in ('A', 'I', 'U', 'E', 'O'):
+            m['vowel'] = m['vowel'].lower()
     c = m0.get('consonant')
     if c and m0['consonant_length']:
         m0['consonant_length'] *= CONS_SCALE.get(c, 1.0)

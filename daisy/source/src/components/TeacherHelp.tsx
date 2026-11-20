@@ -34,7 +34,7 @@ export function TeacherHelp({ onPause, onResume, onPass, onHome, passLabel = '�
         className="flex h-12 shrink-0 items-center gap-1.5 rounded-full border-2 border-stone-200 bg-white px-3 text-sm font-bold text-stone-500"
         aria-label="せんせい ヘルプ"
       >
-        <KeyRound size={18} /> せんせい
+        <KeyRound size={18} /> Teacher
       </button>
       {mode && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-900/40 p-4">
