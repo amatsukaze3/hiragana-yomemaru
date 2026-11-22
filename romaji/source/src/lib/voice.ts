@@ -10,6 +10,7 @@
 import { KANA_INFO, type Kana, type Vowel } from '../data/kana'
 import { VOWEL_ORDER, meanShape, modelProbs, personalProbs, updateNoise, vowelFeature } from './vowelClassifier'
 import { getAudioContext, setMicActive } from './audio'
+import { ONSET_CLASSES, onsetClassOf, onsetFeatures, onsetProbs, onsetScore } from './onset'
 
 export type PassSource = 'asr' | 'formant'
 export type MicStatus = 'idle' | 'starting' | 'listening' | 'denied' | 'unsupported' | 'error'
@@ -43,6 +44,8 @@ const UTT_END_FRAMES = 7 // 約160ms 声が止まったら、ひとつの発声�
 const UTT_MIN_FRAMES = 5 // 約0.12秒より短い音は判定しない
 const UTT_MAX_FRAMES = 50 // 約1.15秒より長い発声（おしゃべり・文）は不合格
 const UTT_MIN_PROB = 0.5
+/** 母音と 子音で 合格したとき、音声認識の けっかを まつ じかん（ms） */
+const ASR_WAIT_MS = 700
 /** 発声の なかで、いちばん大きい声より これだけ（-26dB）小さい音は「すきま」とみなす */
 const UTT_GAP_RATIO = 0.05
 /** 「いちばん大きい まとまり」に いれる 大きさ（-12dB）と、その そとに あっては いけない 大きさ（-10dB） */
@@ -281,7 +284,15 @@ export class HybridVoiceJudge {
   private lockUntil = 0
   private targetSetAt = 0
   // ひとつの発声（声が出はじめてから止まるまで）のまとめ
-  private utt: { feats: number[][]; levels: number[]; silent: number; run: number; top: number } | null = null
+  private utt: { feats: number[][]; levels: number[]; silent: number; run: number; top: number; startSample: number } | null = null
+  // 子音を しらべるための、ちょくぜん 約3びょうの 音（AnalyserNode の 時間波形を つないだもの）
+  private ring = new Float32Array(0)
+  private sampleCount = 0
+  private lastTickAt = 0
+  /** 母音と 子音で 合格した あと、音声認識の けっかを すこし まつ（ちがう 文字が きこえたら とりけす） */
+  private pending: { target: Kana; until: number } | null = null
+  /** さいごの 発声の 子音の なかまの 確率（テスト・ログ用） */
+  lastOnset: { probs: number[]; cls: string } | null = null
   /** 登録した その子の「あいうえお」の形（なければ学習モデルで判定） */
   private voiceprint: number[][] | null = null
   private captureCb: ((shape: number[] | null) => void) | null = null
@@ -380,6 +391,7 @@ export class HybridVoiceJudge {
   /** 出題する文字を変える。前の声の残りで誤合格しないよう、少しの間ロックする */
   setTarget(k: Kana | null, lockMs = 300) {
     this.utt = null
+    this.pending = null
     this.target = k
     this.streak = 0
     this.armed = false
@@ -433,6 +445,7 @@ export class HybridVoiceJudge {
   /** チャイムなどを鳴らしている間は判定しない */
   hold(ms: number) {
     this.utt = null
+    this.pending = null
     this.lockUntil = Math.max(this.lockUntil, performance.now() + ms)
     this.streak = 0
   }
@@ -442,6 +455,7 @@ export class HybridVoiceJudge {
   pause() {
     this.paused = true
     this.utt = null
+    this.pending = null
   }
   resume(lockMs = 400) {
     this.paused = false
@@ -475,6 +489,7 @@ export class HybridVoiceJudge {
     if (!an) return
     an.getFloatTimeDomainData(this.time)
     an.getByteFrequencyData(this.freq)
+    this.appendSamples()
 
     let sq = 0
     for (let i = 0; i < this.time.length; i++) sq += this.time[i] * this.time[i]
@@ -507,6 +522,11 @@ export class HybridVoiceJudge {
     }
 
     const now = performance.now()
+    if (this.pending && (this.pending.target !== this.target || this.paused)) this.pending = null
+    if (this.pending && now >= this.pending.until) {
+      this.pending = null
+      this.pass('formant')
+    }
     if (!this.armed) {
       // 前の声が途切れる（または一定時間たつ）まで待ってから判定を始める
       this.quietFrames = voiced ? 0 : this.quietFrames + 1
@@ -525,7 +545,7 @@ export class HybridVoiceJudge {
 
     // 発声ごとに判定する（声が止まったところで、その発声全体を見て決める）
     if (listening && voiced && !inGap) {
-      if (!this.utt) this.utt = { feats: [], levels: [], silent: 0, run: 0, top: 0 }
+      if (!this.utt) this.utt = { feats: [], levels: [], silent: 0, run: 0, top: 0, startSample: this.sampleCount - this.time.length }
       const u = this.utt
       u.silent = 0
       if (feat) {
@@ -573,9 +593,19 @@ export class HybridVoiceJudge {
         const nOk = this.target === 'ン' && lenOk && core.length >= 3 ? this.nMatches(core) : null
         if ((window as unknown as { __yomeDebug?: boolean }).__yomeDebug && this.voiceprint)
           console.log('UTT', this.target, u.feats.length, core.length, utteranceAvg(core.map((f) => personalProbs(f, this.voiceprint!))).map((v) => v.toFixed(2)).join(' '), nOk)
-        if (this.target && lenOk && (nOk ?? utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', core.map((f) => this.probsOf(f)), thr, 3))) {
+        const dump = (globalThis as unknown as { __onsetDump?: number[][] }).__onsetDump
+        if (dump && lenOk) {
+          const sr = this.analyser!.context.sampleRate
+          const o = onsetFeatures(this.samples(u.startSample - Math.round(sr * 0.25), this.sampleCount), sr)
+          if (o) dump.push([u.top, ...o.feat])
+        }
+        const vowelOk = !!this.target && lenOk && (nOk ?? utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', core.map((f) => this.probsOf(f)), thr, 3))
+        // 母音が あっていても、出だしの 子音が ちがえば 不合格（「か」に「あ」、「さ」に「か」など）
+        if (vowelOk && this.target && this.onsetOk(this.target, u.startSample)) {
           this.onFrame?.({ bands, voiced, match: true, streak: STREAK_TO_PASS })
-          this.pass('formant')
+          // 音声認識が うごいているときは、すこし まって「あ」「さ」など ちがう 文字が きこえていないか たしかめる
+          if (this.asrAlive && this.onsetCheck && this.target !== 'ン') this.pending = { target: this.target, until: now + ASR_WAIT_MS }
+          else this.pass('formant')
           return
         }
         // 読んだのに 合格しなかった（音声認識が あとから 合格にすることもあるので 少し待ってから知らせる）
@@ -592,6 +622,51 @@ export class HybridVoiceJudge {
     this.onFrame?.({ bands, voiced, match, streak: Math.min(this.streak, STREAK_TO_PASS) })
   }
 
+
+  /** AnalyserNode の 時間波形から、前の tick いこうの あたらしい 音だけを つなぐ */
+  private appendSamples() {
+    const sr = this.analyser!.context.sampleRate
+    if (this.ring.length !== Math.round(sr * 3)) {
+      this.ring = new Float32Array(Math.round(sr * 3))
+      this.sampleCount = 0
+      this.lastTickAt = 0
+    }
+    const now = performance.now()
+    const n = this.lastTickAt ? Math.min(this.time.length, Math.max(0, Math.round(((now - this.lastTickAt) * sr) / 1000))) : this.time.length
+    this.lastTickAt = now
+    const L = this.ring.length
+    for (let i = this.time.length - n; i < this.time.length; i++) this.ring[this.sampleCount++ % L] = this.time[i]
+  }
+
+  /** ring から [a, b) の 音を とりだす */
+  private samples(a: number, b: number) {
+    const L = this.ring.length
+    a = Math.max(a, this.sampleCount - L, 0)
+    const out = new Float32Array(Math.max(0, b - a))
+    for (let i = a; i < b; i++) out[i - a] = this.ring[i % L]
+    return out
+  }
+
+  /** 子音の しらべ：目標の 文字の なかま（K・S・H・N・Y・W・R、あ行は V）の 確率が しきいち いじょうか */
+  private onsetOk(target: Kana, startSample: number): boolean {
+    this.lastOnset = null
+    const want = onsetClassOf(KANA_INFO[target]?.romaji ?? '')
+    if (!want || !this.onsetCheck) return true
+    const sr = this.analyser!.context.sampleRate
+    const seg = this.samples(startSample - Math.round(sr * 0.25), this.sampleCount)
+    const o = onsetFeatures(seg, sr)
+    if (!o) return true // 出だしが とれないときは 母音だけで きめる
+    const p = onsetProbs(o.feat)
+    const top = p.indexOf(Math.max(...p))
+    const { score, thr } = onsetScore(p, want, this.onsetStrict)
+    this.lastOnset = { probs: p, cls: ONSET_CLASSES[top] }
+    const scale = (globalThis as unknown as { __oscale?: number }).__oscale ?? 1
+    return score >= thr * scale
+  }
+
+  /** 子音の しらべを するか（ローマ字フローラちゃんでは する）・きびしめに するか（カード とうろく の せってい） */
+  onsetCheck = true
+  onsetStrict = false
 
   private startAsr() {
     const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor }
@@ -624,9 +699,18 @@ export class HybridVoiceJudge {
         for (let j = 0; j < alts.length; j++) {
           const t = fresh(i, alts[j].transcript)
           if (this.target && t && transcriptMatches(this.target, t)) {
+            this.pending = null
             this.pass('asr')
             return
           }
+        }
+      }
+      // 母音と 子音で 合格を まっているときに、ちがう 文字（「あ」「さ」など）が きこえたら とりけす
+      if (this.pending && latest?.[0]) {
+        const t = toHiragana(fresh(last, latest[0].transcript).normalize('NFKC')).replace(/[\s、。．.,!！?？〜~ー「」]/g, '')
+        if (t && t.length <= 3 && /^[ぁ-ゖ]+$/.test(t)) {
+          this.pending = null
+          this.onMiss?.()
         }
       }
     }
