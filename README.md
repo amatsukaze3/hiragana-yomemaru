@@ -60,4 +60,4 @@
 - `romaji/tools/voice/` … こえ（VOICEVOX:小夜/SAYO、じゃままるくんは VOICEVOX:黒沢冴白）の セリフと 生成スクリプト。`romaji-voice-gen` ブランチに push すると Actions（`.github/workflows/romaji-voice.yml`）で つくる
 - 端末に保存するきろくは `flora:` で始まるキーなので、ほかの アプリの きろくとは まざりません
 
-こえ：いまは カタカナはなちゃんの こえ（VOICEVOX:東北ずん子）を かりています。Actions で つくりなおすと、画面の 表記も VOICEVOX:小夜/SAYO に かわります。
+こえ：VOICEVOX:小夜/SAYO／VOICEVOX:黒沢冴白（ローマ字フローラちゃん）

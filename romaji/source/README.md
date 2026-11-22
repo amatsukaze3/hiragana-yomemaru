@@ -24,7 +24,6 @@ npm run build:single:shoot # dist-single-shoot/shooting.html（シューティ�
 
 ## こえ
 - `romaji/tools/voice/`（VOICEVOX:小夜/SAYO ／ じゃままるくんは VOICEVOX:黒沢冴白）。`romaji-voice-gen` ブランチに push すると Actions が つくる
-- まだ つくっていない あいだは、はなちゃんの こえ（VOICEVOX:東北ずん子）を かりている。ことば（w_）・スタンプ（s_）・assess_start・jm_enter は ないので ならない
 - ぜんぶ つくりなおすと `src/data/voiceCredit.json` も かわり、ホーム画面と シューティングの クレジット表記が 自動で かわる（`romaji/terms.html` の 下の 表記は 手で なおす）
 
 ## クレジット
