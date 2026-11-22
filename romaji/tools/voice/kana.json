@@ -1,0 +1,232 @@
+[
+ {
+  "char": "あ",
+  "romaji": "a",
+  "word": "あり"
+ },
+ {
+  "char": "い",
+  "romaji": "i",
+  "word": "いちご"
+ },
+ {
+  "char": "う",
+  "romaji": "u",
+  "word": "うさぎ"
+ },
+ {
+  "char": "え",
+  "romaji": "e",
+  "word": "えんぴつ"
+ },
+ {
+  "char": "お",
+  "romaji": "o",
+  "word": "おにぎり"
+ },
+ {
+  "char": "か",
+  "romaji": "ka",
+  "word": "かめ"
+ },
+ {
+  "char": "き",
+  "romaji": "ki",
+  "word": "きつね"
+ },
+ {
+  "char": "く",
+  "romaji": "ku",
+  "word": "くるま"
+ },
+ {
+  "char": "け",
+  "romaji": "ke",
+  "word": "けしごむ"
+ },
+ {
+  "char": "こ",
+  "romaji": "ko",
+  "word": "こおり"
+ },
+ {
+  "char": "さ",
+  "romaji": "sa",
+  "word": "さかな"
+ },
+ {
+  "char": "し",
+  "romaji": "shi",
+  "word": "しんかんせん"
+ },
+ {
+  "char": "す",
+  "romaji": "su",
+  "word": "すいか"
+ },
+ {
+  "char": "せ",
+  "romaji": "se",
+  "word": "せみ"
+ },
+ {
+  "char": "そ",
+  "romaji": "so",
+  "word": "そうじき"
+ },
+ {
+  "char": "た",
+  "romaji": "ta",
+  "word": "たいよう"
+ },
+ {
+  "char": "ち",
+  "romaji": "chi",
+  "word": "ちょうちょ"
+ },
+ {
+  "char": "つ",
+  "romaji": "tsu",
+  "word": "つき"
+ },
+ {
+  "char": "て",
+  "romaji": "te",
+  "word": "てんとうむし"
+ },
+ {
+  "char": "と",
+  "romaji": "to",
+  "word": "とら"
+ },
+ {
+  "char": "な",
+  "romaji": "na",
+  "word": "なす"
+ },
+ {
+  "char": "に",
+  "romaji": "ni",
+  "word": "にんじん"
+ },
+ {
+  "char": "ぬ",
+  "romaji": "nu",
+  "word": "ぬいぐるみ"
+ },
+ {
+  "char": "ね",
+  "romaji": "ne",
+  "word": "ねこ"
+ },
+ {
+  "char": "の",
+  "romaji": "no",
+  "word": "のり"
+ },
+ {
+  "char": "は",
+  "romaji": "ha",
+  "word": "はさみ"
+ },
+ {
+  "char": "ひ",
+  "romaji": "hi",
+  "word": "ひこうき"
+ },
+ {
+  "char": "ふ",
+  "romaji": "fu",
+  "word": "ふうせん"
+ },
+ {
+  "char": "へ",
+  "romaji": "he",
+  "word": "へりこぷたー"
+ },
+ {
+  "char": "ほ",
+  "romaji": "ho",
+  "word": "ほし"
+ },
+ {
+  "char": "ま",
+  "romaji": "ma",
+  "word": "まくら"
+ },
+ {
+  "char": "み",
+  "romaji": "mi",
+  "word": "みみ"
+ },
+ {
+  "char": "む",
+  "romaji": "mu",
+  "word": "むしめがね"
+ },
+ {
+  "char": "め",
+  "romaji": "me",
+  "word": "めがね"
+ },
+ {
+  "char": "も",
+  "romaji": "mo",
+  "word": "もも"
+ },
+ {
+  "char": "や",
+  "romaji": "ya",
+  "word": "やま"
+ },
+ {
+  "char": "ゆ",
+  "romaji": "yu",
+  "word": "ゆきだるま"
+ },
+ {
+  "char": "よ",
+  "romaji": "yo",
+  "word": "よつば"
+ },
+ {
+  "char": "ら",
+  "romaji": "ra",
+  "word": "らいおん"
+ },
+ {
+  "char": "り",
+  "romaji": "ri",
+  "word": "りんご"
+ },
+ {
+  "char": "る",
+  "romaji": "ru",
+  "word": "るびー"
+ },
+ {
+  "char": "れ",
+  "romaji": "re",
+  "word": "れもん"
+ },
+ {
+  "char": "ろ",
+  "romaji": "ro",
+  "word": "ろぼっと"
+ },
+ {
+  "char": "わ",
+  "romaji": "wa",
+  "word": "わに"
+ },
+ {
+  "char": "を",
+  "romaji": "wo",
+  "word": "ほんをよむ"
+ },
+ {
+  "char": "ん",
+  "romaji": "n",
+  "word": "きりん"
+ }
+]
