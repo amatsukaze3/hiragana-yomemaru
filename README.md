@@ -45,3 +45,19 @@
 - 端末に保存するきろくは `daisy:` で始まるキーなので、ほかの アプリの きろくとは まざりません
 
 こえ：VOICEVOX:四国めたん／VOICEVOX:黒沢冴白（ひらがなデイジーちゃん）
+
+## ローマ字フローラちゃん（`romaji/`）
+
+ひらがなが よめる子が、ローマ字（a〜n の 46もじ）を よめるように なる アプリです。カタカナはなちゃん の しくみを そのまま つかい、画面に ローマ字を だします（音声判定は かなの 音で おこなう）。
+
+公開ページ：https://amatsukaze3.github.io/hiragana-yomemaru/romaji/
+
+- `romaji/index.html` … 公開用（1ファイルで動きます）
+- `romaji/shooting/index.html` … フローラちゃんシューティング だけの ページ（`npm run build:single:shoot` → `dist-single-shoot/shooting.html` をここに）
+- `romaji/source/` … ソース（`npm install` → `npm run build:single` → `dist-single/index.html` を `romaji/index.html` に）
+  - つづり方は `src/lib/romaji.ts`（あたらしい ローマ字（令和7年 内閣告示）／訓令式／りょうほう。カード とうろく の 画面で えらべる）
+  - 4本線と なぞり書きの 書きはじめは `src/lib/fourLines.ts`（文字は Andika）
+- `romaji/tools/voice/` … こえ（VOICEVOX:小夜/SAYO、じゃままるくんは VOICEVOX:黒沢冴白）の セリフと 生成スクリプト。`romaji-voice-gen` ブランチに push すると Actions（`.github/workflows/romaji-voice.yml`）で つくる
+- 端末に保存するきろくは `flora:` で始まるキーなので、ほかの アプリの きろくとは まざりません
+
+こえ：VOICEVOX:小夜/SAYO／VOICEVOX:黒沢冴白（ローマ字フローラちゃん）
