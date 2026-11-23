@@ -61,3 +61,18 @@
 - 端末に保存するきろくは `flora:` で始まるキーなので、ほかの アプリの きろくとは まざりません
 
 こえ：VOICEVOX:小夜/SAYO／VOICEVOX:黒沢冴白（ローマ字フローラちゃん）
+
+## ローマ字フローラちゃん おおもじ（`romaji-oomoji/`）
+
+ローマ字の 大文字（A〜N の 46もじ）を よめるように なる アプリです。すこし お姉さんに なった フローラちゃんが おしえて くれます。ローマ字フローラちゃん（`romaji/`）の しくみを そのまま つかい、カードの 絵は カタカナはなちゃん・ひらがなデイジーちゃんと おなじ 線画（AISU・KAMERA …）です。
+
+公開ページ：https://amatsukaze3.github.io/hiragana-yomemaru/romaji-oomoji/
+
+- `romaji-oomoji/index.html` … 公開用（1ファイルで動きます）
+- `romaji-oomoji/shooting/index.html` … フローラちゃんシューティング おおもじ だけの ページ
+- `romaji-oomoji/source/` … ソース（`npm install` → `npm run build:single` → `dist-single/index.html` を `romaji-oomoji/index.html` に）
+- `romaji-oomoji/tools/voice/` … こえ（1もじ・セリフは フローラちゃんと おなじ。カードの ことばだけ `romaji-oomoji-voice-gen` ブランチに push して Actions で つくる）
+- `romaji-oomoji/tools/font/` … 大文字の I を たて線 1本に した Andika の つくりかた
+- 端末に保存するきろくは `flora2:` で始まるキーなので、ほかの アプリの きろくとは まざりません
+
+こえ：VOICEVOX:小夜/SAYO／VOICEVOX:黒沢冴白（ローマ字フローラちゃん おおもじ）
