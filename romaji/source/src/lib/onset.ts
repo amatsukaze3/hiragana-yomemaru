@@ -83,35 +83,40 @@ function power(x: Float32Array, at: number, len: number, out: Float64Array) {
   for (let k = 0; k < FN / 2; k++) out[k] = re[k] * re[k] + im[k] * im[k]
 }
 
-/** 20ミリびょうの 窓で、声（周期的な 音）らしさ 0〜1 */
-function voicing(x: Float32Array, center: number, sr: number) {
+/**
+ * 20ミリびょうの 窓で、声（周期的な 音）らしさ 0〜1。
+ * stopAt：その あたいに とどいたら そこで やめる（「0.5 いじょうか」だけ しりたい ときに はやく おわる）
+ */
+function voicing(x: Float32Array, center: number, sr: number, stopAt = Infinity) {
   const half = Math.round(sr * 0.012)
-  const a = Math.max(0, center - half)
-  const b = Math.min(x.length, center + half)
+  // 44.1kHz では ブロックの まんなかが はんぱな 位置（110.5 など）に なるので まるめる（まるめないと 計算が NaN に なり、子音が まったく わからなかった）
+  const a = Math.max(0, Math.round(center) - half)
+  const b = Math.min(x.length, Math.round(center) + half)
   const n = b - a
   if (n < half) return 0
   let mean = 0
   for (let i = a; i < b; i++) mean += x[i]
   mean /= n
-  let e0 = 0
-  for (let i = a; i < b; i++) e0 += (x[i] - mean) ** 2
-  if (e0 <= 1e-12) return 0
+  const p = new Float64Array(n)
+  // cs[k]：p[0..k) の 2じょうの わ（ずらした ときの 大きさを すぐ だせる）
+  const cs = new Float64Array(n + 1)
+  for (let i = 0; i < n; i++) {
+    p[i] = x[a + i] - mean
+    cs[i + 1] = cs[i] + p[i] * p[i]
+  }
+  if (cs[n] <= 1e-12) return 0
   let best = 0
   const lo = Math.round(sr / 700)
   const hi = Math.round(sr / 75)
   for (let lag = lo; lag <= hi && lag < n - 8; lag += 2) {
+    const m = n - lag
     let s = 0
-    let e1 = 0
-    let e2 = 0
-    for (let i = a; i + lag < b; i++) {
-      const p = x[i] - mean
-      const q = x[i + lag] - mean
-      s += p * q
-      e1 += p * p
-      e2 += q * q
+    for (let i = 0; i < m; i++) s += p[i] * p[i + lag]
+    const r = s / Math.sqrt(cs[m] * (cs[n] - cs[lag]) + 1e-12)
+    if (r > best) {
+      best = r
+      if (best >= stopAt) return best
     }
-    const r = s / Math.sqrt(e1 * e2 + 1e-12)
-    if (r > best) best = r
   }
   return best
 }
@@ -151,7 +156,7 @@ export function onsetFeatures(x: Float32Array, sr: number): OnsetInfo | null {
   // 母音の はじまり
   let tv = -1
   for (let i = 0; i < nb; i++) {
-    if (E[i] >= top - 12 && voicing(x, i * B + B / 2, sr) >= 0.5) {
+    if (E[i] >= top - 12 && voicing(x, i * B + B / 2, sr, 0.5) >= 0.5) {
       tv = i
       break
     }
@@ -200,7 +205,7 @@ export function onsetFeatures(x: Float32Array, sr: number): OnsetInfo | null {
   for (let i = tv - 1; i >= Math.max(0, tv - Math.round(150 / BLOCK_MS)); i--) {
     if (E[i] < floor) continue
     first = i
-    const vo = voicing(x, i * B + B / 2, sr)
+    const vo = voicing(x, i * B + B / 2, sr, 0.45)
     if (vo < 0.45) {
       uE += Math.pow(10, (E[i] - top) / 10)
       uN++
