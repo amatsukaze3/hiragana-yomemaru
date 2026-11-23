@@ -85,7 +85,7 @@ def to_mp3(x: np.ndarray, dst: str, lufs: float):
     os.unlink(tmp)
 
 
-# ほめことば・かけごえ は テンション たかく、あかるく（声を すこし たかく・抑揚を おおきく・すこし はやく）
+# ほめことば・かけごえ は すこし はやく（高さ・抑揚を あげると 小夜/SAYO は かすれたので、はやさだけ）
 CHEER = {'pass5', 'clear10', 'assess_r1', 'assess_r2', 'assess_r3', 'assess_r4', 'sh_start', 'sh_resume', 'sh_over', 'sh_record',
          'sh_complete', 'sh_miss', 'sh_saved', 'sh_gold', 'bt_intro', 'bt_test', 'bt_perfect', 'bt_win'}
 
@@ -94,26 +94,61 @@ def is_cheer(name: str) -> bool:
     return name in CHEER or name.startswith('s_')
 
 
-def line(text: str, sid: int, dst: str, cheer: bool = False):
+# 1もじの 声の 高さ（Hz）。小夜/SAYO は 350Hz だと かすれた（ふだんの 話し声は 約290〜310Hz）。330Hz で いちばん すんだ 声に なった（2026-11-23）
+KANA_P0 = float(os.environ.get('KANA_P0', '330'))
+# フローラちゃんの セリフ：すこし 高め（+0.03）・抑揚 1.2。ほめことばで 高さを +0.07・抑揚 1.55 に すると かすれたので、はやさだけ かえる
+MAIN_PITCH = 0.03
+MAIN_INTONATION = 1.2
+# 息まじりの 成分を この わりあいに へらして（WORLD で つくりなおす）、すんだ 声に する
+LINE_AP_SCALE = 0.5
+
+
+def world_clean(x: np.ndarray) -> np.ndarray:
+    """かすれ・ガラガラを へらす：高さの とび（まわりの 中央値から 12% いじょう）を なおして すこし なめらかにし、息まじりを へらす"""
+    import pyworld as pw
+    f0, t = pw.harvest(x, SR, f0_floor=150, f0_ceil=700, frame_period=5.0)
+    sp = pw.cheaptrick(x, f0, t, SR)
+    ap = pw.d4c(x, f0, t, SR)
+    v = f0 > 0
+    lf = np.where(v, np.log(np.maximum(f0, 1)), np.nan)
+    g = f0.copy()
+    for i in np.where(v)[0]:
+        m = np.nanmedian(lf[max(0, i - 6):i + 7])
+        if abs(lf[i] - m) > 0.12:
+            g[i] = np.exp(m)
+    g2 = g.copy()
+    for i in np.where(v)[0]:
+        w = g[max(0, i - 2):i + 3]
+        g2[i] = w[w > 0].mean()
+    ap[v] = ap[v] * LINE_AP_SCALE
+    y = pw.synthesize(g2, sp, ap, SR, 5.0)
+    return y[:len(x)]
+
+
+def line(text: str, sid: int, dst: str, cheer: bool = False, main: bool = False):
     q = query(text, sid)
     q['outputSamplingRate'] = SR
     # こどもに ききとりやすいよう、すこし ゆっくり・まえうしろの むおんを みじかく
-    q['speedScale'] = 0.95
-    if cheer:
-        q['speedScale'] = 1.03
-        q['pitchScale'] = 0.07
-        q['intonationScale'] = 1.55
-        q['volumeScale'] = 1.1
+    q['speedScale'] = 0.97
+    if main:
+        q['pitchScale'] = MAIN_PITCH
+        q['intonationScale'] = MAIN_INTONATION
+        if cheer:
+            q['speedScale'] = 1.02
     q['prePhonemeLength'] = 0.05
     q['postPhonemeLength'] = 0.1
     x, sr = sf.read(io.BytesIO(synth(q, sid)))
     assert sr == SR
-    to_mp3(x.astype(np.float64), dst, -16.0)
+    x = x.astype(np.float64)
+    if main:
+        x = world_clean(x)
+    to_mp3(x, dst, -16.0)
 
 
 def kana_all():
     import make_kana as mk
     mk.SID = speaker_id(MAIN)
+    mk.P0 = KANA_P0
     items = json.load(open(os.path.join(HERE, 'kana.json'), encoding='utf-8'))
     os.makedirs(VOICE, exist_ok=True)
     for it in items:
@@ -136,7 +171,7 @@ def lines_all():
         folder = SHOOT if name.split('_')[0] in ('w', 's', 'sh', 'bt', 'jm') else VOICE
         if os.environ.get('ONLY') and name not in os.environ['ONLY'].split(','):
             continue
-        line(text, sid, os.path.join(folder, name + '.mp3'), cheer=sid == main and is_cheer(name))
+        line(text, sid, os.path.join(folder, name + '.mp3'), cheer=sid == main and is_cheer(name), main=sid == main)
         print(name, sid, text, flush=True)
 
 
