@@ -116,7 +116,8 @@ function SpellingStyle() {
 function OnsetStrictness() {
   const [m, setM] = useState<OnsetMode>(getOnsetMode)
   const opts: { id: OnsetMode; label: string; note: string }[] = [
-    { id: 'normal', label: 'ふつう', note: 'はじめは これ。子音で 落ちたら、つぎは もっと ゆるく みる' },
+    { id: 'auto', label: 'おまかせ', note: 'はじめは これ。パソコン・Android は「ふつう」、iPad・iPhone は「しない」' },
+    { id: 'normal', label: 'ふつう', note: '子音で 落ちたら、つぎは もっと ゆるく みる' },
     { id: 'strict', label: 'きびしめ', note: '母音だけの よみを もっと はねる（正しく よんでも 落ちることが ふえる）' },
     { id: 'off', label: 'しない', note: '母音だけで 判定（前の しくみ）' },
   ]
@@ -125,6 +126,7 @@ function OnsetStrictness() {
       <h3 className="text-base font-bold text-stone-800">子音の チェック</h3>
       <p className="leading-relaxed text-stone-500">
         「ka」に「あ」と よんだときに 合格しないよう、声の 出だし（子音）も しらべます。パソコン・Android では 音声認識の 結果も つかいます。
+        iPad・iPhone で こえの とうろく を しているときは 声の 形だけで 判定するため、子音の チェックで 合格しにくく なることが あるので、おまかせ では しません。
         正しく よんでも なかなか 合格しない 子には「しない」に できます（せんせい ヘルプの 合格も つかえます）。
       </p>
       <div className="flex flex-col gap-1.5">

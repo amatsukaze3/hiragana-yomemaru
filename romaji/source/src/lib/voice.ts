@@ -632,7 +632,10 @@ export class HybridVoiceJudge {
       this.lastTickAt = 0
     }
     const now = performance.now()
-    const n = this.lastTickAt ? Math.min(this.time.length, Math.max(0, Math.round(((now - this.lastTickAt) * sr) / 1000))) : this.time.length
+    const want = this.lastTickAt ? Math.max(0, Math.round(((now - this.lastTickAt) * sr) / 1000)) : this.time.length
+    // tick が おくれて（約43ms いじょう）音が ぬけたら おぼえておく（その あたりの 出だしは しらべない）
+    if (this.lastTickAt && want > this.time.length * 1.05) this.gapAt = this.sampleCount
+    const n = Math.min(this.time.length, want)
     this.lastTickAt = now
     const L = this.ring.length
     for (let i = this.time.length - n; i < this.time.length; i++) this.ring[this.sampleCount++ % L] = this.time[i]
@@ -652,8 +655,11 @@ export class HybridVoiceJudge {
     this.lastOnset = null
     const want = onsetClassOf(KANA_INFO[target]?.romaji ?? '')
     if (!want || !this.onsetCheck) return true
+    if (this.onsetAuto && isIOS()) return true
     const sr = this.analyser!.context.sampleRate
-    const seg = this.samples(startSample - Math.round(sr * 0.25), this.sampleCount)
+    const from = startSample - Math.round(sr * 0.25)
+    if (this.gapAt >= from) return true // 音が ぬけている：出だしが こわれているので 母音だけで きめる
+    const seg = this.samples(from, this.sampleCount)
     const o = onsetFeatures(seg, sr)
     if (!o) return true // 出だしが とれないときは 母音だけで きめる
     const p = onsetProbs(o.feat)
@@ -670,6 +676,10 @@ export class HybridVoiceJudge {
   /** 子音の しらべを するか（ローマ字フローラちゃんでは する）・きびしめに するか（カード とうろく の せってい） */
   onsetCheck = true
   onsetStrict = false
+  /** さいごに 音が ぬけた ところ（サンプル） */
+  private gapAt = -1
+  /** おまかせ：iPhone・iPad の 周波数解析では 子音を しらべない（2026-11-23 iPad の 実機で 合格しにくく なったため） */
+  onsetAuto = true
   /** 子音だけ ちがって 落ちた 文字（つぎは ゆるめる） */
   private onsetMissFor: Kana | null = null
 

@@ -277,7 +277,8 @@ export function onsetProbs(feat: number[]): number[] {
  *   きびしめ … 1回め 92%（thr）、落ちた あとは 97%
  * iPad などの 実機では 学習に つかった 声より きびしく でたので（2026-11-23）、ふつうを ゆるめにした
  */
-export type OnsetMode = 'normal' | 'strict' | 'off'
+/** auto：おまかせ（パソコン・Android は ふつう、iPhone・iPad は しない） */
+export type OnsetMode = 'auto' | 'normal' | 'strict' | 'off'
 export function onsetScore(p: number[], want: OnsetClass, mode: OnsetMode = 'normal', retry = false) {
   const k = ONSET_CLASSES.indexOf(want)
   const s = k === 0 ? p[0] / (p[0] + Math.max(...p.slice(1)) + 1e-9) : p[k] / (p[k] + p[0] + 1e-9)
@@ -291,7 +292,7 @@ const MODE_KEY = 'flora:onset'
 export function getOnsetMode(): OnsetMode {
   try {
     const v = localStorage.getItem(MODE_KEY)
-    return v === 'strict' || v === 'off' ? v : 'normal'
+    return v === 'strict' || v === 'off' || v === 'normal' ? v : 'auto'
   } catch {
     return 'normal'
   }
