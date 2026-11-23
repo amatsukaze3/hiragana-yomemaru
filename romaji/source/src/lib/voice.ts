@@ -10,7 +10,7 @@
 import { KANA_INFO, type Kana, type Vowel } from '../data/kana'
 import { VOWEL_ORDER, meanShape, modelProbs, personalProbs, updateNoise, vowelFeature } from './vowelClassifier'
 import { getAudioContext, setMicActive } from './audio'
-import { ONSET_CLASSES, onsetClassOf, onsetFeatures, onsetProbs, onsetScore } from './onset'
+import { ONSET_CLASSES, onsetClassOf, onsetFeatures, onsetProbs, onsetScore, type OnsetClass } from './onset'
 
 export type PassSource = 'asr' | 'formant'
 export type MicStatus = 'idle' | 'starting' | 'listening' | 'denied' | 'unsupported' | 'error'
@@ -192,9 +192,9 @@ const HOMOPHONES: Record<string, string[]> = {
   ん: ['うん', 'ん', 'n', 'm'],
 }
 
-/** 母音だけの ことば（あ・ああ・あー・え など） */
-function isBareVowel(t: string) {
-  return /^[あいうえおぁぃぅぇぉー]+$/.test(t)
+/** みじかい かなの ことば（1もじを よんだ 音声認識の けっか：あ・ああ・か・かあ など） */
+function isShortKana(t: string) {
+  return /^[ぁ-ゖー]{1,3}$/.test(t)
 }
 
 function toHiragana(s: string) {
@@ -294,7 +294,7 @@ export class HybridVoiceJudge {
   private ring = new Float32Array(0)
   private sampleCount = 0
   private lastTickAt = 0
-  /** 母音と 子音で 合格した あと、音声認識の けっかを すこし まつ（ちがう 文字が きこえたら とりけす） */
+  /** あ行で 合格に する まえに、音声認識が ちがう 文字を きいて いないか まつ（時間切れで 合格） */
   private pending: { target: Kana; until: number } | null = null
   /** さいごの 発声の 子音の なかまの 確率（テスト・ログ用） */
   lastOnset: { probs: number[]; cls: string } | null = null
@@ -319,10 +319,10 @@ export class HybridVoiceJudge {
     if (dw.__yomeDebug) dw.__judge = this
     this.paused = false
     if (this.running) return 'listening'
-    // iPhone/iPad：音声認識（Apple）と周波数解析が同じマイクを取りあうので、音声認識だけで判定する
+    // iPhone/iPad：音声認識（Apple）と周波数解析が同じマイクを取りあうので、音声認識だけで判定する。
+    // ローマ字フローラちゃんは こえの とうろく が あっても 音声認識（周波数解析は 母音しか わからず「ka」に「あ」で 合格して しまうため。2026-11-23）
     const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }
-    // ただし こえの とうろく があるときは、その子の声とくらべる周波数解析のほうが 確実なので そちらを使う
-    if (isIOS() && !this.forceAnalyser && !this.voiceprint && !this.iosAsrFailed && (w.SpeechRecognition || w.webkitSpeechRecognition)) {
+    if (isIOS() && !this.forceAnalyser && !this.iosAsrFailed && (w.SpeechRecognition || w.webkitSpeechRecognition)) {
       this.asrOnly = true
       this.lastError = ''
       this.running = true
@@ -605,16 +605,30 @@ export class HybridVoiceJudge {
           if (o) dump.push([u.top, ...o.feat])
         }
         const vowelOk = !!this.target && lenOk && (nOk ?? utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', core.map((f) => this.probsOf(f)), thr, 3))
-        // 判定は ひらがな・カタカナの アプリと おなじ（母音で きめる）。
-        // ただし 音声認識が うごいているとき（パソコン・Android）は、その けっかで うらづける：
-        //  - 子音の ある 文字（ka など）に、音声認識が「あ」など 母音だけを きいていたら 不合格
-        //  - 出だしが 母音だけ っぽい（onset.ts）ときだけ、音声認識の けっかを 0.7びょう まつ（ふだんは またない）
-        const veto = vowelOk && this.asrAlive && this.heardBareVowel(this.target!, u.startAt)
-        if (vowelOk && this.target && !veto) {
-          this.onFrame?.({ bands, voiced, match: true, streak: STREAK_TO_PASS })
-          if (this.asrAlive && this.looksBareVowel(this.target, u.startSample)) this.pending = { target: this.target, until: now + ASR_WAIT_MS }
-          else this.pass('formant')
-          return
+        // ローマ字フローラちゃんの 判定：子音と 母音の 両方が あって はじめて 合格（母音だけの よみは 合格に しない）
+        //  - 音声認識が 目標の 文字を きいたら 合格（startAsr。子音も 母音も わかる）
+        //  - 周波数解析（ここ）は 母音しか わからないので、つぎの ときだけ 合格に する：
+        //    ・出だしの 学習モデル（onset.ts）で 目標の 子音が はっきり きこえた（母音だけの よみが こえるのは 2% いか）
+        //    ・あ行・を は、子音っぽく なく、音声認識が ちがう 文字を きいて いなければ 合格（0.7びょう まって たしかめる）
+        //    ・ん は これまでどおり
+        //  - この 発声で 音声認識が ちがう 文字（「あ」「さ」など）を きいていたら 不合格
+        if (vowelOk && this.target && !(this.asrAlive && this.heardOther(this.target, u.startAt))) {
+          const t = this.target
+          const cls = onsetClassOf(KANA_INFO[t]?.romaji ?? '')
+          let ok: 'now' | 'wait' | 'no'
+          if (!cls) ok = 'now' // ん
+          else {
+            const o = this.onsetScoreOf(cls, u.startSample)
+            if (o && o.score >= o.fast) ok = 'now'
+            else if (cls === 'V' && (!o || o.score >= o.loose)) ok = this.asrAlive ? 'wait' : 'now'
+            else ok = 'no' // 子音の 文字は 音声認識が 合格に するのを まつ
+          }
+          if (ok !== 'no') {
+            this.onFrame?.({ bands, voiced, match: true, streak: STREAK_TO_PASS })
+            if (ok === 'wait') this.pending = { target: t, until: now + ASR_WAIT_MS }
+            else this.pass('formant')
+            return
+          }
         }
         // 読んだのに 合格しなかった（音声認識が あとから 合格にすることもあるので 少し待ってから知らせる）
         if (this.target && lenOk && !this.paused) {
@@ -661,32 +675,23 @@ export class HybridVoiceJudge {
   /** 音声認識が さいごに きいた ことば（ひらがな）と その 時刻 */
   private recentAsr: { text: string; at: number } | null = null
 
-  /** 子音の ある 文字か（あ行・ん は ちがう） */
-  private hasConsonant(target: Kana) {
-    const c = onsetClassOf(KANA_INFO[target]?.romaji ?? '')
-    return !!c && c !== 'V'
-  }
-
-  /** この 発声の あいだに、音声認識が 母音だけ（「あ」「ああ」など）を きいていたか */
-  private heardBareVowel(target: Kana, uttStartAt: number) {
+  /** この 発声の あいだに、音声認識が 目標と ちがう 文字（みじかい かな）を きいていたか */
+  private heardOther(target: Kana, uttStartAt: number) {
     const r = this.recentAsr
-    return !!r && r.at >= uttStartAt - 200 && this.hasConsonant(target) && isBareVowel(r.text)
+    return !!r && r.at >= uttStartAt - 200 && isShortKana(r.text) && !transcriptMatches(target, r.text)
   }
 
-  /** 出だしが 母音だけ っぽいか（子音の ある 文字のとき。onset.ts の 学習モデル。音が ぬけたときは しらべない） */
-  private looksBareVowel(target: Kana, startSample: number): boolean {
+  /** 出だしの 学習モデル（onset.ts）の スコア。音が ぬけた・出だしが とれない ときは null */
+  private onsetScoreOf(want: OnsetClass, startSample: number) {
     this.lastOnset = null
-    const want = onsetClassOf(KANA_INFO[target]?.romaji ?? '')
-    if (!want || want === 'V') return false
     const sr = this.analyser!.context.sampleRate
     const from = startSample - Math.round(sr * 0.25)
-    if (this.gapAt >= from) return false
+    if (this.gapAt >= from) return null
     const o = onsetFeatures(this.samples(from, this.sampleCount), sr)
-    if (!o) return false
+    if (!o) return null
     const p = onsetProbs(o.feat)
-    const { score, thr } = onsetScore(p, want)
     this.lastOnset = { probs: p, cls: ONSET_CLASSES[p.indexOf(Math.max(...p))] }
-    return score < thr
+    return onsetScore(p, want)
   }
 
   /** さいごに 音が ぬけた ところ（サンプル） */
@@ -733,8 +738,8 @@ export class HybridVoiceJudge {
       if (latest?.[0]) {
         const t = toHiragana(fresh(last, latest[0].transcript).normalize('NFKC')).replace(/[\s、。．.,!！?？〜~ー「」]/g, '')
         if (t) this.recentAsr = { text: t, at: performance.now() }
-        // 合格を まっているときに、母音だけ（「あ」など）が きこえたら とりけす
-        if (this.pending && isBareVowel(t)) {
+        // 合格を まっているときに、ちがう 文字（「か」「あ」など）が きこえたら とりけす
+        if (this.pending && isShortKana(t) && !transcriptMatches(this.pending.target, t)) {
           this.pending = null
           this.onMiss?.()
         }
