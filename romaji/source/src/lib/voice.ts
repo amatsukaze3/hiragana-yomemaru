@@ -52,6 +52,11 @@ const ASR_WAIT_MS = 500
  */
 const ASR_FORCE_AFTER_SOUND_MS = 900
 const ASR_DEBOUNCE_MS = 250
+// パソコン：とちゅうの けっかが 来て この時間 あたらしい けっかが なければ とめる（声が つづいて いる あいだは まつ。さいだい ASR_DEBOUNCE_MAX_WAIT_MS）
+const ASR_DEBOUNCE_PC_MS = 300
+const ASR_DEBOUNCE_MAX_WAIT_MS = 1200
+// 音声認識が とまった まま うごいて いなければ、この時間で もう いちど はじめる
+const ASR_WATCHDOG_MS = 2500
 /** 発声の なかで、いちばん大きい声より これだけ（-26dB）小さい音は「すきま」とみなす */
 const UTT_GAP_RATIO = 0.05
 /** 「いちばん大きい まとまり」に いれる 大きさ（-12dB）と、その そとに あっては いけない 大きさ（-10dB） */
@@ -182,7 +187,7 @@ const HOMOPHONES: Record<string, string[]> = {
   ほ: ['帆', '歩', '穂', '保', '補', 'ho'],
   ま: ['間', '真', '魔', '馬', '麻', 'ma'],
   み: ['実', '身', '三', '見', '美', '未', '味', '巳', '3', 'me', 'mi'],
-  む: ['無', '六', '夢', '6', 'mu'],
+  む: ['無', '六', '夢', '務', '武', '鵡', '6', 'μ', 'moo', 'mu'],
   め: ['目', '芽', '女', '雌', 'me'],
   も: ['藻', '喪', '茂', 'mo'],
   や: ['矢', '屋', '夜', '八', '野', '哉', '8', 'ya'],
@@ -196,6 +201,29 @@ const HOMOPHONES: Record<string, string[]> = {
   わ: ['輪', '和', '話', '環', 'は', 'wa'],
   を: ['お', '尾', '緒', '御', 'o', 'oh', 'wo'],
   ん: ['うん', 'ん', 'n', 'm'],
+}
+
+/**
+ * 前の 波形 prev から いまの 波形 cur までに 何サンプル すすんだか（cur[i] = prev[i + d] と なる d）。
+ * いくつも あう（無音など）ときは 時計から みた want に いちばん ちかい もの。みつからなければ -1
+ */
+export function audioAdvance(prev: Float32Array, cur: Float32Array, want: number) {
+  const N = cur.length
+  const K = Math.min(48, N)
+  let best = -1
+  for (let d = 0; d <= N - K; d++) {
+    if (cur[0] !== prev[d]) continue
+    let i = 1
+    while (i < K && cur[i] === prev[d + i]) i++
+    if (i === K && (best < 0 || Math.abs(d - want) < Math.abs(best - want))) best = d
+  }
+  return best
+}
+
+/** ま行・な行の 文字を、音声認識が その母音や「ん」だけに ききまちがえた（「む」→「う」「ん」「うん」） */
+function nasalMisheard(target: Kana, heard: string) {
+  const v = KANA_INFO[target]?.vowel
+  return !!v && [...heard].every((c) => c === v || c === 'ん' || c === 'ー')
 }
 
 /** みじかい かなの ことば（1もじを よんだ 音声認識の けっか：あ・ああ・か・かあ など） */
@@ -212,7 +240,7 @@ function oneMatches(h: string, t: string, r?: string): boolean {
   if (!t) return false
   if (t === h) return true
   if ([...t].every((c) => c === h)) return true // 「ああ」「あーあ」
-  if (t.length <= 3 && t.startsWith(h) && /^[ぁ-ゖ]+$/.test(t) && /^[あいうえおんー]*$/.test(t.slice(1))) return true // 「かあ」「かん」
+  if (t.length <= 3 && t.startsWith(h) && /^[ぁ-ゖ]+$/.test(t) && /^[あいうえおぁぃぅぇぉんー]*$/.test(t.slice(1))) return true // 「かあ」「かん」「むぅ」
   if (r && t === r) return true
   return (HOMOPHONES[h] ?? []).includes(t)
 }
@@ -247,6 +275,7 @@ interface SpeechRecognitionLike {
   onend: (() => void) | null
   onerror: ((e: { error: string }) => void) | null
   // 声の はじまり・おわり（Safari・Chrome。来ない ブラウザも ある）
+  onstart?: (() => void) | null
   onsoundstart?: (() => void) | null
   onspeechstart?: (() => void) | null
   onspeechend?: (() => void) | null
@@ -307,6 +336,7 @@ export class HybridVoiceJudge {
   private utt: { feats: number[][]; levels: number[]; silent: number; run: number; top: number; startSample: number; startAt: number } | null = null
   // 子音を しらべるための、ちょくぜん 約3びょうの 音（AnalyserNode の 時間波形を つないだもの）
   private ring = new Float32Array(0)
+  private prevTime = new Float32Array(0)
   private sampleCount = 0
   private lastTickAt = 0
   /** あ行で 合格に する まえに、音声認識が ちがう 文字を きいて いないか まつ（時間切れで 合格） */
@@ -492,6 +522,8 @@ export class HybridVoiceJudge {
     this.passCount++
     this.target = null
     this.streak = 0
+    // パソコン：合格したら 音声認識を あたらしく しなおす（つぎの 文字の けっかが まえの 文字に つながって おそく ならない ように）
+    if (!this.asrOnly) this.restartAsr()
     this.onPass?.(source)
   }
 
@@ -510,6 +542,15 @@ export class HybridVoiceJudge {
     an.getFloatTimeDomainData(this.time)
     an.getByteFrequencyData(this.freq)
     this.appendSamples()
+    // 音声認識が とまった ままなら もう いちど はじめる
+    if (this.recog && this.asrAlive && this.asrDownAt && performance.now() - this.asrDownAt > ASR_WATCHDOG_MS) {
+      this.asrDownAt = performance.now()
+      try {
+        this.recog.start()
+      } catch {
+        /* すでに うごいている */
+      }
+    }
 
     let sq = 0
     for (let i = 0; i < this.time.length; i++) sq += this.time[i] * this.time[i]
@@ -627,27 +668,38 @@ export class HybridVoiceJudge {
         //    ・あ行・を は、子音っぽく なく、音声認識が ちがう 文字を きいて いなければ 合格（0.7びょう まって たしかめる）
         //    ・ん は これまでどおり
         //  - この 発声で 音声認識が ちがう 文字（「あ」「さ」など）を きいていたら 不合格
-        if (vowelOk && this.target && !(this.asrAlive && this.heardOther(this.target, u.startAt))) {
+        if (vowelOk && this.target) {
           const t = this.target
+          // この 発声で 音声認識が きいた ちがう 文字（なければ null）
+          const heard = this.asrAlive ? this.heardOtherText(t, u.startAt) : null
           const cls = onsetClassOf(KANA_INFO[t]?.romaji ?? '')
           let ok: 'now' | 'wait' | 'no'
-          if (!cls) ok = 'now' // ん
+          if (!cls) ok = heard ? 'no' : 'now' // ん
           else {
             const o = this.onsetScoreOf(cls, u.startSample)
-            if (o && o.score >= o.fast) ok = 'now'
+            const fast = !!o && o.score >= o.fast
+            if (heard) {
+              // ま行・な行（m・n）は 音声認識が「う」「ん」と ききまちがえやすい。
+              // 出だしの 学習モデルが m・n を はっきり きいて いれば 合格（母音だけの よみが こえるのは 2% いか）
+              ok = fast && cls === 'N' && nasalMisheard(t, heard) ? 'now' : 'no'
+            } else if (fast) ok = 'now'
             else if (cls === 'V' && (!o || o.score >= o.loose)) ok = this.asrAlive ? 'wait' : 'now'
             else ok = 'no' // 子音の 文字は 音声認識が 合格に するのを まつ
           }
           if (ok !== 'no') {
             this.onFrame?.({ bands, voiced, match: true, streak: STREAK_TO_PASS })
-            if (ok === 'wait') this.pending = { target: t, until: now + ASR_WAIT_MS }
-            else this.pass('formant')
+            if (ok === 'wait') {
+              this.pending = { target: t, until: now + ASR_WAIT_MS }
+              // 音声認識の さいごの けっかを はやく もらって たしかめる
+              this.finalizeAsr()
+            } else this.pass('formant')
             return
           }
         }
         // 読んだのに 合格しなかった（音声認識が あとから 合格にすることもあるので 少し待ってから知らせる）
         // 音声認識の けっかを はやく もらうため、ここで いったん とめる（パソコン：声の おわりは 周波数解析で わかる）
-        if (this.target && lenOk && !this.paused) this.finalizeAsr()
+        // ながすぎ・ほかの音が あった ときも とめる（とめないと 音声認識の おわりを 2〜4びょう まつ ことに なる）
+        if (this.target && runLen >= UTT_MIN_FRAMES && !this.paused) this.finalizeAsr()
         if (this.target && lenOk && !this.paused) {
           const t = this.target
           const n = this.passCount
@@ -665,19 +717,27 @@ export class HybridVoiceJudge {
   /** AnalyserNode の 時間波形から、前の tick いこうの あたらしい 音だけを つなぐ */
   private appendSamples() {
     const sr = this.analyser!.context.sampleRate
-    if (this.ring.length !== Math.round(sr * 3)) {
+    const N = this.time.length
+    if (this.ring.length !== Math.round(sr * 3) || this.prevTime.length !== N) {
       this.ring = new Float32Array(Math.round(sr * 3))
+      this.prevTime = new Float32Array(N)
       this.sampleCount = 0
       this.lastTickAt = 0
     }
     const now = performance.now()
-    const want = this.lastTickAt ? Math.max(0, Math.round(((now - this.lastTickAt) * sr) / 1000)) : this.time.length
-    // tick が おくれて（約43ms いじょう）音が ぬけたら おぼえておく（その あたりの 出だしは しらべない）
-    if (this.lastTickAt && want > this.time.length * 1.05) this.gapAt = this.sampleCount
-    const n = Math.min(this.time.length, want)
+    const want = this.lastTickAt ? Math.max(0, Math.round(((now - this.lastTickAt) * sr) / 1000)) : N
+    // 前の 波形と かさなる ところを さがして、ほんとうに すすんだ ぶんだけ つなぐ。
+    // （音は 10〜20ms ずつ まとめて とどくので、時計から きめると 音が だぶったり ぬけたりして、子音の 形が こわれる）
+    let n = this.lastTickAt ? audioAdvance(this.prevTime, this.time, want) : N
+    if (n < 0) {
+      // かさなりが ない：tick が おくれて 音が ぬけた（その あたりの 出だしは しらべない）
+      n = Math.min(N, want)
+      this.gapAt = this.sampleCount
+    }
     this.lastTickAt = now
     const L = this.ring.length
-    for (let i = this.time.length - n; i < this.time.length; i++) this.ring[this.sampleCount++ % L] = this.time[i]
+    for (let i = N - n; i < N; i++) this.ring[this.sampleCount++ % L] = this.time[i]
+    this.prevTime.set(this.time)
   }
 
   /** ring から [a, b) の 音を とりだす */
@@ -693,9 +753,9 @@ export class HybridVoiceJudge {
   private recentAsr: { text: string; at: number } | null = null
 
   /** この 発声の あいだに、音声認識が 目標と ちがう 文字（みじかい かな）を きいていたか */
-  private heardOther(target: Kana, uttStartAt: number) {
+  private heardOtherText(target: Kana, uttStartAt: number) {
     const r = this.recentAsr
-    return !!r && r.at >= uttStartAt - 200 && isShortKana(r.text) && !transcriptMatches(target, r.text)
+    return r && r.at >= uttStartAt - 200 && isShortKana(r.text) && !transcriptMatches(target, r.text) ? r.text : null
   }
 
   /** 出だしの 学習モデル（onset.ts）の スコア。音が ぬけた・出だしが とれない ときは null */
@@ -716,14 +776,21 @@ export class HybridVoiceJudge {
 
   /** 音声認識を いったん とめて、そこまでの けっかを すぐ もらう（とまったら onend で すぐ また はじめる） */
   private asrFinalizing = false
+  /** 音声認識が とまった 時刻（うごいて いる ときは 0） */
+  private asrDownAt = 0
   private forceTimer = 0
   private debounceTimer = 0
   private finalizeAt = 0
   private finalizeAsr() {
-    // Android は 音声認識を はじめる たびに 音が なるので しない
+    if (!this.target || this.paused) return
+    this.restartAsr()
+  }
+
+  /** 音声認識を とめて すぐ また はじめる（Android は はじめる たびに 音が なるので しない） */
+  private restartAsr() {
     // とめたのに 2びょう たっても おわりの 知らせ（onend）が 来ない ときは、もう いちど とめられる ように する
     if (this.asrFinalizing && performance.now() - this.finalizeAt > 2000) this.asrFinalizing = false
-    if (!this.recog || this.asrFinalizing || !this.target || this.paused || isAndroid()) return
+    if (!this.recog || this.asrFinalizing || isAndroid()) return
     window.clearTimeout(this.forceTimer)
     window.clearTimeout(this.debounceTimer)
     this.asrFinalizing = true
@@ -733,6 +800,18 @@ export class HybridVoiceJudge {
     } catch {
       this.asrFinalizing = false
     }
+  }
+
+  /** とちゅうの けっかの あと すこし まって とめる（パソコンは 声が つづいて いる あいだ まつ） */
+  private armDebounce(since: number) {
+    window.clearTimeout(this.debounceTimer)
+    this.debounceTimer = window.setTimeout(
+      () => {
+        if (!this.asrOnly && this.utt && performance.now() - since < ASR_DEBOUNCE_MAX_WAIT_MS) this.armDebounce(since)
+        else this.finalizeAsr()
+      },
+      this.asrOnly ? ASR_DEBOUNCE_MS : ASR_DEBOUNCE_PC_MS,
+    )
   }
 
   private startAsr() {
@@ -776,10 +855,10 @@ export class HybridVoiceJudge {
       if (latest?.[0]) {
         const t = toHiragana(fresh(last, latest[0].transcript).normalize('NFKC')).replace(/[\s、。．.,!！?？〜~ー「」]/g, '')
         if (t) this.recentAsr = { text: t, at: performance.now() }
-        // iPhone・iPad：とちゅうの けっかが 来て まだ 合格で なければ、すこし まって とめ、さいごの けっかを もらう
-        if (t && this.asrOnly) {
+        // とちゅうの けっかが 来て まだ 合格で なければ、すこし まって とめ、さいごの けっかを もらう
+        if (t) {
           window.clearTimeout(this.debounceTimer)
-          this.debounceTimer = window.setTimeout(() => this.finalizeAsr(), ASR_DEBOUNCE_MS)
+          this.armDebounce(performance.now())
         }
         // 合格を まっているときに、ちがう 文字（「か」「あ」など）が きこえたら とりけす
         if (this.pending && isShortKana(t) && !transcriptMatches(this.pending.target, t)) {
@@ -817,7 +896,12 @@ export class HybridVoiceJudge {
     r.onspeechstart = onVoiceStart
     r.onspeechend = onVoiceEnd
     r.onsoundend = onVoiceEnd
+    r.onstart = () => {
+      this.asrDownAt = 0
+    }
     r.onend = () => {
+      if (this.recog !== r) return // とめた あとの ふるい 音声認識
+      this.asrDownAt = performance.now()
       this.asrSkip = 0
       this.asrLastIdx = -1
       this.asrLastText = ''
@@ -827,15 +911,16 @@ export class HybridVoiceJudge {
       // じぶんで とめた ときは すぐ また はじめる（つぎの 声を ききのがさない ように）
       const quick = this.asrFinalizing
       this.asrFinalizing = false
-      if (this.running && !fatal) {
-        window.setTimeout(() => {
-          try {
-            if (this.running) r.start()
-          } catch {
-            /* すでに動いている */
-          }
-        }, quick ? 0 : 120)
+      // はじめられなかった ときは すこし まって なんどか やりなおす（音声認識が とまった ままに ならない ように）
+      const restart = (tries: number) => {
+        if (!this.running || fatal || this.recog !== r) return
+        try {
+          r.start()
+        } catch {
+          if (tries < 8) window.setTimeout(() => restart(tries + 1), 150)
+        }
       }
+      if (this.running && !fatal) window.setTimeout(() => restart(0), quick ? 0 : 120)
     }
     try {
       r.start()
