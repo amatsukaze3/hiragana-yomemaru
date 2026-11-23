@@ -8,7 +8,7 @@
  *   V：母音だけ（あ行）  K：か・た行（はれつ）  S：さ・し・つ・ち（まさつ）  H：は・ひ・ふ
  *   N：な・ま行（はなの 音）  Y：や行  W：わ  R：ら行
  *
- * しきいちは 2つ：ふつう（VOICEVOX の 声で 正しい よみの 92% が とおる）・きびしめ（85%）
+ * しきいちは onsetScore を みてね（ふつう・きびしめ。落ちた あとは ゆるくなる）
  *
  * 学習モデル（onsetModel.json）は VOICEVOX の 14の声（ふつう・こどもに ちかづけた 声、
  * まわりの 音を くわえたもの）から つくった（romaji/tools/judge_test/）。
@@ -249,7 +249,7 @@ interface Net {
   W2: number[][]
   b2: number[]
 }
-const MODEL = M as unknown as { classes: string[]; mu: number[]; sd: number[]; thr: number[]; thrStrict: number[]; nets: Net[] }
+const MODEL = M as unknown as { classes: string[]; mu: number[]; sd: number[]; thr: number[]; thrStrict: number[]; thrLoose: number[]; nets: Net[] }
 
 /** 子音の なかまの 確率（ONSET_CLASSES の じゅん）。小さな ニューラルネット 3つの 平均 */
 export function onsetProbs(feat: number[]): number[] {
@@ -272,16 +272,21 @@ export function onsetProbs(feat: number[]): number[] {
  * 目標の なかまで よんだか。
  * 子音の 目標：その なかまの 確率 ÷（その なかま ＋ 母音だけ）が しきいち いじょう（「か」に「あ」を はねる）
  * あ行の 目標：母音だけの 確率 ÷（母音だけ ＋ いちばん つよい 子音）が しきいち いじょう
- * しきいちは、VOICEVOX の 声で 正しい よみの 92% が とおる ところ（onsetModel.json の thr）
+ * しきいち（VOICEVOX の 声で 正しい よみが とおる 割合）：
+ *   ふつう … 1回め 97%（thrLoose）、おなじ 文字で 子音だけ ちがって 落ちた あとは その 半分
+ *   きびしめ … 1回め 92%（thr）、落ちた あとは 97%
+ * iPad などの 実機では 学習に つかった 声より きびしく でたので（2026-11-23）、ふつうを ゆるめにした
  */
-export function onsetScore(p: number[], want: OnsetClass, strict = false) {
+export type OnsetMode = 'normal' | 'strict' | 'off'
+export function onsetScore(p: number[], want: OnsetClass, mode: OnsetMode = 'normal', retry = false) {
   const k = ONSET_CLASSES.indexOf(want)
   const s = k === 0 ? p[0] / (p[0] + Math.max(...p.slice(1)) + 1e-9) : p[k] / (p[k] + p[0] + 1e-9)
-  return { score: s, thr: (strict ? MODEL.thrStrict : MODEL.thr)?.[k] ?? 0 }
+  const loose = MODEL.thrLoose?.[k] ?? 0
+  const thr = mode === 'strict' ? (retry ? loose : (MODEL.thr?.[k] ?? 0)) : retry ? loose * 0.5 : loose
+  return { score: s, thr }
 }
 
 /* ---------- 先生の せってい：子音の チェックの きびしさ ---------- */
-export type OnsetMode = 'normal' | 'strict' | 'off'
 const MODE_KEY = 'flora:onset'
 export function getOnsetMode(): OnsetMode {
   try {

@@ -658,15 +658,20 @@ export class HybridVoiceJudge {
     if (!o) return true // 出だしが とれないときは 母音だけで きめる
     const p = onsetProbs(o.feat)
     const top = p.indexOf(Math.max(...p))
-    const { score, thr } = onsetScore(p, want, this.onsetStrict)
+    // おなじ 文字で 子音だけ ちがって 落ちた あとは、しきいちを ゆるめる（はっきり よめない 子が なんども 落ちないように）
+    const retry = this.onsetMissFor === target
+    const { score, thr } = onsetScore(p, want, this.onsetStrict ? 'strict' : 'normal', retry)
     this.lastOnset = { probs: p, cls: ONSET_CLASSES[top] }
-    const scale = (globalThis as unknown as { __oscale?: number }).__oscale ?? 1
-    return score >= thr * scale
+    const ok = score >= thr
+    this.onsetMissFor = ok ? null : target
+    return ok
   }
 
   /** 子音の しらべを するか（ローマ字フローラちゃんでは する）・きびしめに するか（カード とうろく の せってい） */
   onsetCheck = true
   onsetStrict = false
+  /** 子音だけ ちがって 落ちた 文字（つぎは ゆるめる） */
+  private onsetMissFor: Kana | null = null
 
   private startAsr() {
     const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor }
