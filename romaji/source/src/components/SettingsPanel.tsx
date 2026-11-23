@@ -265,7 +265,7 @@ export function SettingsPanel({ open, onClose, meter, setMeter }: { open: boolea
               <section className="flex flex-col gap-2 rounded-2xl border-2 border-amber-100 bg-white p-4 text-sm text-stone-700">
                 <h3 className="text-base font-bold text-stone-800">こえの とうろく</h3>
                 <p className="leading-relaxed text-stone-500">
-                  つかう子の「ア・イ・ウ・エ・オ・ン」を とうろくすると、その子の声に あわせて判定するので、よく合格するようになります。つかう子が かわったら、とうろくしなおしてください。
+                  つかう子の「ア・イ・ウ・エ・オ・ン」を とうろくすると、パソコン・Android では その子の声に あわせて 母音を 判定します（iPad・iPhone は 音声認識で 判定するので つかいません）。つかう子が かわったら、とうろくしなおしてください。
                 </p>
                 <p className="text-stone-600">{print ? `とうろくずみ（${print.name ? `${print.name} さん・` : ''}${formatDate(print.date)}）` : 'まだ とうろくしていません'}</p>
                 <div className="flex flex-wrap gap-2">

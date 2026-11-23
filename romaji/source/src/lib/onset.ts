@@ -249,7 +249,7 @@ interface Net {
   W2: number[][]
   b2: number[]
 }
-const MODEL = M as unknown as { classes: string[]; mu: number[]; sd: number[]; thr: number[]; thrStrict: number[]; thrLoose: number[]; nets: Net[] }
+const MODEL = M as unknown as { classes: string[]; mu: number[]; sd: number[]; thr: number[]; thrStrict: number[]; thrLoose: number[]; thrFast: number[]; nets: Net[] }
 
 /** 子音の なかまの 確率（ONSET_CLASSES の じゅん）。小さな ニューラルネット 3つの 平均 */
 export function onsetProbs(feat: number[]): number[] {
@@ -270,13 +270,14 @@ export function onsetProbs(feat: number[]): number[] {
 
 /**
  * 目標の なかまの スコア（子音：p[目標]/(p[目標]+p[母音だけ])、あ行：p[母音だけ]/(p[母音だけ]+いちばん つよい 子音)）と しきいち。
- * しきいちは VOICEVOX の 声で 正しい よみの 97% が こえる ところ（thrLoose）。
- * 2026-11-23 から 合否には つかわず、パソコン・Android で「母音だけ っぽい」ときに 音声認識の けっかを まつ 合図に だけ つかう
+ * voice.ts の 判定で つかう：fast 以上なら すぐ 合格（パソコン・Android）、loose みまんの あ行は 子音っぽいので 合格に しない
  */
 export function onsetScore(p: number[], want: OnsetClass) {
   const k = ONSET_CLASSES.indexOf(want)
   const s = k === 0 ? p[0] / (p[0] + Math.max(...p.slice(1)) + 1e-9) : p[k] / (p[k] + p[0] + 1e-9)
-  return { score: s, thr: MODEL.thrLoose?.[k] ?? 0 }
+  // loose：正しい よみの 97% が こえる（これ みまんは「ちがう なかま っぽい」）
+  // fast：子音の 文字は 母音だけの よみが 2%、あ行は 子音の よみが 3% しか こえない（これ いじょうは「はっきり 正しい」）
+  return { score: s, loose: MODEL.thrLoose?.[k] ?? 0, fast: MODEL.thrFast?.[k] ?? 2 }
 }
 
 /** 文字（ローマ字）の 子音の なかま。ん は しらべない（null） */
