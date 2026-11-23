@@ -17,14 +17,15 @@ for v in sorted(set(vo)):
 def score(P,k):
     if k==0: return P[:,0]/(P[:,0]+np.max(P[:,1:],1)+1e-9)
     return P[:,k]/(P[:,k]+P[:,0]+1e-9)
-thr=[];thrS=[]
+thr=[];thrS=[];thrL=[]
 for k in range(8):
     thrS.append(float(np.percentile(score(P,k)[y==k],15)))
+    thrL.append(float(np.percentile(score(P,k)[y==k],3)))
     s=score(P,k); t=np.percentile(s[y==k],(1-R)*100); thr.append(float(t))
     others=(y!=k)&(y!=0)
     print(f'{CL[k]} thr {t:.3f}  正しいを通す {(s[y==k]>=t).mean():.3f}  ' + (f'母音だけ通す {(s[y==0]>=t).mean():.3f}  ' if k else f'子音を通す {(s[y!=0]>=t).mean():.3f}') + (f' ちがう子音 {(score(P,k)[others]>=t).mean():.3f}' if k else ''))
 if len(sys.argv)>4:
     ms=[mk(s).fit(Z,y) for s in range(3)]
-    json.dump({'classes':CL,'mu':mu.round(6).tolist(),'sd':sd.round(6).tolist(),'thr':[round(t,4) for t in thr],'thrStrict':[round(t,4) for t in thrS],
+    json.dump({'classes':CL,'mu':mu.round(6).tolist(),'sd':sd.round(6).tolist(),'thr':[round(t,4) for t in thr],'thrStrict':[round(t,4) for t in thrS],'thrLoose':[round(t,4) for t in thrL],
                'nets':[{'W1':m.coefs_[0].T.round(5).tolist(),'b1':m.intercepts_[0].round(5).tolist(),'W2':m.coefs_[1].T.round(5).tolist(),'b2':m.intercepts_[1].round(5).tolist()} for m in ms]},open(sys.argv[4],'w'))
     print('saved')

@@ -116,7 +116,7 @@ function SpellingStyle() {
 function OnsetStrictness() {
   const [m, setM] = useState<OnsetMode>(getOnsetMode)
   const opts: { id: OnsetMode; label: string; note: string }[] = [
-    { id: 'normal', label: 'ふつう', note: 'はじめは これ' },
+    { id: 'normal', label: 'ふつう', note: 'はじめは これ。子音で 落ちたら、つぎは もっと ゆるく みる' },
     { id: 'strict', label: 'きびしめ', note: '母音だけの よみを もっと はねる（正しく よんでも 落ちることが ふえる）' },
     { id: 'off', label: 'しない', note: '母音だけで 判定（前の しくみ）' },
   ]
