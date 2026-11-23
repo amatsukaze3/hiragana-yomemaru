@@ -301,8 +301,8 @@ export class HybridVoiceJudge {
     if (this.running) return 'listening'
     // iPhone/iPad：音声認識（Apple）と周波数解析が同じマイクを取りあうので、音声認識だけで判定する
     const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }
-    // ただし こえの とうろく があるときは、その子の声とくらべる周波数解析のほうが 確実なので そちらを使う
-    if (isIOS() && !this.forceAnalyser && !this.voiceprint && !this.iosAsrFailed && (w.SpeechRecognition || w.webkitSpeechRecognition)) {
+    // こえの とうろく があっても 音声認識で判定する（周波数解析は母音しか聞かず「さ」に「あ」で合格してしまうため。11月6日より前の判定にもどす：2026-11-23）
+    if (isIOS() && !this.forceAnalyser && !this.iosAsrFailed && (w.SpeechRecognition || w.webkitSpeechRecognition)) {
       this.asrOnly = true
       this.lastError = ''
       this.running = true
