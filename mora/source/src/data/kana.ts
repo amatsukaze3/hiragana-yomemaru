@@ -4,7 +4,7 @@
  * 1つのカード＝1つの「よみ」（Kana は その よみの 文字列：「が」「きゃ」「おかあさん」）
  *  - 濁音・半濁音・拗音：1つの 音を よむ（絵カードの ことばは word）
  *  - 長音・撥音・拗長音・促音：ことばを まるごと よむ（multi）
- * カードの絵は あとから入れる（image が '' の あいだは 文字と ことばだけの カード）
+ * カードの絵は できたものから入れる（image が '' の あいだは 文字と ことばだけの カード。濁音・半濁音は 2026-11-23 に 入れた）
  */
 
 export type Kana = string
@@ -115,10 +115,16 @@ export function lastVowel(s: string): Vowel {
   return 'う' // ん など
 }
 
+/** カードの絵（src/assets/cards/<ローマ字>.webp）：右に 絵、左に もじ（1200×700） */
+const ART = import.meta.glob('../assets/cards/*.webp', { eager: true, import: 'default' }) as Record<string, string>
+const artOf = (romaji: string) => ART[`../assets/cards/${romaji}.webp`] ?? ''
+
 export const KANA_INFO: Record<Kana, KanaInfo> = {}
 for (const r of SOUND_ROWS)
   for (const [k, romaji, word] of r.items)
-    KANA_INFO[k] = { char: k, romaji, word, vowel: lastVowel(k), group: r.group, multi: false, image: '', imageAspect: 1000 / 760, letter: { cx: 50, cy: 50, h: 43 } }
+    KANA_INFO[k] = artOf(romaji)
+      ? { char: k, romaji, word, vowel: lastVowel(k), group: r.group, multi: false, image: artOf(romaji), imageAspect: 1200 / 700, letter: { cx: 21, cy: 50, h: 49 } }
+      : { char: k, romaji, word, vowel: lastVowel(k), group: r.group, multi: false, image: '', imageAspect: 1000 / 760, letter: { cx: 50, cy: 50, h: 43 } }
 for (const r of WORD_ROWS)
   for (const [k, romaji] of r.items)
     KANA_INFO[k] = { char: k, romaji, word: k, vowel: lastVowel(k), group: r.group, multi: true, image: '', imageAspect: 1000 / 760, letter: { cx: 50, cy: 50, h: 30 } }
