@@ -9,7 +9,7 @@
  */
 import { KANA_INFO, type Kana, type Vowel } from '../data/kana'
 import { VOWEL_ORDER, meanShape, modelProbs, personalProbs, updateNoise, vowelFeature } from './vowelClassifier'
-import { getAudioContext, setMicActive } from './audio'
+import { getAudioContext, onFloraVoice, setMicActive } from './audio'
 import { ONSET_CLASSES, onsetClassOf, onsetFeatures, onsetProbs, onsetScore, type OnsetClass } from './onset'
 
 export type PassSource = 'asr' | 'formant'
@@ -57,6 +57,8 @@ const ASR_DEBOUNCE_PC_MS = 300
 const ASR_DEBOUNCE_MAX_WAIT_MS = 1200
 // 音声認識が とまった まま うごいて いなければ、この時間で もう いちど はじめる
 const ASR_WATCHDOG_MS = 2500
+// iPhone・iPad：フローラちゃんが しゃべる まえに マイク（音声認識）を とめて まつ 時間
+const VOICE_MUTE_WAIT_MS = 250
 /** 発声の なかで、いちばん大きい声より これだけ（-26dB）小さい音は「すきま」とみなす */
 const UTT_GAP_RATIO = 0.05
 /** 「いちばん大きい まとまり」に いれる 大きさ（-12dB）と、その そとに あっては いけない 大きさ（-10dB） */
@@ -388,6 +390,8 @@ export class HybridVoiceJudge {
       this.running = true
       this.startAsr()
       if (this.asrAlive) {
+        this.unsubVoice?.()
+        this.unsubVoice = onFloraVoice((s) => this.floraVoice(s))
         this.onStatus?.('listening', true)
         return 'listening'
       }
@@ -436,6 +440,10 @@ export class HybridVoiceJudge {
   stop() {
     this.running = false
     this.asrOnly = false
+    this.unsubVoice?.()
+    this.unsubVoice = null
+    this.mutedForVoice = false
+    window.clearTimeout(this.unmuteTimer)
     if (this.timer) window.clearInterval(this.timer)
     this.timer = null
     try {
@@ -796,6 +804,41 @@ export class HybridVoiceJudge {
 
   /** 音声認識を いったん とめて、そこまでの けっかを すぐ もらう（とまったら onend で すぐ また はじめる） */
   private asrFinalizing = false
+  /**
+   * iPhone・iPad：フローラちゃんが しゃべる あいだは 音声認識（マイク）を とめる。
+   * マイクを つかって いる あいだの iPhone・iPad の 音は 電話のような 音質に なり、声が かすれて きこえるため。
+   * しゃべりはじめ：とめて、VOICE_MUTE_WAIT_MS まって もらう。しゃべりおわり：すぐ また はじめる
+   */
+  private unsubVoice: (() => void) | null = null
+  private mutedForVoice = false
+  private unmuteTimer = 0
+  private floraVoice(speaking: boolean): number {
+    if (!this.asrOnly || !this.running || !this.recog) return 0
+    window.clearTimeout(this.unmuteTimer)
+    if (speaking) {
+      if (this.mutedForVoice) return 0
+      this.mutedForVoice = true
+      window.clearTimeout(this.forceTimer)
+      window.clearTimeout(this.debounceTimer)
+      try {
+        this.recog.abort()
+      } catch {
+        /* noop */
+      }
+      return VOICE_MUTE_WAIT_MS
+    }
+    this.unmuteTimer = window.setTimeout(() => {
+      this.mutedForVoice = false
+      if (!this.running || !this.recog) return
+      try {
+        this.recog.start()
+      } catch {
+        /* まだ とまりきって いない：onend で はじめる */
+      }
+    }, 60)
+    return 0
+  }
+
   /** 音声認識が とまった 時刻（うごいて いる ときは 0） */
   private asrDownAt = 0
   private forceTimer = 0
@@ -810,7 +853,7 @@ export class HybridVoiceJudge {
   private restartAsr() {
     // とめたのに 2びょう たっても おわりの 知らせ（onend）が 来ない ときは、もう いちど とめられる ように する
     if (this.asrFinalizing && performance.now() - this.finalizeAt > 2000) this.asrFinalizing = false
-    if (!this.recog || this.asrFinalizing || isAndroid()) return
+    if (!this.recog || this.asrFinalizing || this.mutedForVoice || isAndroid()) return
     window.clearTimeout(this.forceTimer)
     window.clearTimeout(this.debounceTimer)
     this.asrFinalizing = true
@@ -933,7 +976,7 @@ export class HybridVoiceJudge {
       this.asrFinalizing = false
       // はじめられなかった ときは すこし まって なんどか やりなおす（音声認識が とまった ままに ならない ように）
       const restart = (tries: number) => {
-        if (!this.running || fatal || this.recog !== r) return
+        if (!this.running || fatal || this.recog !== r || this.mutedForVoice) return
         try {
           r.start()
         } catch {
