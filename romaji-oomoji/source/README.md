@@ -30,8 +30,7 @@ npm run build:single:shoot # dist-single-shoot/shooting.html（シューティ�
 
 ## こえ
 - 1もじの 声・セリフは フローラちゃん（小文字）と おなじ（VOICEVOX:小夜/SAYO ／ じゃままるくんは VOICEVOX:黒沢冴白）
-- カードの ことば（w_・s_：「アイス」「アイスの スタンプ、ゲット！」）だけ あたらしく つくる。`romaji-oomoji-voice-gen` ブランチに push すると Actions（`.github/workflows/romaji-oomoji-voice.yml`）が `ONLY='w_*,s_*'` で つくって その ブランチに コミットする → `src/assets/voice/shoot/` を とりこんで build
-  - ことばの 音声が ない あいだは、ステップ1の ことばの よみあげ・スタンプの セリフ・ずかんの ことばは ならない（ほかの 人の 声に しないため）
+- カードの ことば（w_・s_：「アイス」「アイスの スタンプ、ゲット！」）だけ あたらしく つくった。ことばを かえる ときは `romaji-oomoji/tools/voice/lines.json` を なおして `romaji-oomoji-voice-gen` ブランチに push すると、Actions（`.github/workflows/romaji-oomoji-voice.yml`）が `ONLY='w_*,s_*'` で つくって その ブランチに コミットする → `src/assets/voice/shoot/` の w_・s_ を とりこんで build
 
 ## クレジット
 VOICEVOX の 表記が 必要です（ホーム画面とシューティングのメニューに表示しています）。消さないでください。
