@@ -45,7 +45,13 @@ const UTT_MIN_FRAMES = 5 // 約0.12秒より短い音は判定しない
 const UTT_MAX_FRAMES = 50 // 約1.15秒より長い発声（おしゃべり・文）は不合格
 const UTT_MIN_PROB = 0.5
 /** 母音と 子音で 合格したとき、音声認識の けっかを まつ じかん（ms） */
-const ASR_WAIT_MS = 700
+const ASR_WAIT_MS = 500
+/**
+ * 音声認識の けっかを はやく だす：声が おわったら（または 声が はじまって この 時間が たったら）音声認識を いったん とめる。
+ * とめると、そこまでの 音の けっか（final）が すぐ かえってくる（とめないと 2〜3びょう かかる。iPad で 約3びょう）。とめたら すぐ また はじめる
+ */
+const ASR_FORCE_AFTER_SOUND_MS = 900
+const ASR_DEBOUNCE_MS = 250
 /** 発声の なかで、いちばん大きい声より これだけ（-26dB）小さい音は「すきま」とみなす */
 const UTT_GAP_RATIO = 0.05
 /** 「いちばん大きい まとまり」に いれる 大きさ（-12dB）と、その そとに あっては いけない 大きさ（-10dB） */
@@ -240,6 +246,15 @@ interface SpeechRecognitionLike {
   onresult: ((e: { resultIndex: number; results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
   onend: (() => void) | null
   onerror: ((e: { error: string }) => void) | null
+  // 声の はじまり・おわり（Safari・Chrome。来ない ブラウザも ある）
+  onsoundstart?: (() => void) | null
+  onspeechstart?: (() => void) | null
+  onspeechend?: (() => void) | null
+  onsoundend?: (() => void) | null
+}
+
+function isAndroid() {
+  return /Android/.test(navigator.userAgent)
 }
 
 function isIOS() {
@@ -631,6 +646,8 @@ export class HybridVoiceJudge {
           }
         }
         // 読んだのに 合格しなかった（音声認識が あとから 合格にすることもあるので 少し待ってから知らせる）
+        // 音声認識の けっかを はやく もらうため、ここで いったん とめる（パソコン：声の おわりは 周波数解析で わかる）
+        if (this.target && lenOk && !this.paused) this.finalizeAsr()
         if (this.target && lenOk && !this.paused) {
           const t = this.target
           const n = this.passCount
@@ -697,6 +714,27 @@ export class HybridVoiceJudge {
   /** さいごに 音が ぬけた ところ（サンプル） */
   private gapAt = -1
 
+  /** 音声認識を いったん とめて、そこまでの けっかを すぐ もらう（とまったら onend で すぐ また はじめる） */
+  private asrFinalizing = false
+  private forceTimer = 0
+  private debounceTimer = 0
+  private finalizeAt = 0
+  private finalizeAsr() {
+    // Android は 音声認識を はじめる たびに 音が なるので しない
+    // とめたのに 2びょう たっても おわりの 知らせ（onend）が 来ない ときは、もう いちど とめられる ように する
+    if (this.asrFinalizing && performance.now() - this.finalizeAt > 2000) this.asrFinalizing = false
+    if (!this.recog || this.asrFinalizing || !this.target || this.paused || isAndroid()) return
+    window.clearTimeout(this.forceTimer)
+    window.clearTimeout(this.debounceTimer)
+    this.asrFinalizing = true
+    this.finalizeAt = performance.now()
+    try {
+      this.recog.stop()
+    } catch {
+      this.asrFinalizing = false
+    }
+  }
+
   private startAsr() {
     const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor }
     const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition
@@ -734,10 +772,15 @@ export class HybridVoiceJudge {
           }
         }
       }
-      // さいごに きこえた ことば（母音だけ かどうかを 周波数解析の 判定で つかう）
+      // さいごに きこえた ことば（周波数解析の 判定で、ちがう 文字を きいていないか みる）
       if (latest?.[0]) {
         const t = toHiragana(fresh(last, latest[0].transcript).normalize('NFKC')).replace(/[\s、。．.,!！?？〜~ー「」]/g, '')
         if (t) this.recentAsr = { text: t, at: performance.now() }
+        // iPhone・iPad：とちゅうの けっかが 来て まだ 合格で なければ、すこし まって とめ、さいごの けっかを もらう
+        if (t && this.asrOnly) {
+          window.clearTimeout(this.debounceTimer)
+          this.debounceTimer = window.setTimeout(() => this.finalizeAsr(), ASR_DEBOUNCE_MS)
+        }
         // 合格を まっているときに、ちがう 文字（「か」「あ」など）が きこえたら とりけす
         if (this.pending && isShortKana(t) && !transcriptMatches(this.pending.target, t)) {
           this.pending = null
@@ -760,11 +803,30 @@ export class HybridVoiceJudge {
         this.onStatus?.('listening', false)
       }
     }
+    // iPhone・iPad（音声認識だけ）は 周波数解析が ないので、音声認識の「声の おわり」の 知らせで とめる。
+    // 知らせが 来ない ときの ために、声が はじまって ASR_FORCE_AFTER_SOUND_MS たっても 合格して いなければ とめる
+    const onVoiceStart = () => {
+      if (!this.asrOnly || !this.target) return
+      window.clearTimeout(this.forceTimer)
+      this.forceTimer = window.setTimeout(() => this.finalizeAsr(), ASR_FORCE_AFTER_SOUND_MS)
+    }
+    const onVoiceEnd = () => {
+      if (this.asrOnly) this.finalizeAsr()
+    }
+    r.onsoundstart = onVoiceStart
+    r.onspeechstart = onVoiceStart
+    r.onspeechend = onVoiceEnd
+    r.onsoundend = onVoiceEnd
     r.onend = () => {
       this.asrSkip = 0
       this.asrLastIdx = -1
       this.asrLastText = ''
       this.asrSkipText = ''
+      window.clearTimeout(this.forceTimer)
+      window.clearTimeout(this.debounceTimer)
+      // じぶんで とめた ときは すぐ また はじめる（つぎの 声を ききのがさない ように）
+      const quick = this.asrFinalizing
+      this.asrFinalizing = false
       if (this.running && !fatal) {
         window.setTimeout(() => {
           try {
@@ -772,7 +834,7 @@ export class HybridVoiceJudge {
           } catch {
             /* すでに動いている */
           }
-        }, 120)
+        }, quick ? 0 : 120)
       }
     }
     try {
