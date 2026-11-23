@@ -2,7 +2,7 @@
 import { HybridVoiceJudge } from '../../source/src/lib/voice'
 import { meanShape } from '../../source/src/lib/vowelClassifier'
 
-const SR = 48000
+const SR = Number(process.env.SR ?? 48000) // SR=44100 で 44.1kHz の パソコンを まねる（音も 44.1kHz に して AUD で わたす）
 const N = 2048
 let simT = 0
 ;(globalThis as any).performance = { now: () => simT }
