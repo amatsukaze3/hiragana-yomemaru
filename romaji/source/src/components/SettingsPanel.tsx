@@ -11,7 +11,6 @@ import { VoiceRegister } from './VoiceRegister'
 import { clearMastered, loadMastered } from '../lib/progress'
 import { clearTeacherPin, hasTeacherPin } from './TeacherHelp'
 import { cardRomaji, setRomajiStyle, useRomajiStyle, wordRomaji, type RomajiStyle } from '../lib/romaji'
-import { getOnsetMode, setOnsetMode, type OnsetMode } from '../lib/onset'
 
 /** 先生の暗証番号を けす（わすれたとき）。子どもが 消さないよう、たし算に答えてもらう */
 function PinReset() {
@@ -112,50 +111,12 @@ function SpellingStyle() {
   )
 }
 
-/** 子音の チェックの きびしさ（「か」に「あ」と よんでも 合格しないように する しくみ） */
-function OnsetStrictness() {
-  const [m, setM] = useState<OnsetMode>(getOnsetMode)
-  const opts: { id: OnsetMode; label: string; note: string }[] = [
-    { id: 'off', label: 'しない', note: 'はじめは これ。ひらがな・カタカナの アプリと おなじ 判定' },
-    { id: 'normal', label: 'ふつう', note: '子音も しらべる。子音で 落ちたら、つぎは もっと ゆるく みる' },
-    { id: 'strict', label: 'きびしめ', note: '母音だけの よみを もっと はねる（正しく よんでも 落ちることが ふえる）' },
-  ]
-  return (
-    <section className="flex flex-col gap-2 rounded-2xl border-2 border-violet-200 bg-white p-4 text-sm text-stone-700">
-      <h3 className="text-base font-bold text-stone-800">子音の チェック</h3>
-      <p className="leading-relaxed text-stone-500">
-        はじめは「しない」：ひらがなよめ丸・はなちゃん・デイジーちゃんと おなじように、「ka」を「か」と よんだら 合格です。
-        「ka」に「あ」と よんでも 合格して しまうのが 気になるときは「ふつう」「きびしめ」に すると、声の 出だし（子音）も しらべます。
-        ただし iPad では 正しく よんでも 合格しにくく なり、パソコンでは 合格（ビーム）まで すこし 時間が かかります。
-      </p>
-      <div className="flex flex-col gap-1.5">
-        {opts.map((o) => (
-          <label key={o.id} className={`flex cursor-pointer items-center gap-2 rounded-xl border-2 px-3 py-2 ${m === o.id ? 'border-violet-400 bg-violet-50' : 'border-stone-200'}`}>
-            <input
-              type="radio"
-              name="onset-mode"
-              checked={m === o.id}
-              onChange={() => {
-                setOnsetMode(o.id)
-                setM(o.id)
-              }}
-              className="h-4 w-4 accent-violet-500"
-            />
-            <span className="font-bold">{o.label}</span>
-            <span className="flex-1 text-xs text-stone-500">{o.note}</span>
-          </label>
-        ))}
-      </div>
-    </section>
-  )
-}
-
 export function useMeterSetting(): [boolean, (v: boolean) => void] {
   const [on, setOn] = useState(() => lsGet('flora:meter') === '1')
   return [on, (v) => (setOn(v), lsSet('flora:meter', v ? '1' : '0'))]
 }
 
-/** 右上の「カード とうろく」パネル（保護者・先生向け） */
+/** 右上の「カードの とうろく／ことばの せってい」パネル（保護者・先生向け） */
 export function SettingsPanel({ open, onClose, meter, setMeter }: { open: boolean; onClose: () => void; meter: boolean; setMeter: (v: boolean) => void }) {
   const { art, setImage, setOverlay, reset } = useCards()
   const [fontStatus, setFontStatus] = useState<FontStatus>('checking')
@@ -196,14 +157,17 @@ export function SettingsPanel({ open, onClose, meter, setMeter }: { open: boolea
             onClick={(e) => e.stopPropagation()}
           >
             <header className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-stone-800">カード とうろく</h2>
+              <h2 className="text-xl font-bold leading-snug text-stone-800">
+                カードの とうろく
+                <br />
+                ことばの せってい
+              </h2>
               <button type="button" onClick={onClose} className="rounded-full p-2 text-stone-500 hover:bg-stone-200" aria-label="とじる">
                 <X size={26} />
               </button>
             </header>
 
             <SpellingStyle />
-            <OnsetStrictness />
             <p className="text-sm leading-relaxed text-stone-500">
               手持ちのカード画像（PNG）を選ぶと、この端末に保存して差し替えます。画像はこの端末の中だけに残り、外には送られません。
             </p>

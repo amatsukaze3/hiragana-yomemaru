@@ -8,7 +8,7 @@
  *   V：母音だけ（あ行）  K：か・た行（はれつ）  S：さ・し・つ・ち（まさつ）  H：は・ひ・ふ
  *   N：な・ま行（はなの 音）  Y：や行  W：わ  R：ら行
  *
- * しきいちは onsetScore を みてね（ふつう・きびしめ。落ちた あとは ゆるくなる）
+ * 合否には つかわない（voice.ts の looksBareVowel で、音声認識の けっかを まつか どうかを きめる だけ）
  *
  * 学習モデル（onsetModel.json）は VOICEVOX の 14の声（ふつう・こどもに ちかづけた 声、
  * まわりの 音を くわえたもの）から つくった（romaji/tools/judge_test/）。
@@ -269,44 +269,14 @@ export function onsetProbs(feat: number[]): number[] {
 }
 
 /**
- * 目標の なかまで よんだか。
- * 子音の 目標：その なかまの 確率 ÷（その なかま ＋ 母音だけ）が しきいち いじょう（「か」に「あ」を はねる）
- * あ行の 目標：母音だけの 確率 ÷（母音だけ ＋ いちばん つよい 子音）が しきいち いじょう
- * しきいち（VOICEVOX の 声で 正しい よみが とおる 割合）：
- *   ふつう … 1回め 97%（thrLoose）、おなじ 文字で 子音だけ ちがって 落ちた あとは その 半分
- *   きびしめ … 1回め 92%（thr）、落ちた あとは 97%
- * iPad などの 実機では 学習に つかった 声より きびしく でたので（2026-11-23）、ふつうを ゆるめにした
+ * 目標の なかまの スコア（子音：p[目標]/(p[目標]+p[母音だけ])、あ行：p[母音だけ]/(p[母音だけ]+いちばん つよい 子音)）と しきいち。
+ * しきいちは VOICEVOX の 声で 正しい よみの 97% が こえる ところ（thrLoose）。
+ * 2026-11-23 から 合否には つかわず、パソコン・Android で「母音だけ っぽい」ときに 音声認識の けっかを まつ 合図に だけ つかう
  */
-/**
- * off（はじめ）：子音を しらべない。ひらがなよめ丸・はなちゃん・デイジーちゃんと おなじ 判定（「か」は「か」として きく）
- * normal・strict：子音も しらべる（先生が えらんだ ときだけ）
- */
-export type OnsetMode = 'normal' | 'strict' | 'off'
-export function onsetScore(p: number[], want: OnsetClass, mode: OnsetMode = 'normal', retry = false) {
+export function onsetScore(p: number[], want: OnsetClass) {
   const k = ONSET_CLASSES.indexOf(want)
   const s = k === 0 ? p[0] / (p[0] + Math.max(...p.slice(1)) + 1e-9) : p[k] / (p[k] + p[0] + 1e-9)
-  const loose = MODEL.thrLoose?.[k] ?? 0
-  const thr = mode === 'strict' ? (retry ? loose : (MODEL.thr?.[k] ?? 0)) : retry ? loose * 0.5 : loose
-  return { score: s, thr }
-}
-
-/* ---------- 先生の せってい：子音の チェックの きびしさ ---------- */
-const MODE_KEY = 'flora:onset'
-export function getOnsetMode(): OnsetMode {
-  try {
-    const v = localStorage.getItem(MODE_KEY)
-    // 2026-11-23：iPad で 合格しにくく、シューティングの ビームも おそく なったので、はじめは しない（前の auto も しない に）
-    return v === 'strict' || v === 'normal' ? v : 'off'
-  } catch {
-    return 'normal'
-  }
-}
-export function setOnsetMode(m: OnsetMode) {
-  try {
-    localStorage.setItem(MODE_KEY, m)
-  } catch {
-    /* noop */
-  }
+  return { score: s, thr: MODEL.thrLoose?.[k] ?? 0 }
 }
 
 /** 文字（ローマ字）の 子音の なかま。ん は しらべない（null） */

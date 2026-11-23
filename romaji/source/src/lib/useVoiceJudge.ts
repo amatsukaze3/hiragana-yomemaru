@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Kana } from '../data/kana'
 import { voiceprintRows } from './voiceprint'
 import { HybridVoiceJudge, type FrameInfo, type MicStatus, type PassSource } from './voice'
-import { getOnsetMode } from './onset'
 
 /**
  * 画面からハイブリッド判定エンジンを使うためのフック。
@@ -44,11 +43,6 @@ export function useVoiceJudge(target: Kana | null, onPass: (src: PassSource) => 
   const start = useCallback((opts?: { forRegister?: boolean }) => {
     const e = engine.current!
     e.forceAnalyser = !!opts?.forRegister
-    // 子音の チェック（先生の せってい）
-    const om = getOnsetMode()
-    e.onsetCheck = om !== 'off'
-    e.onsetStrict = om === 'strict'
-    e.onsetAuto = false
     // 登録があれば、その子の声とくらべて判定する
     e.setVoiceprint(opts?.forRegister ? null : (voiceprintRows()))
     return e.start()

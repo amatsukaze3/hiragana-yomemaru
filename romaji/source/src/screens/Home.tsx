@@ -64,9 +64,14 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, o
         <button
           type="button"
           onClick={onSettings}
-          className="flex items-center gap-2 rounded-full border-2 border-amber-200 bg-white px-4 py-2 text-sm font-bold text-stone-600 shadow-sm"
+          className="flex items-center gap-2 rounded-2xl border-2 border-amber-200 bg-white px-4 py-1.5 text-sm font-bold text-stone-600 shadow-sm"
         >
-          <ImagePlus size={20} /> カード とうろく
+          <ImagePlus size={20} />
+          {/* フローラちゃんは つづり方（ヘボン式・訓令式）も ここで えらぶので 2行 */}
+          <span className="flex flex-col items-start leading-tight">
+            <span>カードの とうろく</span>
+            <span>ことばの せってい</span>
+          </span>
         </button>
       </header>
 

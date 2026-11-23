@@ -40,7 +40,7 @@ export function Tutorial({ onClose }: { onClose: () => void }) {
             </ol>
             <p className="text-sm leading-relaxed text-stone-500">
               おうちのかた・先生へ：その子の声に あわせて判定するので、正しく読んだときに 合格しやすくなります（約15秒）。
-              使う子が かわったら、右上の「カード とうろく」から 登録しなおしてください。
+              使う子が かわったら、右上の「カードの とうろく／ことばの せってい」から 登録しなおしてください。
             </p>
             <button type="button" onClick={() => setPage('register')} className="flex items-center gap-2 rounded-full bg-violet-500 px-8 py-4 text-2xl font-bold text-white shadow-[0_5px_0_#6d28d9] active:translate-y-1 active:shadow-none">
               <AudioLines size={28} /> こえを とうろくする
