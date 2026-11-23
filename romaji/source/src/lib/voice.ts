@@ -192,6 +192,11 @@ const HOMOPHONES: Record<string, string[]> = {
   ん: ['うん', 'ん', 'n', 'm'],
 }
 
+/** 母音だけの ことば（あ・ああ・あー・え など） */
+function isBareVowel(t: string) {
+  return /^[あいうえおぁぃぅぇぉー]+$/.test(t)
+}
+
 function toHiragana(s: string) {
   return s.replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60))
 }
@@ -284,7 +289,7 @@ export class HybridVoiceJudge {
   private lockUntil = 0
   private targetSetAt = 0
   // ひとつの発声（声が出はじめてから止まるまで）のまとめ
-  private utt: { feats: number[][]; levels: number[]; silent: number; run: number; top: number; startSample: number } | null = null
+  private utt: { feats: number[][]; levels: number[]; silent: number; run: number; top: number; startSample: number; startAt: number } | null = null
   // 子音を しらべるための、ちょくぜん 約3びょうの 音（AnalyserNode の 時間波形を つないだもの）
   private ring = new Float32Array(0)
   private sampleCount = 0
@@ -545,7 +550,7 @@ export class HybridVoiceJudge {
 
     // 発声ごとに判定する（声が止まったところで、その発声全体を見て決める）
     if (listening && voiced && !inGap) {
-      if (!this.utt) this.utt = { feats: [], levels: [], silent: 0, run: 0, top: 0, startSample: this.sampleCount - this.time.length }
+      if (!this.utt) this.utt = { feats: [], levels: [], silent: 0, run: 0, top: 0, startSample: this.sampleCount - this.time.length, startAt: now }
       const u = this.utt
       u.silent = 0
       if (feat) {
@@ -600,11 +605,14 @@ export class HybridVoiceJudge {
           if (o) dump.push([u.top, ...o.feat])
         }
         const vowelOk = !!this.target && lenOk && (nOk ?? utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', core.map((f) => this.probsOf(f)), thr, 3))
-        // 母音が あっていても、出だしの 子音が ちがえば 不合格（「か」に「あ」、「さ」に「か」など）
-        if (vowelOk && this.target && this.onsetOk(this.target, u.startSample)) {
+        // 判定は ひらがな・カタカナの アプリと おなじ（母音で きめる）。
+        // ただし 音声認識が うごいているとき（パソコン・Android）は、その けっかで うらづける：
+        //  - 子音の ある 文字（ka など）に、音声認識が「あ」など 母音だけを きいていたら 不合格
+        //  - 出だしが 母音だけ っぽい（onset.ts）ときだけ、音声認識の けっかを 0.7びょう まつ（ふだんは またない）
+        const veto = vowelOk && this.asrAlive && this.heardBareVowel(this.target!, u.startAt)
+        if (vowelOk && this.target && !veto) {
           this.onFrame?.({ bands, voiced, match: true, streak: STREAK_TO_PASS })
-          // 音声認識が うごいているときは、すこし まって「あ」「さ」など ちがう 文字が きこえていないか たしかめる
-          if (this.asrAlive && this.onsetCheck && this.target !== 'ン') this.pending = { target: this.target, until: now + ASR_WAIT_MS }
+          if (this.asrAlive && this.looksBareVowel(this.target, u.startSample)) this.pending = { target: this.target, until: now + ASR_WAIT_MS }
           else this.pass('formant')
           return
         }
@@ -650,38 +658,39 @@ export class HybridVoiceJudge {
     return out
   }
 
-  /** 子音の しらべ：目標の 文字の なかま（K・S・H・N・Y・W・R、あ行は V）の 確率が しきいち いじょうか */
-  private onsetOk(target: Kana, startSample: number): boolean {
-    this.lastOnset = null
-    const want = onsetClassOf(KANA_INFO[target]?.romaji ?? '')
-    if (!want || !this.onsetCheck) return true
-    if (this.onsetAuto && isIOS()) return true
-    const sr = this.analyser!.context.sampleRate
-    const from = startSample - Math.round(sr * 0.25)
-    if (this.gapAt >= from) return true // 音が ぬけている：出だしが こわれているので 母音だけで きめる
-    const seg = this.samples(from, this.sampleCount)
-    const o = onsetFeatures(seg, sr)
-    if (!o) return true // 出だしが とれないときは 母音だけで きめる
-    const p = onsetProbs(o.feat)
-    const top = p.indexOf(Math.max(...p))
-    // おなじ 文字で 子音だけ ちがって 落ちた あとは、しきいちを ゆるめる（はっきり よめない 子が なんども 落ちないように）
-    const retry = this.onsetMissFor === target
-    const { score, thr } = onsetScore(p, want, this.onsetStrict ? 'strict' : 'normal', retry)
-    this.lastOnset = { probs: p, cls: ONSET_CLASSES[top] }
-    const ok = score >= thr
-    this.onsetMissFor = ok ? null : target
-    return ok
+  /** 音声認識が さいごに きいた ことば（ひらがな）と その 時刻 */
+  private recentAsr: { text: string; at: number } | null = null
+
+  /** 子音の ある 文字か（あ行・ん は ちがう） */
+  private hasConsonant(target: Kana) {
+    const c = onsetClassOf(KANA_INFO[target]?.romaji ?? '')
+    return !!c && c !== 'V'
   }
 
-  /** 子音の しらべを するか（ローマ字フローラちゃんでは する）・きびしめに するか（カード とうろく の せってい） */
-  onsetCheck = true
-  onsetStrict = false
+  /** この 発声の あいだに、音声認識が 母音だけ（「あ」「ああ」など）を きいていたか */
+  private heardBareVowel(target: Kana, uttStartAt: number) {
+    const r = this.recentAsr
+    return !!r && r.at >= uttStartAt - 200 && this.hasConsonant(target) && isBareVowel(r.text)
+  }
+
+  /** 出だしが 母音だけ っぽいか（子音の ある 文字のとき。onset.ts の 学習モデル。音が ぬけたときは しらべない） */
+  private looksBareVowel(target: Kana, startSample: number): boolean {
+    this.lastOnset = null
+    const want = onsetClassOf(KANA_INFO[target]?.romaji ?? '')
+    if (!want || want === 'V') return false
+    const sr = this.analyser!.context.sampleRate
+    const from = startSample - Math.round(sr * 0.25)
+    if (this.gapAt >= from) return false
+    const o = onsetFeatures(this.samples(from, this.sampleCount), sr)
+    if (!o) return false
+    const p = onsetProbs(o.feat)
+    const { score, thr } = onsetScore(p, want)
+    this.lastOnset = { probs: p, cls: ONSET_CLASSES[p.indexOf(Math.max(...p))] }
+    return score < thr
+  }
+
   /** さいごに 音が ぬけた ところ（サンプル） */
   private gapAt = -1
-  /** おまかせ：iPhone・iPad の 周波数解析では 子音を しらべない（2026-11-23 iPad の 実機で 合格しにくく なったため） */
-  onsetAuto = true
-  /** 子音だけ ちがって 落ちた 文字（つぎは ゆるめる） */
-  private onsetMissFor: Kana | null = null
 
   private startAsr() {
     const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor }
@@ -720,10 +729,12 @@ export class HybridVoiceJudge {
           }
         }
       }
-      // 母音と 子音で 合格を まっているときに、ちがう 文字（「あ」「さ」など）が きこえたら とりけす
-      if (this.pending && latest?.[0]) {
+      // さいごに きこえた ことば（母音だけ かどうかを 周波数解析の 判定で つかう）
+      if (latest?.[0]) {
         const t = toHiragana(fresh(last, latest[0].transcript).normalize('NFKC')).replace(/[\s、。．.,!！?？〜~ー「」]/g, '')
-        if (t && t.length <= 3 && /^[ぁ-ゖ]+$/.test(t)) {
+        if (t) this.recentAsr = { text: t, at: performance.now() }
+        // 合格を まっているときに、母音だけ（「あ」など）が きこえたら とりけす
+        if (this.pending && isBareVowel(t)) {
           this.pending = null
           this.onMiss?.()
         }
