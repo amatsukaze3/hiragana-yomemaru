@@ -149,7 +149,7 @@ export function SettingsPanel({ open, onClose, meter, setMeter }: { open: boolea
                     <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                       <div className="flex items-baseline gap-2">
                         <span className="font-card text-2xl text-stone-900">{k}</span>
-                        <span className="truncate text-sm text-stone-500">{a.custom ? '差し替え中' : a.url ? `${KANA_INFO[k].word}（はじめの絵）` : `${KANA_INFO[k].word || 'もじだけ'}（絵は まだ ありません）`}</span>
+                        <span className="truncate text-sm text-stone-500">{a.custom ? '差し替え中' : a.url ? `${KANA_INFO[k].caption}（はじめの絵）` : `${KANA_INFO[k].word || 'もじだけ'}（絵は まだ ありません）`}</span>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <button

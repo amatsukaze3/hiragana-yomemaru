@@ -34,6 +34,23 @@ export function MasuGrid() {
   )
 }
 
+/** ことばの 一部を 赤く する */
+function Marked({ text, marks }: { text: string; marks: [number, number][] }) {
+  const out: ReactNode[] = []
+  let i = 0
+  for (const [a, b] of marks) {
+    if (a > i) out.push(text.slice(i, a))
+    out.push(
+      <span key={a} className="text-red-500">
+        {text.slice(a, b)}
+      </span>,
+    )
+    i = b
+  }
+  if (i < text.length) out.push(text.slice(i))
+  return <>{out}</>
+}
+
 interface CardProps {
   char: Kana
   variant: 'picture' | 'letter'
@@ -49,23 +66,30 @@ export function Card({ char, variant, onTap, hideLetter, children }: CardProps) 
   const info = KANA_INFO[char]
   // 絵が まだ ない カードは「もじ＋ことば」の カード
   const noArt = variant === 'picture' && !a.url
+  // はじめから 入っている 絵（まんなかに 絵、下に ことば）
+  const builtIn = variant === 'picture' && !noArt && !a.custom
   // 何文字も ある よみ（きゃ・おかあさん）は 横長の カード
   const wide = Math.min(3.2, Math.max(1, char.length * 0.72))
-  const ratio = variant === 'picture' && !noArt ? a.aspect : noArt ? Math.max(1000 / 760, wide) : wide
+  const ratio = builtIn ? info.imageAspect : variant === 'picture' && !noArt ? a.aspect : noArt ? Math.max(1000 / 760, wide) : wide
   const { ref, size } = useFit(ratio)
 
-  // 既定の線画なら元のカードと同じ位置に、差し替えた絵なら中央に重ねる
-  const pos = noArt ? { cx: 50, cy: 42, h: 46 } : variant === 'picture' && !a.custom ? info.letter : { cx: 50, cy: 50, h: 46 }
+  // はじめの絵・もじだけの カードは 上よりに（下に ことばを 書く）、差し替えた絵は 中央に 重ねる
+  const pos = noArt ? { cx: 50, cy: 42, h: 46 } : builtIn ? info.letter : { cx: 50, cy: 50, h: 46 }
   // 横に はみださないよう、文字数で 大きさを おさえる
   const fit = (px: number, box: number) => Math.min(px, (box * 0.88) / Math.max(1, char.length))
   const letterPx = variant === 'picture' && !noArt ? fit((size.h * pos.h) / 100 / 0.86, size.w) : fit(size.h * (noArt ? 0.5 : 0.74), size.w)
+  // 大きな 文字を 重ねるか（みゅ・りゃ・びゅ は 絵が 文字 そのものなので 重ねない）
+  const showLetter = (variant === 'letter' || noArt || a.overlay) && !hideLetter && !(builtIn && info.letterArt)
+  // 下に 小さく ことば（よむ ところを 赤く）
+  const showCaption = (builtIn || noArt) && !hideLetter
+  const capPx = Math.min(size.h * 0.12, (size.w * 0.8) / Math.max(1, info.caption.length))
 
   return (
     <div ref={ref} className="relative flex h-full w-full items-center justify-center">
       <motion.button
         type="button"
         onClick={onTap}
-        aria-label={`${char}（${info.word}）`}
+        aria-label={`${char}（${info.caption}）`}
         className="relative overflow-hidden rounded-[28px] border-4 border-amber-200 bg-white shadow-[0_6px_0_#fde68a]"
         style={{ width: size.w, height: size.h }}
         whileTap={{ scale: 0.97 }}
@@ -74,15 +98,10 @@ export function Card({ char, variant, onTap, hideLetter, children }: CardProps) 
         transition={{ type: 'spring', stiffness: 260, damping: 20 }}
       >
         {variant === 'letter' && char.length === 1 && <MasuGrid />}
-        {noArt && info.word && info.word !== char && (
-          <span className="font-card pointer-events-none absolute inset-x-0 bottom-[9%] whitespace-nowrap text-center leading-none text-stone-500" style={{ fontSize: Math.min(size.h * 0.16, (size.w * 0.85) / info.word.length) }}>
-            {info.word}
-          </span>
-        )}
         {variant === 'picture' && !noArt && (
-          <img src={a.url} alt={info.word} draggable={false} className={`absolute inset-0 h-full w-full object-contain ${info.framed && !a.custom ? '' : 'p-[3%]'}`} />
+          <img src={a.url} alt={info.caption} draggable={false} className={`absolute inset-0 h-full w-full object-contain ${builtIn ? '' : 'p-[3%]'}`} />
         )}
-        {(variant === 'letter' || noArt || a.overlay) && !hideLetter && (
+        {showLetter && (
           <span
             className="font-card pointer-events-none absolute whitespace-nowrap leading-none text-stone-900"
             style={{
@@ -95,16 +114,11 @@ export function Card({ char, variant, onTap, hideLetter, children }: CardProps) 
             {char}
           </span>
         )}
-        {variant === 'picture' && !a.custom && a.overlay && !hideLetter &&
-          (info.labels ?? []).map((lb) => (
-            <span
-              key={lb.text}
-              className="font-card pointer-events-none absolute whitespace-nowrap leading-none text-stone-900"
-              style={{ left: `${lb.cx}%`, top: `${lb.cy}%`, fontSize: (size.h * lb.h) / 100 / 0.86, transform: 'translate(-50%, -50%)' }}
-            >
-              {lb.text}
-            </span>
-          ))}
+        {showCaption && (
+          <span className="font-card pointer-events-none absolute inset-x-0 bottom-[5%] whitespace-nowrap text-center leading-none text-stone-900" style={{ fontSize: capPx }}>
+            <Marked text={info.caption} marks={info.marks} />
+          </span>
+        )}
         {children}
       </motion.button>
     </div>

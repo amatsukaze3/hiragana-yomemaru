@@ -94,6 +94,12 @@ export interface KanaInfo {
   letter: { cx: number; cy: number; h: number }
   framed?: boolean
   labels?: { text: string; cx: number; cy: number; h: number }[]
+  /** 絵 そのものが 文字（みゅ・りゃ・びゅ）：絵の上に 大きな 文字を 重ねない */
+  letterArt?: boolean
+  /** カードの下に 小さく 書く ことば（ないときは よみ そのもの） */
+  caption: string
+  /** caption の うち 赤く する ところ [はじめ, おわり) */
+  marks: [number, number][]
 }
 
 const VOWEL_OF: Record<string, Vowel> = {}
@@ -115,19 +121,54 @@ export function lastVowel(s: string): Vowel {
   return 'う' // ん など
 }
 
-/** カードの絵（src/assets/cards/<ローマ字>.webp）：右に 絵、左に もじ（1200×700） */
+/** 長音カードの 赤く する ところ（のばす おと） */
+const CHOU_MARK: Record<string, string> = {
+  おかあさん: 'かあ', おにいさん: 'にい', ふうせん: 'ふう', おねえさん: 'ねえ', こおり: 'こお',
+  おとうさん: 'とう', ぼうし: 'ぼう', とけい: 'けい', せんせい: 'せい',
+}
+
+/** ことばの なかで 赤く する ところ */
+function marksOf(group: Group, char: string, caption: string): [number, number][] {
+  const all = (re: RegExp) => [...caption.matchAll(re)].map((m) => [m.index!, m.index! + m[0].length] as [number, number])
+  switch (group) {
+    case 'chou': {
+      const t = CHOU_MARK[caption] ?? ''
+      const i = t ? caption.indexOf(t) : -1
+      return i >= 0 ? [[i, i + t.length]] : []
+    }
+    case 'hatsu':
+      return all(/ん/g)
+    case 'soku':
+      return all(/っ/g)
+    case 'youchou':
+      return all(/[ぁ-ゖ][ゃゅょ]う/g)
+    default: {
+      const i = caption.indexOf(char)
+      return i >= 0 ? [[i, i + char.length]] : []
+    }
+  }
+}
+
+/** カードの絵（src/assets/cards/<ローマ字>.webp）：まんなかに 絵（1000×760、下の あきに ことばを 書く） */
 const ART = import.meta.glob('../assets/cards/*.webp', { eager: true, import: 'default' }) as Record<string, string>
 const artOf = (romaji: string) => ART[`../assets/cards/${romaji}.webp`] ?? ''
 
 export const KANA_INFO: Record<Kana, KanaInfo> = {}
 for (const r of SOUND_ROWS)
   for (const [k, romaji, word] of r.items)
-    KANA_INFO[k] = artOf(romaji)
-      ? { char: k, romaji, word, vowel: lastVowel(k), group: r.group, multi: false, image: artOf(romaji), imageAspect: 1200 / 700, letter: { cx: 21, cy: 50, h: 49 } }
-      : { char: k, romaji, word, vowel: lastVowel(k), group: r.group, multi: false, image: '', imageAspect: 1000 / 760, letter: { cx: 50, cy: 50, h: 43 } }
+    KANA_INFO[k] = {
+      char: k, romaji, word, vowel: lastVowel(k), group: r.group, multi: false,
+      image: artOf(romaji), imageAspect: 1000 / 760, letter: { cx: 50, cy: 42, h: k.length > 1 ? 31 : 40 },
+      letterArt: !word && !!artOf(romaji),
+      caption: word || k, marks: marksOf(r.group, k, word || k),
+    }
 for (const r of WORD_ROWS)
   for (const [k, romaji] of r.items)
-    KANA_INFO[k] = { char: k, romaji, word: k, vowel: lastVowel(k), group: r.group, multi: true, image: '', imageAspect: 1000 / 760, letter: { cx: 50, cy: 50, h: 30 } }
+    KANA_INFO[k] = {
+      char: k, romaji, word: k, vowel: lastVowel(k), group: r.group, multi: true,
+      image: '', imageAspect: 1000 / 760, letter: { cx: 50, cy: 42, h: 30 },
+      caption: k, marks: marksOf(r.group, k, k),
+    }
 
 export const isMulti = (k: Kana) => !!KANA_INFO[k]?.multi
 
