@@ -58,7 +58,7 @@ const ASR_DEBOUNCE_MAX_WAIT_MS = 1200
 // 音声認識が とまった まま うごいて いなければ、この時間で もう いちど はじめる
 const ASR_WATCHDOG_MS = 2500
 // iPhone・iPad：フローラちゃんが しゃべる まえに マイク（音声認識）を とめて まつ 時間
-const VOICE_MUTE_WAIT_MS = 250
+const VOICE_MUTE_WAIT_MS = 200
 /** 発声の なかで、いちばん大きい声より これだけ（-26dB）小さい音は「すきま」とみなす */
 const UTT_GAP_RATIO = 0.05
 /** 「いちばん大きい まとまり」に いれる 大きさ（-12dB）と、その そとに あっては いけない 大きさ（-10dB） */
@@ -235,7 +235,7 @@ function weakMisheard(target: Kana, heard: string, cls: OnsetClass) {
 /** ら行の はじきの 音は「だ」「で」「ど」に きこえやすい（こどもの「ら」は とくに） */
 const FLAP_AS_D: Record<string, string> = { ら: 'だ', れ: 'で', ろ: 'ど' }
 
-/** パソコン・Android（Google の 音声認識）：ら・れ・ろ を「だ・で・ど」と きいても 合格 */
+/** ら・れ・ろ を「だ・で・ど」と きいても 合格（子音は きこえて いるので、母音だけの よみでは ない） */
 export function flapMatches(kana: Kana, raw: string): boolean {
   const d = FLAP_AS_D[toHiragana(kana)]
   if (!d) return false
@@ -781,9 +781,9 @@ export class HybridVoiceJudge {
     return r && r.at >= uttStartAt - 200 && isShortKana(r.text) && !this.asrMatches(target, r.text) ? r.text : null
   }
 
-  /** 音声認識の けっかが 目標の 文字か（パソコン・Android は ら・れ・ろ の「だ・で・ど」も） */
+  /** 音声認識の けっかが 目標の 文字か（ら・れ・ろ は「だ・で・ど」も） */
   private asrMatches(target: Kana, t: string) {
-    return transcriptMatches(target, t) || (!this.asrOnly && flapMatches(target, t))
+    return transcriptMatches(target, t) || flapMatches(target, t)
   }
 
   /** 出だしの 学習モデル（onset.ts）の スコア。音が ぬけた・出だしが とれない ときは null */
@@ -835,7 +835,7 @@ export class HybridVoiceJudge {
       } catch {
         /* まだ とまりきって いない：onend で はじめる */
       }
-    }, 60)
+    }, 0)
     return 0
   }
 
