@@ -4,7 +4,7 @@
  * 1つのカード＝1つの「よみ」（Kana は その よみの 文字列：「が」「きゃ」「おかあさん」）
  *  - 濁音・半濁音・拗音：1つの 音を よむ（絵カードの ことばは word）
  *  - 長音・撥音・拗長音・促音：ことばを まるごと よむ（multi）
- * カードの絵は できたものから入れる（image が '' の あいだは 文字と ことばだけの カード。濁音・半濁音は 2026-11-23 に 入れた）
+ * カードの絵は できたものから入れる（image が '' の あいだは 文字と ことばだけの カード。濁音・半濁音・拗音・撥音は 2026-11-23 に 入れた）
  */
 
 export type Kana = string
@@ -166,7 +166,7 @@ for (const r of WORD_ROWS)
   for (const [k, romaji] of r.items)
     KANA_INFO[k] = {
       char: k, romaji, word: k, vowel: lastVowel(k), group: r.group, multi: true,
-      image: '', imageAspect: 1000 / 760, letter: { cx: 50, cy: 42, h: 30 },
+      image: artOf(romaji), imageAspect: 1000 / 760, letter: { cx: 50, cy: 42, h: 31 },
       caption: k, marks: marksOf(r.group, k, k),
     }
 
