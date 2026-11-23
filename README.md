@@ -61,3 +61,18 @@
 - 端末に保存するきろくは `flora:` で始まるキーなので、ほかの アプリの きろくとは まざりません
 
 こえ：VOICEVOX:小夜/SAYO／VOICEVOX:黒沢冴白（ローマ字フローラちゃん）
+
+## ひらがなよめ丸 スペシャルモーラ（`mora/`）
+
+特殊音（濁音・半濁音・拗音・長音・撥音・拗長音・促音）の よめ丸です。ひらがなよめ丸のソースを もとにした 別コピー。
+
+公開ページ：https://amatsukaze3.github.io/hiragana-yomemaru/mora/
+
+- `mora/index.html` … 公開用（1ファイルで動きます）
+- `mora/source/` … ソース（`npm install` → `npm run build:single` → `dist-single/index.html` を `mora/index.html` に）
+  - カードと ことば：`src/data/kana.ts`（1つの 音＝濁音・半濁音・拗音、ことば＝長音・撥音・拗長音・促音）
+  - 絵は まだ ない（`image: ''` のあいだは「もじ＋ことば」の カード）。設定の「カード とうろく」から 絵を 入れられる
+- 端末に保存するきろくは `mora:` で始まるキー。声の登録と 先生の暗証番号は ひらがなよめ丸と 共通
+- シューティングは なし（あとで）
+
+こえ：VOICEVOX:ずんだもん
