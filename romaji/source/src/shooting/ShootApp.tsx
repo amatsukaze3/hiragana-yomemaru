@@ -18,7 +18,7 @@ import { cardRomaji } from '../lib/romaji'
 type Screen = { name: 'menu' } | { name: 'game'; mode: ModeId; resume?: SaveData | null } | { name: 'zukan' } | { name: 'batchiri'; pick: WeakPick }
 
 /** ローマ字フローラちゃんの 本体 */
-export const MAIN_APP_URL = 'https://amatsukaze3.github.io/hiragana-yomemaru/katakana/'
+export const MAIN_APP_URL = 'https://amatsukaze3.github.io/hiragana-yomemaru/romaji/'
 
 /** 単体アプリ（フローラちゃんシューティング だけの ページ） */
 export default function ShootApp() {
