@@ -193,11 +193,11 @@ const HOMOPHONES: Record<string, string[]> = {
   や: ['矢', '屋', '夜', '八', '野', '哉', '8', 'ya'],
   ゆ: ['湯', '油', '由', 'u', 'you', 'yu'],
   よ: ['世', '夜', '四', '代', '余', '予', '与', 'yo'],
-  ら: ['等', '羅', '良', 'ra'],
-  り: ['利', '理', '里', '李', '梨', '吏', 'ri'],
-  る: ['留', '流', '瑠', 'ru'],
-  れ: ['礼', '例', '零', 're'],
-  ろ: ['炉', '路', '六', '呂', 'ro'],
+  ら: ['等', '羅', '良', '裸', '螺', '拉', 'la', 'rah', 'ra'],
+  り: ['利', '理', '里', '李', '梨', '吏', '離', '裏', '璃', '履', 'li', 'lee', 'ree', 'ri'],
+  る: ['留', '流', '瑠', 'lu', 'rue', 'ru'],
+  れ: ['礼', '例', '零', '霊', '令', '冷', '麗', '齢', 'le', 'ray', 'rei', 're'],
+  ろ: ['炉', '路', '六', '呂', '露', '櫓', '老', '労', '郎', '朗', '廊', '楼', '蝋', 'lo', 'low', 'row', 'law', 'roe', 'ro'],
   わ: ['輪', '和', '話', '環', 'は', 'wa'],
   を: ['お', '尾', '緒', '御', 'o', 'oh', 'wo'],
   ん: ['うん', 'ん', 'n', 'm'],
@@ -220,10 +220,25 @@ export function audioAdvance(prev: Float32Array, cur: Float32Array, want: number
   return best
 }
 
-/** ま行・な行の 文字を、音声認識が その母音や「ん」だけに ききまちがえた（「む」→「う」「ん」「うん」） */
-function nasalMisheard(target: Kana, heard: string) {
+/**
+ * よわい 子音（ま行・な行・ら行）を、音声認識が その母音だけに ききまちがえた（「む」→「う」「ん」「うん」、「ら」→「あ」）。
+ * 出だしの 学習モデルが 子音を はっきり きいて いれば 合格に する ときに つかう
+ */
+function weakMisheard(target: Kana, heard: string, cls: OnsetClass) {
   const v = KANA_INFO[target]?.vowel
-  return !!v && [...heard].every((c) => c === v || c === 'ん' || c === 'ー')
+  if (!v || (cls !== 'N' && cls !== 'R')) return false
+  return [...heard].every((c) => c === v || c === 'ー' || (cls === 'N' && c === 'ん'))
+}
+
+/** ら行の はじきの 音は「だ」「で」「ど」に きこえやすい（こどもの「ら」は とくに） */
+const FLAP_AS_D: Record<string, string> = { ら: 'だ', れ: 'で', ろ: 'ど' }
+
+/** パソコン・Android（Google の 音声認識）：ら・れ・ろ を「だ・で・ど」と きいても 合格 */
+export function flapMatches(kana: Kana, raw: string): boolean {
+  const d = FLAP_AS_D[toHiragana(kana)]
+  if (!d) return false
+  const whole = toHiragana(raw.normalize('NFKC').toLowerCase()).replace(/[\s、。．.,!！?？〜~ーっ「」]/g, '')
+  return oneMatches(d, whole)
 }
 
 /** みじかい かなの ことば（1もじを よんだ 音声認識の けっか：あ・ああ・か・かあ など） */
@@ -679,9 +694,9 @@ export class HybridVoiceJudge {
             const o = this.onsetScoreOf(cls, u.startSample)
             const fast = !!o && o.score >= o.fast
             if (heard) {
-              // ま行・な行（m・n）は 音声認識が「う」「ん」と ききまちがえやすい。
-              // 出だしの 学習モデルが m・n を はっきり きいて いれば 合格（母音だけの よみが こえるのは 2% いか）
-              ok = fast && cls === 'N' && nasalMisheard(t, heard) ? 'now' : 'no'
+              // ま行・な行・ら行（m・n・r）は 音声認識が「う」「ん」「あ」と ききまちがえやすい。
+              // 出だしの 学習モデルが 子音を はっきり きいて いれば 合格（母音だけの よみが こえるのは 2% いか）
+              ok = fast && weakMisheard(t, heard, cls) ? 'now' : 'no'
             } else if (fast) ok = 'now'
             else if (cls === 'V' && (!o || o.score >= o.loose)) ok = this.asrAlive ? 'wait' : 'now'
             else ok = 'no' // 子音の 文字は 音声認識が 合格に するのを まつ
@@ -755,7 +770,12 @@ export class HybridVoiceJudge {
   /** この 発声の あいだに、音声認識が 目標と ちがう 文字（みじかい かな）を きいていたか */
   private heardOtherText(target: Kana, uttStartAt: number) {
     const r = this.recentAsr
-    return r && r.at >= uttStartAt - 200 && isShortKana(r.text) && !transcriptMatches(target, r.text) ? r.text : null
+    return r && r.at >= uttStartAt - 200 && isShortKana(r.text) && !this.asrMatches(target, r.text) ? r.text : null
+  }
+
+  /** 音声認識の けっかが 目標の 文字か（パソコン・Android は ら・れ・ろ の「だ・で・ど」も） */
+  private asrMatches(target: Kana, t: string) {
+    return transcriptMatches(target, t) || (!this.asrOnly && flapMatches(target, t))
   }
 
   /** 出だしの 学習モデル（onset.ts）の スコア。音が ぬけた・出だしが とれない ときは null */
@@ -844,7 +864,7 @@ export class HybridVoiceJudge {
         const alts = e.results[i]
         for (let j = 0; j < alts.length; j++) {
           const t = fresh(i, alts[j].transcript)
-          if (this.target && t && transcriptMatches(this.target, t)) {
+          if (this.target && t && this.asrMatches(this.target, t)) {
             this.pending = null
             this.pass('asr')
             return
@@ -861,7 +881,7 @@ export class HybridVoiceJudge {
           this.armDebounce(performance.now())
         }
         // 合格を まっているときに、ちがう 文字（「か」「あ」など）が きこえたら とりけす
-        if (this.pending && isShortKana(t) && !transcriptMatches(this.pending.target, t)) {
+        if (this.pending && isShortKana(t) && !this.asrMatches(this.pending.target, t)) {
           this.pending = null
           this.onMiss?.()
         }
