@@ -101,6 +101,8 @@ MAIN_PITCH = 0.03
 MAIN_INTONATION = 1.2
 # 息まじりの 成分を この わりあいに へらして（WORLD で つくりなおす）、すんだ 声に する
 LINE_AP_SCALE = 0.5
+# 高さを ならす はば（フレーム。1フレーム 5ms）
+F0_SMOOTH = 6
 
 
 def world_clean(x: np.ndarray) -> np.ndarray:
@@ -116,9 +118,11 @@ def world_clean(x: np.ndarray) -> np.ndarray:
         m = np.nanmedian(lf[max(0, i - 6):i + 7])
         if abs(lf[i] - m) > 0.12:
             g[i] = np.exp(m)
+    # 高さの こまかい ゆれを ±30ms で ならす（2026-11-23 ユーザーが ためし音声 C を えらんだ。±10ms だと 揺れが のこった。
+    # 声の 形まで ならすと 機械っぽく なったので、ならすのは 高さ だけ）
     g2 = g.copy()
     for i in np.where(v)[0]:
-        w = g[max(0, i - 2):i + 3]
+        w = g[max(0, i - F0_SMOOTH):i + F0_SMOOTH + 1]
         g2[i] = w[w > 0].mean()
     ap[v] = ap[v] * LINE_AP_SCALE
     y = pw.synthesize(g2, sp, ap, SR, 5.0)
