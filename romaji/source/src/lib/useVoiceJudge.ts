@@ -48,7 +48,7 @@ export function useVoiceJudge(target: Kana | null, onPass: (src: PassSource) => 
     const om = getOnsetMode()
     e.onsetCheck = om !== 'off'
     e.onsetStrict = om === 'strict'
-    e.onsetAuto = om === 'auto'
+    e.onsetAuto = false
     // 登録があれば、その子の声とくらべて判定する
     e.setVoiceprint(opts?.forRegister ? null : (voiceprintRows()))
     return e.start()
