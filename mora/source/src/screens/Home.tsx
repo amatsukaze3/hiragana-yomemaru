@@ -1,11 +1,14 @@
 import { useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import { AudioLines, BookOpen, ImagePlus, Mic, Timer } from 'lucide-react'
+import { AudioLines, BookOpen, ImagePlus, Lock, Mic, Rocket, Timer } from 'lucide-react'
 import { VoiceRegister } from '../components/VoiceRegister'
 import { Mascot } from '../components/Mascot'
 import { GROUPS, ROWS, type Row } from '../data/kana'
 import { KanaProgress } from '../components/KanaProgress'
-import { loadMastered } from '../lib/progress'
+import { Modal } from '../components/Celebrate'
+import { allMastered, loadMastered, setShootSeen, shootSeen } from '../lib/progress'
+import { getBestScore } from '../shooting/words'
+import { playChime } from '../lib/audio'
 import { formatTime, getBest } from './Challenge'
 
 interface Props {
@@ -15,11 +18,23 @@ interface Props {
   onLearn: () => void
   onChallenge: () => void
   onSettings: () => void
+  onShoot: () => void
 }
 
-export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess }: Props) {
+export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, onShoot }: Props) {
   const best = getBest(row.id)
   const [mastered] = useState(loadMastered)
+  const unlocked = allMastered(mastered)
+  // 95まい ぜんぶ よめたら、はじめての ときだけ お知らせを 出す
+  const [announce, setAnnounce] = useState(() => {
+    if (unlocked && !shootSeen()) {
+      setShootSeen()
+      window.setTimeout(playChime, 400)
+      return true
+    }
+    return false
+  })
+  const shootBest = Math.max(getBestScore('normal'), getBestScore('fast'))
   const [registering, setRegistering] = useState(false)
   // 先生用：よめ丸くんを 5回つづけて タップすると アセスメントモード
   const taps = useRef<number[]>([])
@@ -122,9 +137,42 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess }:
             }
             tone="bg-orange-400 shadow-[0_8px_0_#c2410c]"
           />
+          {/* おまけ（オプション）なので、ひかえめに */}
+          <div className="flex justify-center sm:col-span-2">
+            {unlocked ? (
+              <button type="button" onClick={onShoot} className="flex items-center gap-1.5 rounded-full border border-sky-200 bg-white px-4 py-1.5 text-sm text-sky-700">
+                <Rocket size={16} /> よめ丸シューティング{shootBest ? `（さいこう ${shootBest}てん）` : ''}
+              </button>
+            ) : (
+              <p className="flex items-center gap-1 text-xs text-stone-400">
+                <Lock size={13} /> ぜんぶの カードを おぼえられたら「よめ丸シューティング」が できるように なるよ。
+              </p>
+            )}
+          </div>
         </div>
       </main>
       {registering && <VoiceRegister onCancel={() => setRegistering(false)} onDone={() => setRegistering(false)} />}
+      <Modal open={announce}>
+        <Rocket size={72} className="text-sky-500" />
+        <p className="text-3xl font-bold text-stone-800">ぜんぶの カードが よめたね！</p>
+        <p className="text-xl text-stone-600">「よめ丸シューティング」が あらわれた！</p>
+        <Mascot size={100} mood="cheer" />
+        <div className="flex flex-wrap justify-center gap-3">
+          <button type="button" onClick={() => setAnnounce(false)} className="rounded-full border-2 border-amber-300 bg-white px-6 py-3 text-xl font-bold text-stone-700">
+            あとで
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAnnounce(false)
+              onShoot()
+            }}
+            className="rounded-full bg-sky-500 px-6 py-3 text-xl font-bold text-white shadow-[0_5px_0_#0369a1]"
+          >
+            あそぶ！
+          </button>
+        </div>
+      </Modal>
       <footer className="flex flex-col items-center gap-0.5 px-4 pb-[max(10px,env(safe-area-inset-bottom))] text-center text-xs text-stone-400">
         <span>
           © 2026 TOSS中丹教育サークル 大松幹生 /{' '}
@@ -133,7 +181,7 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess }:
           </a>
           （商用利用不可）
         </span>
-        <span>こえ：VOICEVOX:ずんだもん</span>
+        <span>こえ：VOICEVOX:ずんだもん／VOICEVOX:黒沢冴白</span>
       </footer>
     </div>
   )

@@ -94,6 +94,9 @@ export function utteranceAvg(probs: number[][]) {
   return avg
 }
 
+/** 周波数解析（母音）だけで 合格に するか。スペシャルモーラでは つかわない */
+const FORMANT_PASS = false
+
 export function utteranceMatches(target: Vowel, probs: number[][], minProb = UTT_MIN_PROB, minFrames = UTT_MIN_FRAMES): boolean {
   const n = probs.length
   if (n < minFrames || n > UTT_MAX_FRAMES) return false
@@ -562,8 +565,9 @@ export class HybridVoiceJudge {
         const nOk = this.target === 'ん' && lenOk && core.length >= 3 ? this.nMatches(core) : null
         if ((window as unknown as { __yomeDebug?: boolean }).__yomeDebug && this.voiceprint)
           console.log('UTT', this.target, u.feats.length, core.length, utteranceAvg(core.map((f) => personalProbs(f, this.voiceprint!))).map((v) => v.toFixed(2)).join(' '), nOk)
-        // ことばの カード（おかあさん・らっぱ など）は 母音だけでは わからないので、音声認識で 判定する
-        if (this.target && !isMulti(this.target) && lenOk && (nOk ?? utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', core.map((f) => this.probsOf(f)), thr, 3))) {
+        // スペシャルモーラの カードは ぜんぶ 子音や 小さい字が ある（が・きゃ・おかあさん など）。
+        // 周波数解析は 母音しか 聞けず「が」に「あ」で 合格してしまうので、合格は 音声認識だけで きめる（2026-11-23）
+        if (this.target && FORMANT_PASS && !isMulti(this.target) && lenOk && (nOk ?? utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', core.map((f) => this.probsOf(f)), thr, 3))) {
           this.onFrame?.({ bands, voiced, match: true, streak: STREAK_TO_PASS })
           this.pass('formant')
           return

@@ -9,6 +9,8 @@ type Pt = { x: number; y: number }
 interface Props {
   char: Kana
   resetSignal: number
+  /** なぞって 指を はなしたとき */
+  onComplete?: () => void
 }
 
 /**
@@ -16,7 +18,7 @@ interface Props {
  * 「きゃ」「おかあさん」のように 何文字も あるので、画数は かぞえず 自由に なぞる。
  * なぞり おわって 指を はなすと、よみを 読み上げる（つづけて なぞる ときは 1.2秒 あけて）。
  */
-export function TraceCanvas({ char, resetSignal }: Props) {
+export function TraceCanvas({ char, resetSignal, onComplete }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const guideRef = useRef<HTMLCanvasElement>(null)
   const inkRef = useRef<HTMLCanvasElement>(null)
@@ -126,6 +128,7 @@ export function TraceCanvas({ char, resetSignal }: Props) {
     strokes.current.push(cur.current)
     cur.current = null
     drawInk()
+    onComplete?.()
     const now = performance.now()
     if (now - lastSpeak.current > 1200) {
       lastSpeak.current = now
