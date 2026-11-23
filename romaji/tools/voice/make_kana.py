@@ -12,7 +12,7 @@
 - 息まじりの 成分（aperiodicity）は 0.4ばいに へらして、はっきりした 声に する
 - 声の高さは 46もじ おなじ 350Hz。出だしの「すべりあがり」は おさえ、おわり すこし さがる 言い切りの 形（こまかい ゆれは のこさない）
 - まえの 無音は 0.08びょう（みじかいと iPad などで 鳴りはじめが きれて 破裂音が きこえない）
-- ファイルは 24kHz モノラル 128kbps、ラウドネス -16.5 LUFS
+- ファイルは 24kHz モノラル 96kbps、ラウドネス -16.5 LUFS
 - しらべるとき：raw_candidates.py で VOICEVOX の もとの 音を raw/ に のこし、RAW_DIR=raw RAW_USE=1 で 加工だけ ためせる
 """
 import io, json, math, os, subprocess, sys, tempfile
@@ -189,7 +189,7 @@ def make(kana, out_mp3, debug=False):
     if pk > 0.89: out *= 0.89 / pk
     with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
         sf.write(f.name, out, SR); tmp = f.name
-    subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', tmp, '-ar', str(SR), '-ac', '1', '-b:a', '128k', out_mp3], check=True)
+    subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', tmp, '-ar', str(SR), '-ac', '1', '-b:a', '96k', out_mp3], check=True)
     if debug: sf.write(out_mp3.replace('.mp3', '.wav'), out, SR)
     os.unlink(tmp)
     return out

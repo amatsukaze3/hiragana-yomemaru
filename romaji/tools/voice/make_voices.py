@@ -11,7 +11,7 @@ VOICEVOX エンジン（http://127.0.0.1:50021）が うごいている状態で
 - セリフ … lines.json
     → pass5・clear10・reg_guide・retry_register・assess_* は src/assets/voice/
     → w_・s_・sh_・bt_・jm_ は src/assets/voice/shoot/
-すべて 24kHz・モノラル・128kbps（ざらつかないよう 96 から あげた）。ffmpeg・pyworld・pyloudnorm・soundfile が 必要です。
+すべて 24kHz・モノラル・96kbps。ffmpeg・pyworld・pyloudnorm・soundfile が 必要です。
 
 クレジット「VOICEVOX:小夜/SAYO」「VOICEVOX:黒沢冴白」の 表記が 必要です。
 ぜんぶ つくりなおすと src/data/voiceCredit.json も かきかえるので、ホーム画面と シューティングの メニューの 表記は 自動で かわります（terms.html の 下の 表記は 手で なおす）。
@@ -81,7 +81,7 @@ def to_mp3(x: np.ndarray, dst: str, lufs: float):
     with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
         sf.write(f.name, x, SR)
         tmp = f.name
-    subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', tmp, '-ar', str(SR), '-ac', '1', '-b:a', '128k', dst], check=True)
+    subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', tmp, '-ar', str(SR), '-ac', '1', '-b:a', '96k', dst], check=True)
     os.unlink(tmp)
 
 
@@ -99,16 +99,12 @@ KANA_P0 = float(os.environ.get('KANA_P0', '330'))
 # フローラちゃんの セリフ：すこし 高め（+0.03）・抑揚 1.2。ほめことばで 高さを +0.07・抑揚 1.55 に すると かすれたので、はやさだけ かえる
 MAIN_PITCH = 0.03
 MAIN_INTONATION = 1.2
-# 息まじりの 成分を この わりあいに へらして（WORLD で つくりなおす）、すんだ 声に する（4kHz より 高い ところは もっと へらす）
-LINE_AP_SCALE = 0.45
-LINE_AP_SCALE_HI = 0.3
-# ざらつき対策（2026-11-23）：声の 高さは ±20ms、声の 形（スペクトル）は ±10ms で ならして なめらかに
-F0_SMOOTH = 4
-SP_SMOOTH = 2
+# 息まじりの 成分を この わりあいに へらして（WORLD で つくりなおす）、すんだ 声に する
+LINE_AP_SCALE = 0.5
 
 
 def world_clean(x: np.ndarray) -> np.ndarray:
-    """かすれ・ざらつきを へらす：高さの とび（まわりの 中央値から 12% いじょう）を なおして なめらかにし、声の 形も ならし、息まじりを へらす"""
+    """かすれ・ガラガラを へらす：高さの とび（まわりの 中央値から 12% いじょう）を なおして すこし なめらかにし、息まじりを へらす"""
     import pyworld as pw
     f0, t = pw.harvest(x, SR, f0_floor=150, f0_ceil=700, frame_period=5.0)
     sp = pw.cheaptrick(x, f0, t, SR)
@@ -122,17 +118,10 @@ def world_clean(x: np.ndarray) -> np.ndarray:
             g[i] = np.exp(m)
     g2 = g.copy()
     for i in np.where(v)[0]:
-        w = g[max(0, i - F0_SMOOTH):i + F0_SMOOTH + 1]
+        w = g[max(0, i - 2):i + 3]
         g2[i] = w[w > 0].mean()
-    fr = np.linspace(0, SR / 2, ap.shape[1])
-    ap[v] = ap[v] * np.where(fr < 4000, LINE_AP_SCALE, LINE_AP_SCALE_HI)
-    # 声の ところだけ、まえ うしろの 声の フレームと 対数で 平均（子音や むおんとは まぜない）
-    L = np.log(sp)
-    L2 = L.copy()
-    for i in np.where(v)[0]:
-        a, b = max(0, i - SP_SMOOTH), min(len(f0), i + SP_SMOOTH + 1)
-        L2[i] = L[a:b][v[a:b]].mean(axis=0)
-    y = pw.synthesize(g2, np.exp(L2), ap, SR, 5.0)
+    ap[v] = ap[v] * LINE_AP_SCALE
+    y = pw.synthesize(g2, sp, ap, SR, 5.0)
     return y[:len(x)]
 
 
