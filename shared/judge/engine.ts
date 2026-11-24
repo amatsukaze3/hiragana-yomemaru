@@ -1162,6 +1162,7 @@ export class JudgeEngine {
     )
   }
 
+  private lastAsrLog = ''
   /** 音声認識の 1つの けっか（こうほ ぜんぶ）を みる */
   private onAsrResult(alts: string[], final: boolean) {
     const t = this.target
@@ -1170,7 +1171,12 @@ export class JudgeEngine {
     const hit = matchTargets(all, alts, this.config.script)
     const top = alts[0] ?? ''
     const heard = classify(t, top, this.config.script)
-    this.log.add({ type: 'asr', target: t, alts: alts.slice(0, 5), final, kind: hit ? `${hit.kind}${hit.kana !== t ? `:${hit.kana}` : ''}${hit.alt ? `#${hit.alt + 1}` : ''}` : heard.kind })
+    // おなじ とちゅうの けっかが なんども くる（パソコン）ので、かわった ときだけ きろくする
+    const sig = `${t}|${final}|${alts.slice(0, 5).join('／')}`
+    if (sig !== this.lastAsrLog || hit) {
+      this.lastAsrLog = sig
+      this.log.add({ type: 'asr', target: t, alts: alts.slice(0, 5), final, kind: hit ? `${hit.kind}${hit.kana !== t ? `:${hit.kana}` : ''}${hit.alt ? `#${hit.alt + 1}` : ''}` : heard.kind })
+    }
     if (hit) {
       this.pending = null
       this.pass('asr', hit.kana, hit.kind === 'variant' ? 'variant' : 'asr')
