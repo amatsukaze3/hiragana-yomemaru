@@ -75,6 +75,11 @@ function playMiss() {
   }
 }
 
+/** iPhone・iPad：マイクが もどるのを まって カードを とめる いちばん ながい 時間（もどらない ときは うごかす） */
+const MIC_WAIT_MAX_MS = 3000
+/** iPhone・iPad：わくが ひかって から この時間で 音声認識を とめて けっかを もらう（声の 知らせが こない とき） */
+const SHOOT_LISTEN_WINDOW_MS = 1100
+
 export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: SaveData | null; onHome: () => void; onZukan: () => void }) {
   const [phase, setPhaseState] = useState<Phase>('ready')
   const phaseRef = useRef<Phase>('ready')
@@ -178,6 +183,19 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
   )
   retry.bind(voice)
   const micOk = voice.status === 'listening'
+  // ゲームの ループから マイクの ようすを みる
+  const voiceRef = useRef(voice)
+  voiceRef.current = voice
+  /**
+   * iPhone・iPad：あてた あと ずんだもんが 文字を よむ あいだは 声が かすれない ように マイクを とめるので、
+   * あてて から 約1.3びょう きこえない。その あいだは カードを とめ、ねらう カードの わくを けす。
+   * きこえる ように なったら わくが ひかる ＝「よんで いいよ」の 合図（2026-11-24）
+   */
+  const [hearing, setHearing] = useState(true)
+  const hearingRef = useRef(true)
+  const micWaitSince = useRef(0)
+  // わくが ひかったら すぐ よむので、ききとり窓は みじかく（iPhone・iPad で 声の 知らせが こない とき）
+  useEffect(() => voice.setListenWindow(SHOOT_LISTEN_WINDOW_MS), [voice.setListenWindow])
 
   /* ---------- ことばと カード ---------- */
   const newWord = () => {
@@ -353,7 +371,19 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
       raf = requestAnimationFrame(loop)
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
-      if (phaseRef.current !== 'playing' || now < freezeUntil.current) return
+      // iPhone・iPad：マイクが きこえない すきまは カードを とめる（MIC_WAIT_MAX_MS で あきらめて うごかす）
+      const v = voiceRef.current
+      const gap = phaseRef.current === 'playing' && v.status === 'listening' && v.hasMicGaps() && !v.canHear()
+      let micWait = false
+      if (gap) {
+        if (!micWaitSince.current) micWaitSince.current = now
+        micWait = now - micWaitSince.current < MIC_WAIT_MAX_MS
+      } else micWaitSince.current = 0
+      if (hearingRef.current === gap) {
+        hearingRef.current = !gap
+        setHearing(!gap)
+      }
+      if (phaseRef.current !== 'playing' || now < freezeUntil.current || micWait) return
       elapsed.current += dt
       const sec = fallSecAt(mode, elapsed.current)
       if (elapsed.current >= nextSpawn.current) spawn(sec)
@@ -548,6 +578,8 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
         <div ref={area} className="absolute inset-x-0 top-0 bottom-0 overflow-hidden">
           {cardsView.map((c) => {
             const isTarget = c.id === targetId
+            // わくは マイクが きこえる ときだけ（iPhone・iPad の すきまでは うすい わくで「つぎは これ」）
+            const lit = isTarget && hearing
             return (
               <div
                 key={c.id}
@@ -565,13 +597,13 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
                   className={`relative flex h-full w-full items-center justify-center rounded-[22%] bg-white transition-[box-shadow,transform] duration-150 ${isTarget ? 'scale-110' : 'opacity-90'}`}
                   style={{
                     border: `5px solid ${colorOf(c.wordUid)}`,
-                    boxShadow: isTarget ? '0 0 0 5px #fff, 0 0 0 10px #f97316, 0 8px 18px rgba(249,115,22,.35)' : '0 5px 0 rgba(0,0,0,.08)',
+                    boxShadow: lit ? '0 0 0 5px #fff, 0 0 0 10px #f97316, 0 8px 18px rgba(249,115,22,.35)' : isTarget ? '0 0 0 5px #fff, 0 0 0 9px #e7e5e4' : '0 5px 0 rgba(0,0,0,.08)',
                   }}
                 >
                   <span className="font-card leading-none text-stone-900" style={{ fontSize: '0.62em' }}>
                     {c.kana}
                   </span>
-                  {isTarget && (
+                  {lit && (
                     <motion.span
                       className="pointer-events-none absolute -inset-4 rounded-full border-4 border-dashed border-orange-400"
                       animate={{ rotate: 360 }}

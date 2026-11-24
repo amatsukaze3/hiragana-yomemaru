@@ -53,8 +53,16 @@ export function useVoiceJudge(target: Kana | null, onPass: (src: PassSource) => 
   const stop = useCallback(() => engine.current!.stop(), [])
   const hold = useCallback((ms: number) => engine.current!.hold(ms), [])
 
+  /** iPhone・iPad：マイクが きこえない すきまが ある（シューティングは その あいだ カードを とめる） */
+  const hasMicGaps = useCallback(() => engine.current!.hasMicGaps(), [])
+  /** いま よめば きこえるか */
+  const canHear = useCallback(() => engine.current!.canHear(), [])
+  /** iPhone・iPad：声の 知らせが こない ときの ききとり窓（ミリびょう） */
+  const setListenWindow = useCallback((ms: number) => {
+    engine.current!.listenWindowMs = ms
+  }, [])
   const pause = useCallback(() => engine.current!.pause(), [])
   const resume = useCallback(() => engine.current!.resume(), [])
   const lastError = () => engine.current!.lastError
-  return { status, asr, start, stop, hold, frame, lastError, heard, capture, cancelCapture, refreshVoiceprint, pause, resume }
+  return { status, asr, start, stop, hold, frame, lastError, heard, capture, cancelCapture, refreshVoiceprint, pause, resume, hasMicGaps, canHear, setListenWindow }
 }
