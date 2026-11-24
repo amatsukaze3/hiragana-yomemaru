@@ -4,9 +4,8 @@ import { Confetti } from '../components/Celebrate'
 import { KANA_INFO, ROWS } from '../data/kana'
 import { GoalRoad } from './GoalRoad'
 import { Stamp } from './Stamp'
-import { sayWord } from './voices'
+import { MarkedWord, sayStampWord, stampLetter } from './MarkedWord'
 import { STAMP_TOTAL, loadGold, loadStamps } from './words'
-import { wordRomaji } from '../lib/romaji'
 
 /** スタンプずかん（46こ で コンプリート） */
 export function Zukan({ onHome }: { onHome: () => void }) {
@@ -49,12 +48,14 @@ export function Zukan({ onHome }: { onHome: () => void }) {
                   <li key={k}>
                     <button
                       type="button"
-                      onClick={() => owned && sayWord(k)}
+                      onClick={() => owned && sayStampWord(k)}
                       className="flex w-full flex-col items-center gap-1 rounded-2xl bg-white p-2 shadow-sm"
                       aria-label={owned ? KANA_INFO[k].word : 'まだ'}
                     >
+                      {/* スタンプの 上に その 文字を 赤く */}
+                      <span className={`font-roma text-xl font-bold leading-none ${owned ? 'text-red-500' : 'text-stone-300'}`}>{stampLetter(k)}</span>
                       <Stamp id={k} size={64} owned={owned} gold={gold.has(k)} />
-                      <span className={`font-roma text-lg leading-tight ${owned ? 'text-stone-800' : 'text-stone-300'}`}>{owned ? wordRomaji(KANA_INFO[k].word) : '？？？'}</span>
+                      <span className={`font-roma text-lg leading-tight ${owned ? 'text-stone-800' : 'text-stone-300'}`}>{owned ? <MarkedWord id={k} word={KANA_INFO[k].word} /> : '？？？'}</span>
                     </button>
                   </li>
                 )

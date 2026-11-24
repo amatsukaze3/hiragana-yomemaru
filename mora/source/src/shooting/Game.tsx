@@ -15,6 +15,7 @@ import { ActionButton } from '../screens/Learn'
 import { GoalRoad } from './GoalRoad'
 import { logCorrect, logError, onceper } from '../lib/errorLog'
 import { Stamp } from './Stamp'
+import { MarkedWord } from './MarkedWord'
 import { sayKana, sayLine, sayStamp } from './voices'
 import { STAMP_TOTAL, clearSave, loadGold, saveGold, type RoundStamp, fallSecAt, getBestScore, loadStamps, pickWord, saveStamps, setBestScore, speedLevel, wordOf, writeSave, type Mode, type SaveData, type WordTask } from './words'
 
@@ -704,7 +705,7 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
               <motion.div initial={{ scale: 2.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.15, duration: 0.25, ease: 'easeIn' }}>
                 <Stamp id={stampPop.task.id} size={150} tilt={-8} gold={stampPop.gold} />
               </motion.div>
-              <p className="font-card text-5xl text-stone-800">{stampPop.task.word}</p>
+              <p className="font-card text-5xl text-stone-800"><MarkedWord id={stampPop.task.id} word={stampPop.task.word} /></p>
             </motion.div>
           </motion.div>
         )}
