@@ -103,7 +103,7 @@ export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, o
                           on ? 'bg-orange-500 text-white shadow-[0_4px_0_#c2410c]' : 'border-2 border-amber-200 bg-white text-stone-700'
                         }`}
                       >
-                        {word ? <span className="text-base sm:text-lg">{GROUPS.find((g) => g.id === r.group)!.name}</span> : r.label}
+                        {word ? <span className="whitespace-nowrap text-base sm:text-lg">{r.name}</span> : r.label}
                       </motion.button>
                     </li>
                   )

@@ -55,7 +55,7 @@ const SOUND_ROWS: { id: string; name: string; label: string; group: Group; items
 /** ことばで よむ カード：[ことば, ローマ字] */
 const WORD_ROWS: { id: string; name: string; label: string; group: Group; items: [string, string][] }[] = [
   {
-    id: 'chou', name: '長音（のばす おと）', label: 'ー', group: 'chou',
+    id: 'chou', name: '長音（のばすおと）', label: 'ー', group: 'chou',
     items: [['おかあさん', 'okaasan'], ['おにいさん', 'oniisan'], ['ふうせん', 'fuusen'], ['おねえさん', 'oneesan'], ['こおり', 'koori'], ['おとうさん', 'otousan'], ['ぼうし', 'boushi'], ['とけい', 'tokei'], ['せんせい', 'sensei']],
   },
   {
@@ -74,7 +74,13 @@ const WORD_ROWS: { id: string; name: string; label: string; group: Group; items:
 
 export const ROWS: Row[] = [
   ...SOUND_ROWS.map((r) => ({ id: r.id, name: r.name, label: r.label, group: r.group, kana: r.items.map((i) => i[0]) })),
-  ...WORD_ROWS.map((r) => ({ id: r.id, name: r.name, label: r.label, group: r.group, kana: r.items.map((i) => i[0]) })),
+  // ことばの 行は 多いので 半分ずつ（長音（のばす おと）1・2 など）に わけて 練習する
+  ...WORD_ROWS.flatMap((r) => {
+    const half = Math.ceil(r.items.length / 2)
+    return [r.items.slice(0, half), r.items.slice(half)].map((items, i) => ({
+      id: `${r.id}${i + 1}`, name: `${r.name}${i + 1}`, label: r.label, group: r.group, kana: items.map((it) => it[0]),
+    }))
+  }),
 ]
 
 export const KANA: Kana[] = ROWS.flatMap((r) => r.kana)
