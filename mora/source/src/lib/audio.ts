@@ -10,11 +10,11 @@ const FILES = import.meta.glob('../assets/voice/*.mp3', { eager: true, import: '
 const byName: Record<string, string> = {}
 for (const [path, url] of Object.entries(FILES)) byName[path.split('/').pop()!.replace('.mp3', '')] = url
 const CLIPS: Record<string, string> = {}
-for (const n of Object.keys(byName)) if (n.startsWith('assess_') || ['pass5', 'clear10', 'reg_guide', 'retry_register'].includes(n)) CLIPS[n] = byName[n]
+for (const n of Object.keys(byName)) if (n.startsWith('assess_') || ['pass5', 'clear10', 'reg_guide', 'retry_register', 'nagaku'].includes(n)) CLIPS[n] = byName[n]
 for (const info of Object.values(KANA_INFO)) if (byName[info.romaji]) CLIPS[info.char] = byName[info.romaji]
 // こえの とうろく の おてほん（あ・い・う・え・お・ん）
 for (const [c, r] of [['あ', 'a'], ['い', 'i'], ['う', 'u'], ['え', 'e'], ['お', 'o'], ['ん', 'n']]) if (byName[r] && !CLIPS[c]) CLIPS[c] = byName[r]
-export type ClipName = 'pass5' | 'clear10' | 'reg_guide' | 'retry_register' | 'assess_name' | 'assess_start' | 'assess_r1' | 'assess_r2' | 'assess_r3' | 'assess_r4'
+export type ClipName = 'pass5' | 'clear10' | 'reg_guide' | 'retry_register' | 'nagaku' | 'assess_name' | 'assess_start' | 'assess_r1' | 'assess_r2' | 'assess_r3' | 'assess_r4'
 
 let ctx: AudioContext | null = null
 let unlocked = false
