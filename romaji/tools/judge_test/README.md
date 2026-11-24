@@ -1,38 +1,13 @@
-# 判定エンジンの テスト台（ローマ字フローラちゃん）
+# 判定エンジンの テスト台（ローマ字フローラちゃん → 5つの アプリ 共通に）
 
-「か」に「あ」と よんでも 合格してしまう 問題（母音しか みていなかった）を なおすときに つくった しくみ。
+2026-11-25 から 判定エンジンは `shared/judge/` に まとめ、テスト台も `shared/judge/test/` に うつしました（くわしくは `shared/judge/README.md`）。
 
-1. テスト音声：`judge-test-audio` ブランチに push すると Actions（`.github/workflows/judge-test-audio.yml`）が VOICEVOX の 14の声 × 45もじ × 2（ふつう・こどもに ちかづけた 声）を `audio/*.flac` に つくる（音声は その ブランチに だけ ある）
-2. `python3 conv.py audio f32` … 48kHz の float32 に する
-3. `node build.mjs run && node /tmp/judge_run.mjs` … voice.ts を そのまま うごかし（AnalyserNode を まねる）、
-   正しい よみの 合格率・母音だけの 不合格率・ちがう 子音の 不合格率 を だす（MODE=model,vp,noisy,asr ／ NOONSET=1 で 子音チェック なし）
-4. 子音の 学習モデル：`node build.mjs dump && node /tmp/judge_dump.mjs`（出だしの 特徴を onset_feats.json に）→
-   `python3 final.py 1.0 24 0.92 ../../source/src/lib/onsetModel.json`（声ごとに はずして ためした 数字を だしてから 保存）
+ここに のこって いる もの：
+- `make_test_audio.py` … VOICEVOX で テスト音声を つくる（`judge-test-audio` ブランチに push すると Actions で うごく）
+- `conv.py` … `python3 conv.py audio f32` で 48kHz の float32 に する
+- `final.py` … 出だしの 学習モデル（`shared/judge/onsetModel.json`）を つくる：
+  `node shared/judge/test/build.mjs dump && node /tmp/judge_dump.mjs`（出だしの 特徴を onset_feats.json に）→
+  `python3 final.py 1.0 24 0.92 ../../../shared/judge/onsetModel.json`
 
 2026-11-23 の 結果（のこりの 1つの 声で ためした 数字。正しい よみの 92% が とおる しきいち）：
 母音だけの よみが とおってしまう 割合　か・た行 42%、さ行 5%、は行 36%、な・ま行 22%、や行 9%、わ 40%、ら行 58%（前は ほぼ 100%）
-
-## iPhone・iPad（Apple の 音声認識だけ）の まね：`ios_mock.ts`
-`node build.mjs ios_mock && node /tmp/judge_ios_mock.mjs` … Apple の 音声認識を まねた もの（つづけて よむと まえの 文字と つなげて ことばに かきかえる：か＋き →「柿」）で、
-おぼえる ステップ5の ながれ（合格 → 0.7びょうで つぎの 文字）を うごかし、1かいめで 合格する わりあいを だす（START_MS：音声認識が きけるように なるまで、READ_AFTER：文字が でてから よむまで）。
-2026-11-24：合格の たびに 音声認識を あたらしく する まえ 89% → あと 100%
-
-## iPad の シューティングの まね：`shoot_ios/`
-本物の Chrome（playwright）で シューティングの 単体ページ（`old.html`・`new.html` を この フォルダに おく）を iPad の ふりで うごかし、
-Apple の 音声認識の まね（`mock.js`：start から START_MS で きけるように なる）と こども の まね（`child.js`）で、あてた すぐ あとの カードが 1かいめで 合格する わりあいを だす。
-2026-11-24（START_MS=400、はやい モード）：まえ 0〜12%（あてた あと 約1.3びょう マイクが とまって いて、その あいだに よむと きこえない）→ あと 82〜100%（マイクが もどるまで カードを とめ、もどったら わくを ひからせる）
-
-### 2026-11-24 午後：みじかい 1もじで Apple の 音声認識が だまる（「は」を 3かい よんで やっと「ははは」）
-まねを iPad の ようすに あわせた：とちゅうの けっかは PARTIAL_MIN（3）もじ たまるまで でない、とめると すぐ でる。
-声の 知らせ（soundstart・speechstart）は 1かいの 音声認識で さいしょの 音の 1かい だけ（EVENTS=1）／こない（EVENTS=0）。
-CHIME=1：合格の チャイムで 知らせを つかいきる。shoot_ios の NOISE=1：音声認識が はじまって すぐ まわりの 音で つかいきる（教室）。
-- ios_mock（おぼえる）の 1かいめ 合格：まえ EVENTS=0 0%（かならず 3かい）・EVENTS=1 CHIME=1 20% → あと 96〜98%（EVENTS=0 は よむのが はやい子 100%、おそい子 45〜51%）
-- shoot_ios（わくが ひかったら よむ子）：まえ 0%（3かい）→ あと 100%（EVENTS=0・EVENTS=1・NOISE=1）。わくに かまわず よむ子は NOISE=1 で きこえない ことが ある
-
-### 2026-11-24 夕方：iPad で 母音・ん を こえの とうろく で きく
-iPad で「n・a・i・u の ききとりが かなり わるい」（Apple の 音声認識は 母音・ん だけの みじかい 声を ききとりにくい）。
-こえの とうろく が あれば、母音（あいうえお・を）と ん（ん も とうろく して いる とき）の カードは 周波数解析で きき、子音の ある カードは 音声認識の まま（カードごとに きりかえる。スペシャルモーラと おなじ）。
-- `vt.ts`：母音・ん の カードを とうろく で 判定（acoustic）した ときの せいど。VOICEVOX（とうろく が とれなかった v10・v11n を のぞく）：
-  ただしい よみ あ〜お 94%（ん 59%）・ちがう 母音を 不合格 97%・子音つき（ka など）を 不合格 81%（出だしの 線を strict に した。loose だと 68%）
-- Rくんの 録音（とうろく も おなじ 録音から）：あ・い・え・お 合格（う は つづけて よんだ 録音から きったので い からの うつりが のこり 不合格）
-- `ios_switch.ts`：iPad の まね（getUserMedia・AudioContext も まね）で、ワ→ヲ→ン、あ行、まぜた じゅんばんで きりかえ：子音の カード 1かいめ 合格 80/80、母音・ん は きりかえて 約0.7びょうで きける

@@ -6,7 +6,7 @@ import { MicBadge } from './MicStatus'
 import { Mascot } from './Mascot'
 import { playChime, sayVoice, speak } from '../lib/audio'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
-import { VOWEL_ORDER } from '../lib/vowelClassifier'
+import { VOWEL_ORDER } from '../../../shared/judge/vowelClassifier.ts'
 import type { Kana } from '../data/kana'
 
 /** とうろくする音：あ・い・う・え・お と、聞きとりにくい「ん」 */

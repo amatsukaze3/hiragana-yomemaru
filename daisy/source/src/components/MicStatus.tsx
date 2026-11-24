@@ -11,13 +11,26 @@ const LABELS: Record<keyof FrameInfo['bands'], string> = {
   vHigh: 'い',
 }
 
-/** マイクの状態と、声の大きさの目安 */
-export function MicBadge({ status, frame, onRetry, error, heard }: { status: MicStatus; frame: React.RefObject<FrameInfo | null>; onRetry?: () => void; error?: string; heard?: string }) {
+/**
+ * マイクの状態と、声の大きさの目安。
+ * canHear：iPhone・iPad で マイクが いま きこえるか（音声認識の きりかえの すきまは false）。
+ * きこえない あいだは「ちょっと まってね」を だして、よむ タイミングが わかる ように する
+ */
+export function MicBadge({ status, frame, onRetry, error, heard, canHear }: { status: MicStatus; frame: React.RefObject<FrameInfo | null>; onRetry?: () => void; error?: string; heard?: string; canHear?: () => boolean }) {
   const [help, setHelp] = useState(false)
   const ring = useRef<HTMLSpanElement>(null)
+  const [ready, setReady] = useState(true)
+  const readyRef = useRef(true)
+  const canHearRef = useRef(canHear)
+  canHearRef.current = canHear
   useEffect(() => {
     let raf = 0
     const loop = () => {
+      const r = canHearRef.current ? canHearRef.current() : true
+      if (r !== readyRef.current) {
+        readyRef.current = r
+        setReady(r)
+      }
       const f = frame.current
       if (ring.current) {
         const v = f?.voiced ? 1 : 0
@@ -31,15 +44,16 @@ export function MicBadge({ status, frame, onRetry, error, heard }: { status: Mic
   }, [frame])
 
   const listening = status === 'listening'
+  const waiting = listening && !ready
   const text =
-    status === 'listening' ? 'Listening' : status === 'starting' ? 'Getting ready' : status === 'denied' ? 'Mic not allowed' : status === 'unsupported' ? 'No mic' : status === 'error' ? 'Mic not working' : 'Mic off'
+    waiting ? 'Wait a moment…' : status === 'listening' ? 'Listening' : status === 'starting' ? 'Getting ready' : status === 'denied' ? 'Mic not allowed' : status === 'unsupported' ? 'No mic' : status === 'error' ? 'Mic not working' : 'Mic off'
 
   return (
     <div className="flex items-center gap-3">
       <span className="relative flex h-14 w-14 items-center justify-center">
         <span ref={ring} className="absolute inset-0 rounded-full bg-pink-300 transition-transform duration-75" />
         <motion.span
-          className={`relative flex h-12 w-12 items-center justify-center rounded-full ${listening ? 'bg-pink-500 text-white' : 'bg-stone-200 text-stone-500'}`}
+          className={`relative flex h-12 w-12 items-center justify-center rounded-full ${listening && !waiting ? 'bg-pink-500 text-white' : listening ? 'bg-stone-300 text-white' : 'bg-stone-200 text-stone-500'}`}
         >
           {listening ? <Mic size={26} /> : <MicOff size={26} />}
         </motion.span>

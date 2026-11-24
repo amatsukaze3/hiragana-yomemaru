@@ -69,7 +69,7 @@ class MockRecog {
 }
 g.webkitSpeechRecognition = MockRecog
 
-import { HybridVoiceJudge } from '../../source/src/lib/voice'
+import { HybridVoiceJudge } from './engine_stub'
 const HIRA: Record<string, string> = { ア: 'あ', イ: 'い', ウ: 'う', エ: 'え', オ: 'お', カ: 'か', キ: 'き', ク: 'く', ケ: 'け', コ: 'こ', サ: 'さ', シ: 'し', ス: 'す', セ: 'せ', ソ: 'そ' }
 const rows = [['ア', 'イ', 'ウ', 'エ', 'オ'], ['カ', 'キ', 'ク', 'ケ', 'コ'], ['サ', 'シ', 'ス', 'セ', 'ソ']]
 function shuffle<T>(a: T[], seed: number) { const r = [...a]; let s = seed; for (let i = r.length - 1; i > 0; i--) { s = (s * 1103515245 + 12345) % 2 ** 31; const j = s % (i + 1); [r[i], r[j]] = [r[j], r[i]] } return r }
@@ -77,12 +77,15 @@ function shuffle<T>(a: T[], seed: number) { const r = [...a]; let s = seed; for 
 const READ_AFTER = Number(process.env.READ_AFTER ?? 900) // 文字が でてから よむまで（ミリびょう。この 0.5〜1.5ばいで ばらつく）
 let rs = 12345
 const rnd = () => ((rs = (rs * 1103515245 + 12345) % 2 ** 31) / 2 ** 31)
-let first = 0, total = 0, tries = 0
+let first = 0, total = 0, tries = 0, okN = 0
+const ttp: number[] = []
 for (let seed = 1; seed <= 20; seed++)
   for (const row of rows) {
     const j = new HybridVoiceJudge() as any
+    if (process.env.WIN) j.listenWindowMs = Number(process.env.WIN)
     let passed = false
-    j.onPass = () => { passed = true; if (process.env.TRACE) console.log(simT, 'PASS') }
+    let passAt = 0
+    j.onPass = () => { passed = true; passAt = simT; if (process.env.TRACE) console.log(simT, 'PASS') }
     void j.start()
     runUntil(simT + 1000)
     for (const k of shuffle(row, seed)) {
@@ -92,6 +95,7 @@ for (let seed = 1; seed <= 20; seed++)
       passed = false
       let n = 0
       let t0 = simT
+      const shownAt = simT
       while (!passed && n < 6) {
         // 1かいめは READ_AFTER の 0.5〜1.5ばい、よみなおしは 1.2〜2.0びょう あと
         runUntil(t0 + (n === 0 ? READ_AFTER * (0.5 + rnd()) : 0))
@@ -102,6 +106,7 @@ for (let seed = 1; seed <= 20; seed++)
       }
       total++; tries += n
       if (n === 1 && passed) first++
+      if (passed) { okN++; ttp.push(passAt - shownAt) }
       // 合格：チャイム・hold(900)、0.7びょうで つぎの 文字
       if (CHIME) setTimeout(() => [...MockRecog.all].reverse().find((r) => r.running)?.sound(), 150)
       j.hold(900)
@@ -109,4 +114,5 @@ for (let seed = 1; seed <= 20; seed++)
     }
     j.stop()
   }
-console.log(`1かいめで 合格 ${first}/${total} (${((100 * first) / total).toFixed(0)}%)  よんだ かいすう へいきん ${(tries / total).toFixed(2)}`)
+ttp.sort((a, b) => a - b)
+console.log(`1かいめで 合格 ${first}/${total} (${((100 * first) / total).toFixed(0)}%)  よんだ かいすう へいきん ${(tries / total).toFixed(2)}  合格 ${okN}/${total}  合格までの 時間 中央 ${ttp[ttp.length >> 1]}ms・9わり ${ttp[Math.floor(ttp.length * 0.9)]}ms`)

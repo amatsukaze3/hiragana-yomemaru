@@ -11,6 +11,7 @@ import { VoiceRegister } from './VoiceRegister'
 import { clearMastered, loadMastered } from '../lib/progress'
 import { clearTeacherPin, hasTeacherPin } from './TeacherHelp'
 import { cardRomaji, setRomajiStyle, useRomajiStyle, wordRomaji, type RomajiStyle } from '../lib/romaji'
+import { JudgeLogPanel } from './JudgeLogPanel'
 
 /** 先生の暗証番号を けす（わすれたとき）。子どもが 消さないよう、たし算に答えてもらう */
 function PinReset() {
@@ -287,6 +288,8 @@ export function SettingsPanel({ open, onClose, meter, setMeter }: { open: boolea
                 </div>
               </section>
             )}
+
+            <JudgeLogPanel />
 
             <label className="flex items-center gap-3 rounded-2xl border-2 border-amber-100 bg-white p-4 text-sm text-stone-700">
               <input id="meter" type="checkbox" checked={meter} onChange={(e) => setMeter(e.target.checked)} className="h-5 w-5 accent-blue-500" />

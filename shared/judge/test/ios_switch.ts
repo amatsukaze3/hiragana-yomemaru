@@ -47,7 +47,7 @@ class MockRecog {
   }
 }
 g.webkitSpeechRecognition = MockRecog
-import { HybridVoiceJudge } from '../../source/src/lib/voice'
+import { HybridVoiceJudge } from './engine_stub'
 const HIRA: Record<string, string> = { ア: 'あ', イ: 'い', ウ: 'う', エ: 'え', オ: 'お', カ: 'か', キ: 'き', ク: 'く', ケ: 'け', コ: 'こ', サ: 'さ', ワ: 'わ', ヲ: 'を', ン: 'ん', タ: 'た', ナ: 'な' }
 const VOW = new Set(['ア', 'イ', 'ウ', 'エ', 'オ', 'ヲ', 'ン'])
 let rs = 7

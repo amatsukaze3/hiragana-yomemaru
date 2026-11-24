@@ -1,6 +1,6 @@
 // 判定エンジン（voice.ts）を node で うごかす テスト台。AnalyserNode を まねる
-import { HybridVoiceJudge } from '../../source/src/lib/voice'
-import { meanShape } from '../../source/src/lib/vowelClassifier'
+import { HybridVoiceJudge } from './engine_stub'
+import { meanShape } from '../vowelClassifier'
 
 const SR = Number(process.env.SR ?? 48000) // SR=44100 で 44.1kHz の パソコンを まねる（音も 44.1kHz に して AUD で わたす）
 const N = 2048
@@ -102,7 +102,11 @@ class ReplayAnalyser {
   getByteFrequencyData(a: Uint8Array) { a.set(this.cur!.freq) }
 }
 
-export interface RunOpts { voiceprint?: number[][] | null; noiseDb?: number; asr?: boolean; gain?: number; seed?: number; acoustic?: boolean }
+export interface RunOpts {
+  voiceprint?: number[][] | null; noiseDb?: number; asr?: boolean; gain?: number; seed?: number; acoustic?: boolean
+  /** 音声認識の けっかを まねる：目標を きめて から この ミリびょう あとに asrAlts を とどける（パソコンの Google の おくれ） */
+  asrAt?: number; asrAlts?: string[]
+}
 
 function run(key: string, sig: Float32Array, opts: RunOpts, begin: (j: any) => void) {
   simT = 0; timers.length = 0
@@ -120,8 +124,10 @@ function run(key: string, sig: Float32Array, opts: RunOpts, begin: (j: any) => v
   j.micOpenAt = -1e9
   const frames = framesOf(key, sig, opts)
   const startAt = Math.floor(1600 / 23)
+  let beganAt = -1
   frames.forEach((f, i) => {
-    if (i === startAt) begin(j)
+    if (i === startAt) { begin(j); beganAt = simT }
+    if (opts.asrAlts && beganAt >= 0 && opts.asrAt !== undefined && simT >= beganAt + opts.asrAt && simT < beganAt + opts.asrAt + 23 && j.target) j.onAsrResult(opts.asrAlts, true)
     an.cur = f
     simT += 23
     j.tick()
