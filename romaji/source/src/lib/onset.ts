@@ -282,7 +282,8 @@ export function onsetScore(p: number[], want: OnsetClass) {
   const s = k === 0 ? p[0] / (p[0] + Math.max(...p.slice(1)) + 1e-9) : p[k] / (p[k] + p[0] + 1e-9)
   // loose：正しい よみの 97% が こえる（これ みまんは「ちがう なかま っぽい」）
   // fast：子音の 文字は 母音だけの よみが 2%、あ行は 子音の よみが 3% しか こえない（これ いじょうは「はっきり 正しい」）
-  return { score: s, loose: MODEL.thrLoose?.[k] ?? 0, fast: MODEL.thrFast?.[k] ?? 2 }
+  // strict：あ行を 周波数解析だけで 合格に する とき（iPad で こえの とうろく）の 線。子音つきの よみ（ka など）を 約8わり おとす
+  return { score: s, loose: MODEL.thrLoose?.[k] ?? 0, fast: MODEL.thrFast?.[k] ?? 2, strict: MODEL.thrStrict?.[k] ?? 0 }
 }
 
 /** 文字（ローマ字）の 子音の なかま。ん は しらべない（null） */

@@ -102,7 +102,7 @@ class ReplayAnalyser {
   getByteFrequencyData(a: Uint8Array) { a.set(this.cur!.freq) }
 }
 
-export interface RunOpts { voiceprint?: number[][] | null; noiseDb?: number; asr?: boolean; gain?: number; seed?: number }
+export interface RunOpts { voiceprint?: number[][] | null; noiseDb?: number; asr?: boolean; gain?: number; seed?: number; acoustic?: boolean }
 
 function run(key: string, sig: Float32Array, opts: RunOpts, begin: (j: any) => void) {
   simT = 0; timers.length = 0
@@ -115,6 +115,9 @@ function run(key: string, sig: Float32Array, opts: RunOpts, begin: (j: any) => v
   j.asrAlive = !!opts.asr
   j.setVoiceprint(opts.voiceprint ?? null)
   j.onsetCheck = !(globalThis as any).__noOnset
+  // iPhone・iPad で 母音・ん を こえの とうろく で きく とき（音声認識なし・出だしの しらべは きびしい 線）
+  j.acoustic = !!opts.acoustic
+  j.micOpenAt = -1e9
   const frames = framesOf(key, sig, opts)
   const startAt = Math.floor(1600 / 23)
   frames.forEach((f, i) => {
