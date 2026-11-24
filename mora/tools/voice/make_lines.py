@@ -1,6 +1,6 @@
 """
 スペシャルモーラの ずんだもんの セリフを つくる（Actions の mora-voice で うごかす）。
-lines.json の { "名前": "セリフ" } を VOICEVOX:ずんだもん（ノーマル）で よみあげて、
+lines.json の { "名前": "セリフ" }（あいだを あけない：空白は VOICEVOX が 間（ま）に する） を VOICEVOX:ずんだもん（ノーマル）で よみあげて、
 mora/source/src/assets/voice/<名前>.mp3 に 保存する（24kHz・モノラル・96kbps・-16 LUFS。ほかの セリフと おなじ）。
 """
 import json, os, subprocess, tempfile, urllib.parse, urllib.request
