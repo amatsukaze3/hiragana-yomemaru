@@ -475,6 +475,9 @@ export class HybridVoiceJudge {
     // かわりに、いまある結果より前のものは この問題では使わない
     this.asrSkip = Math.max(0, this.asrLastIdx)
     this.asrSkipText = this.asrLastText
+    // iPhone・iPad：まえの 問題で きいた ことばが のこって いたら（合格いがいで つぎへ すすんだ とき）、あたらしく する。
+    // のこった ままだと、Apple の 音声認識が つぎの 文字と つなげて ことばに かきかえて しまう（pass の せつめい）
+    if (k && this.asrOnly && this.asrLastText) this.restartAsr()
   }
 
   /** あ・い・う・え・お の確率（「ん」の登録は ここでは 使わない：ほかの文字の判定を じゃましないため） */
@@ -545,8 +548,12 @@ export class HybridVoiceJudge {
     this.passCount++
     this.target = null
     this.streak = 0
-    // パソコン：合格したら 音声認識を あたらしく しなおす（つぎの 文字の けっかが まえの 文字に つながって おそく ならない ように）
-    if (!this.asrOnly) this.restartAsr()
+    // 合格したら 音声認識を あたらしく しなおす（つぎの 文字の けっかが まえの 文字に つながらない ように）
+    //  - パソコン：つながると おそく なる
+    //  - iPhone・iPad（2026-11-24）：おなじ 音声認識の まま つぎの 文字を よむと、Apple の 音声認識が まえの 文字と
+    //    つなげて ことばに かきかえて しまう（か＋き →「柿」、す＋し →「寿司」）。すると 2もじめ いこうは 1かいめで とおらず、
+    //    いいなおすと（音声認識が あたらしく なって）とおる。合格の チャイムと つぎの 文字が でるまでの あいだに あたらしく する
+    this.restartAsr()
     this.onPass?.(source)
   }
 
