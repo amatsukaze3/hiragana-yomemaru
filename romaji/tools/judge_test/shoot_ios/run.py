@@ -6,7 +6,7 @@ from playwright.async_api import async_playwright
 async def one(p, html, eager, read_after, start_ms, secs):
     b = await p.chromium.launch(args=['--autoplay-policy=no-user-gesture-required'])
     ctx = await b.new_context(viewport={'width': 1024, 'height': 768})
-    await ctx.add_init_script(f"window.__NO_AUDIOSTART={os.environ.get('NOAS','0')};window.__START_MS={start_ms};window.__EAGER={1 if eager else 0};window.__READ_AFTER={read_after};")
+    await ctx.add_init_script(f"window.__NO_AUDIOSTART={os.environ.get('NOAS','0')};window.__EVENTS={os.environ.get('EVENTS','1')};window.__NOISE={os.environ.get('NOISE','0')};window.__PARTIAL_MIN={os.environ.get('PARTIAL_MIN','3')};window.__START_MS={start_ms};window.__EAGER={1 if eager else 0};window.__READ_AFTER={read_after};")
     await ctx.add_init_script(path=f'{HERE}/mock.js')
     pg = await ctx.new_page()
     pg.on('pageerror', lambda e: print('PAGEERROR', e))
@@ -23,7 +23,7 @@ async def one(p, html, eager, read_after, start_ms, secs):
     return f"{html:4} {'あてて ' + str(read_after) + 'ms で よむ' if eager else 'わくが ひかったら よむ'}  あてた すぐ あとの カード：1かいめ {f(a)}   ほか：{f(o)}  きこえなかった {st['unheard']}"
 async def main():
     async with async_playwright() as p:
-        jobs = [(h, e, ra) for h in os.environ.get('HTMLS','old,new').split(',') for (e, ra) in [(1, 300), (1, 600), (1, 1000), (0, 0)]]
+        jobs = [(h, e, ra) for h in os.environ.get('HTMLS','old,new').split(',') for (e, ra) in [(1, 400), (0, 0)]]
         res = await asyncio.gather(*[one(p, h, e, ra, int(sys.argv[1]) if len(sys.argv) > 1 else 300, int(os.environ.get('SECS', 60))) for h, e, ra in jobs])
         print('\n'.join(res))
 asyncio.run(main())

@@ -51,6 +51,17 @@ const ASR_WAIT_MS = 500
  * とめると、そこまでの 音の けっか（final）が すぐ かえってくる（とめないと 2〜3びょう かかる。iPad で 約3びょう）。とめたら すぐ また はじめる
  */
 const ASR_FORCE_AFTER_SOUND_MS = 900
+/**
+ * iPhone・iPad：みじかい 1もじ（「は」「か」）だと Apple の 音声認識は とちゅうの けっかを ださず、
+ * こどもが 3かい よんで やっと「ははは」が でていた（2026-11-24）。とめれば すぐ「は」が かえってくるので、とめる きっかけを ふやす：
+ *  - 声の 知らせ（soundstart・speechstart）は 1かいの 音声認識で 1かい だけ。目標が ない とき（合格の チャイム・つぎの 文字が でる まえ）に
+ *    きた 知らせで つかいきって いた → 目標が なくても ASR_FORCE_AFTER_SOUND_MS で あたらしく し、目標が きまった とき
+ *    知らせを つかいきって いたら あたらしく する
+ *  - ききとり窓：きこえる ように なって（目標が きまって）から この時間 けっかが こなければ とめる。
+ *    声の 知らせが いちども こない ブラウザ では みじかく（_NO_EVENTS）、くる ブラウザ では 知らせが こなかった ときの ための あんぜん
+ */
+const ASR_WINDOW_NO_EVENTS_MS = 1600
+const ASR_WINDOW_MS = 5000
 const ASR_DEBOUNCE_MS = 250
 // パソコン：とちゅうの けっかが 来て この時間 あたらしい けっかが なければ とめる（声が つづいて いる あいだは まつ。さいだい ASR_DEBOUNCE_MAX_WAIT_MS）
 const ASR_DEBOUNCE_PC_MS = 300
@@ -448,6 +459,7 @@ export class HybridVoiceJudge {
     this.running = false
     this.asrOnly = false
     this.asrDeaf()
+    window.clearTimeout(this.windowTimer)
     this.unsubVoice?.()
     this.unsubVoice = null
     this.mutedForVoice = false
@@ -485,7 +497,9 @@ export class HybridVoiceJudge {
     this.asrSkipText = this.asrLastText
     // iPhone・iPad：まえの 問題で きいた ことばが のこって いたら（合格いがいで つぎへ すすんだ とき）、あたらしく する。
     // のこった ままだと、Apple の 音声認識が つぎの 文字と つなげて ことばに かきかえて しまう（pass の せつめい）
-    if (k && this.asrOnly && this.asrLastText) this.restartAsr()
+    // 声の 知らせを もう つかって いた とき も（チャイムなどで。つぎに よむ 声で 知らせが こず、とめられなく なる）
+    if (k && this.asrOnly && (this.asrLastText || this.sessionSound)) this.restartAsr()
+    else this.armWindow()
   }
 
   /** あ・い・う・え・お の確率（「ん」の登録は ここでは 使わない：ほかの文字の判定を じゃましないため） */
@@ -555,6 +569,7 @@ export class HybridVoiceJudge {
     if (!this.target || this.paused) return
     this.passCount++
     this.target = null
+    window.clearTimeout(this.windowTimer)
     this.streak = 0
     // 合格したら 音声認識を あたらしく しなおす（つぎの 文字の けっかが まえの 文字に つながらない ように）
     //  - パソコン：つながると おそく なる
@@ -864,6 +879,7 @@ export class HybridVoiceJudge {
   private asrReadyTimer = 0
   /** start() を よんだ：知らせ（onstart）を まち、こなければ ASR_READY_FALLBACK_MS で きける ことに する */
   private asrStarting() {
+    this.sessionSound = false
     window.clearTimeout(this.asrReadyTimer)
     this.asrReadyTimer = window.setTimeout(() => this.asrReady(0), ASR_READY_FALLBACK_MS)
   }
@@ -875,10 +891,35 @@ export class HybridVoiceJudge {
     if (this.asrHearing && !exact) return
     this.asrHearing = true
     this.asrHearAt = performance.now() + margin
+    this.armWindow()
   }
   private asrDeaf() {
     window.clearTimeout(this.asrReadyTimer)
+    window.clearTimeout(this.windowTimer)
     this.asrHearing = false
+  }
+
+  /** ききとり窓（ASR_WINDOW_MS）：きこえる ように なった・目標が きまった ときに はじめる */
+  private windowTimer = 0
+  /**
+   * 声の 知らせが こない ブラウザの ききとり窓。シューティングは わくが ひかったら すぐ よむので みじかく
+   * （ながいと 合格が おそく なり、こどもが いいなおす）
+   */
+  listenWindowMs = ASR_WINDOW_NO_EVENTS_MS
+  /** この 音声認識で 声の 知らせ（soundstart・speechstart）を もう つかった（1かいの 音声認識で 1かい だけ くる） */
+  private sessionSound = false
+  /** 声の 知らせが いちどでも きた（この ブラウザは 知らせを だす） */
+  private sawSoundEvent = false
+  private armWindow() {
+    window.clearTimeout(this.windowTimer)
+    if (!this.asrOnly || !this.target || !this.asrHearing) return
+    const from = Math.max(this.asrHearAt, this.targetSetAt)
+    const w = this.sawSoundEvent ? ASR_WINDOW_MS : this.listenWindowMs
+    this.windowTimer = window.setTimeout(() => this.windowEnd(), Math.max(0, from + w - performance.now()))
+  }
+  private windowEnd() {
+    if (!this.asrOnly || !this.target || this.paused || this.mutedForVoice || this.asrFinalizing || !this.asrHearing) return
+    this.finalizeAsr()
   }
 
   /**
@@ -977,6 +1018,7 @@ export class HybridVoiceJudge {
         // とちゅうの けっかが 来て まだ 合格で なければ、すこし まって とめ、さいごの けっかを もらう
         if (t) {
           window.clearTimeout(this.debounceTimer)
+          window.clearTimeout(this.windowTimer)
           this.armDebounce(performance.now())
         }
         // 合格を まっているときに、ちがう 文字（「か」「あ」など）が きこえたら とりけす
@@ -1004,9 +1046,16 @@ export class HybridVoiceJudge {
     // iPhone・iPad（音声認識だけ）は 周波数解析が ないので、音声認識の「声の おわり」の 知らせで とめる。
     // 知らせが 来ない ときの ために、声が はじまって ASR_FORCE_AFTER_SOUND_MS たっても 合格して いなければ とめる
     const onVoiceStart = () => {
-      if (!this.asrOnly || !this.target) return
+      if (!this.asrOnly || this.recog !== r) return
+      if (!this.sawSoundEvent) {
+        this.sawSoundEvent = true
+        this.armWindow() // 知らせが くる ブラウザ：窓は あんぜんの ための ながい ほうに
+      }
+      if (this.sessionSound) return
+      this.sessionSound = true
       window.clearTimeout(this.forceTimer)
-      this.forceTimer = window.setTimeout(() => this.finalizeAsr(), ASR_FORCE_AFTER_SOUND_MS)
+      // 目標が なければ（チャイムなど）あたらしく する だけ（つぎの 声で また 知らせが くる ように）
+      this.forceTimer = window.setTimeout(() => (this.target ? this.finalizeAsr() : this.restartAsr()), ASR_FORCE_AFTER_SOUND_MS)
     }
     const onVoiceEnd = () => {
       if (this.asrOnly) this.finalizeAsr()
