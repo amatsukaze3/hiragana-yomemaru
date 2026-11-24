@@ -7,7 +7,7 @@ import { HybridVoiceJudge, type FrameInfo, type MicStatus, type PassSource } fro
  * 画面からハイブリッド判定エンジンを使うためのフック。
  * start() はボタンのタップから呼ぶ（iOS のマイク許可・自動再生対策）。
  */
-export function useVoiceJudge(target: Kana | null, onPass: (src: PassSource) => void, questionKey?: number, onMiss?: () => void) {
+export function useVoiceJudge(target: Kana | null, onPass: (src: PassSource) => void, questionKey?: number, onMiss?: (k?: Kana) => void) {
   const engine = useRef<HybridVoiceJudge | null>(null)
   const [status, setStatus] = useState<MicStatus>('idle')
   const [asr, setAsr] = useState(false)
@@ -28,7 +28,7 @@ export function useVoiceJudge(target: Kana | null, onPass: (src: PassSource) => 
       setAsr(a)
     }
     e.onHeard = (t) => setHeard(t)
-    e.onMiss = () => missRef.current?.()
+    e.onMiss = (k) => missRef.current?.(k)
     e.onFrame = (f) => {
       frame.current = f
     }

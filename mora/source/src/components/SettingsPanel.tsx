@@ -230,7 +230,7 @@ export function SettingsPanel({ open, onClose, meter, setMeter }: { open: boolea
               <section className="flex flex-col gap-2 rounded-2xl border-2 border-amber-100 bg-white p-4 text-sm text-stone-700">
                 <h3 className="text-base font-bold text-stone-800">こえの とうろく</h3>
                 <p className="leading-relaxed text-stone-500">
-                  つかう子の「あ・い・う・え・お・ん」を とうろくすると、その子の声に あわせて判定するので、よく合格するようになります。つかう子が かわったら、とうろくしなおしてください。
+                  つかう子の「あ・い・う・え・お・ん」を とうろくすると、iPad・iPhone では 1つの 音の カード（が・きゃ など）を その子の 声に あわせて 判定します（にごりも しらべます）。音声認識が みじかい 1音を ききとれない 子も 合格しやすく なります。つかう子が かわったら、とうろくしなおしてください。
                 </p>
                 <p className="text-stone-600">{print ? `とうろくずみ（${print.name ? `${print.name} さん・` : ''}${formatDate(print.date)}）` : 'まだ とうろくしていません'}</p>
                 <div className="flex flex-wrap gap-2">

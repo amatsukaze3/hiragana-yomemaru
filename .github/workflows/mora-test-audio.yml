@@ -1,0 +1,26 @@
+# スペシャルモーラの 判定テスト用の 音声（VOICEVOX）を つくる（一時的なブランチ mora-test-audio-gen に push したときだけ うごく）
+name: mora-test-audio
+on:
+  push:
+    branches: [mora-test-audio-gen]
+permissions:
+  contents: write
+jobs:
+  make:
+    runs-on: ubuntu-latest
+    services:
+      voicevox:
+        image: voicevox/voicevox_engine:cpu-latest
+        ports: ['50021:50021']
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install numpy soundfile
+      - name: wait for engine
+        run: for i in $(seq 60); do curl -sf http://127.0.0.1:50021/version && break; sleep 5; done
+      - run: python3 mora/tools/judge_test/make_test_audio.py
+      - name: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mora/tools/judge_test
+          git commit -m "スペシャルモーラ 判定テスト用の音声 [skip ci]" && git push origin HEAD:mora-test-audio-gen

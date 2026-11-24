@@ -10,6 +10,7 @@
 import { KANA_INFO, isMulti, type Kana, type Vowel } from '../data/kana'
 import { VOWEL_ORDER, meanShape, modelProbs, personalProbs, updateNoise, vowelFeature } from './vowelClassifier'
 import { getAudioContext, setMicActive } from './audio'
+import { isFricativeRomaji, soundsVoiceless, voicingInfo } from './voicing'
 
 export type PassSource = 'asr' | 'formant'
 export type MicStatus = 'idle' | 'starting' | 'listening' | 'denied' | 'unsupported' | 'error'
@@ -94,8 +95,22 @@ export function utteranceAvg(probs: number[][]) {
   return avg
 }
 
-/** 周波数解析（母音）だけで 合格に するか。スペシャルモーラでは つかわない */
-const FORMANT_PASS = false
+/**
+ * 周波数解析での 合格（スペシャルモーラ）
+ *  - iPhone・iPad で こえの とうろく が ある ときだけ、1つの 音の カード（が・ぱ・きゃ など）で つかう（ことばの カードは 音声認識）。
+ *    iPhone・iPad は 音声認識と マイクを とりあうので、とうろく が ある 1つの 音の カードは 音声認識の かわりに これで きく。
+ *    パソコン・Android（音声認識が いっしょに うごく）と、とうろく が ない ときは、これまでどおり 音声認識だけで 合格を きめる
+ *    （「が」に「あ」で 合格して しまうため：2026-11-23。にごりの 判定も ほかの 声では まだ たしかでない：voicing.ts）
+ *  - 濁音（が・ざ・だ・ば行、ぎゃ・じゃ・びゃ行）は、母音に くわえて 子音で 声帯が ふるえて いるか（voicing.ts）も みる。
+ *    「が」を「か」と 読んだら 合格に しない。「あ」だけ と「が」は 見わけられない
+ * 2026-11-24：iPad で 声の 高い 女の子が 1つの 音の カードで まったく 合格しなかった（音声認識が みじかい 1音を ききとれない）
+ */
+const VOICED_ROMAJI = /^(g|z|j|d|b)/
+export const isVoicedKana = (k: Kana) => VOICED_ROMAJI.test(KANA_INFO[k]?.romaji ?? '')
+/** 拗音（きゃ・しゅ など）：「い」の くちから うつるので 母音の みかたを かえる（singleVowelOk） */
+const isYouon = (k: Kana) => /[ゃゅょ]/.test(k)
+/** 1つの 音の カードの 発声の みじかさの 下限（約0.09びょう。こえの 高い 子の「が」は 0.12びょう ほど） */
+const SINGLE_MIN_FRAMES = 4
 
 export function utteranceMatches(target: Vowel, probs: number[][], minProb = UTT_MIN_PROB, minFrames = UTT_MIN_FRAMES): boolean {
   const n = probs.length
@@ -242,6 +257,23 @@ function stripPrefix(t: string, prefix: string) {
   return a.slice(n)
 }
 
+/**
+ * 前の 波形 prev から いまの 波形 cur までに 何サンプル すすんだか（cur[i] = prev[i + d] と なる d）。
+ * いくつも あう（無音など）ときは 時計から みた want に いちばん ちかい もの。みつからなければ -1（ローマ字フローラちゃんと おなじ）
+ */
+export function audioAdvance(prev: Float32Array, cur: Float32Array, want: number) {
+  const N = cur.length
+  const K = Math.min(48, N)
+  let best = -1
+  for (let d = 0; d <= N - K; d++) {
+    if (cur[0] !== prev[d]) continue
+    let i = 1
+    while (i < K && cur[i] === prev[d + i]) i++
+    if (i === K && (best < 0 || Math.abs(d - want) < Math.abs(best - want))) best = d
+  }
+  return best
+}
+
 export class HybridVoiceJudge {
   private target: Kana | null = null
   private stream: MediaStream | null = null
@@ -273,7 +305,15 @@ export class HybridVoiceJudge {
   private lockUntil = 0
   private targetSetAt = 0
   // ひとつの発声（声が出はじめてから止まるまで）のまとめ
-  private utt: { feats: number[][]; levels: number[]; silent: number; run: number; top: number } | null = null
+  private utt: { feats: number[][]; levels: number[]; silent: number; run: number; top: number; startSample: number } | null = null
+  // マイクの 生の 波形（直近 3びょう）。子音の にごりを しらべる のに つかう
+  private ring = new Float32Array(0)
+  private prevTime = new Float32Array(0)
+  private sampleCount = 0
+  private lastTickAt = 0
+  private gapAt = -1
+  /** さいごに しらべた 子音の にごり（テスト・保護者向けの 説明用） */
+  lastVoicing: { prom: number; unv: number; voiceless: boolean } | null = null
   /** 登録した その子の「あいうえお」の形（なければ学習モデルで判定） */
   private voiceprint: number[][] | null = null
   private captureCb: ((shape: number[] | null) => void) | null = null
@@ -298,7 +338,7 @@ export class HybridVoiceJudge {
     // iPhone/iPad：音声認識（Apple）と周波数解析が同じマイクを取りあうので、音声認識だけで判定する
     const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }
     // こえの とうろく があっても 音声認識で判定する（周波数解析は母音しか聞かず「さ」に「あ」で合格してしまうため。11月6日より前の判定にもどす：2026-11-23）
-    if (isIOS() && !this.forceAnalyser && !this.iosAsrFailed && (w.SpeechRecognition || w.webkitSpeechRecognition)) {
+    if (isIOS() && !this.forceAnalyser && !this.iosAsrFailed && !this.iosAcoustic(this.target) && (w.SpeechRecognition || w.webkitSpeechRecognition)) {
       this.asrOnly = true
       this.lastError = ''
       this.running = true
@@ -349,6 +389,30 @@ export class HybridVoiceJudge {
     return 'listening'
   }
 
+  /** iPhone・iPad で この カードを 周波数解析で 判定するか（こえの とうろく が あって、1つの 音の カード） */
+  private iosAcoustic(k: Kana | null) {
+    return (isIOS() || this.acousticAnywhere) && !!this.voiceprint && !!k && !isMulti(k)
+  }
+  /** テスト用：iPhone・iPad で なくても 周波数解析で 合格に する */
+  acousticAnywhere = false
+
+  /** iPhone・iPad：カードの しゅるいが かわったら 音声認識 ⇄ 周波数解析 を きりかえる */
+  private switching = false
+  private async switchMode() {
+    if (this.switching) return
+    this.switching = true
+    const onStatus = this.onStatus
+    this.onStatus = null // 画面の マイクの 表示は そのまま（いったん とめて すぐ つける）
+    try {
+      this.stop()
+      await this.start()
+    } finally {
+      this.onStatus = onStatus
+      this.switching = false
+      this.onStatus?.(this.running ? 'listening' : 'idle', this.asrAlive)
+    }
+  }
+
   stop() {
     this.running = false
     this.asrOnly = false
@@ -382,6 +446,9 @@ export class HybridVoiceJudge {
     // かわりに、いまある結果より前のものは この問題では使わない
     this.asrSkip = Math.max(0, this.asrLastIdx)
     this.asrSkipText = this.asrLastText
+    this.asrMissAt = 0
+    // iPhone・iPad：音声認識 と 周波数解析の どちらで きくかが かわる カードなら きりかえる
+    if (this.running && k && isIOS() && !this.forceAnalyser && !this.iosAsrFailed && this.iosAcoustic(k) === this.asrOnly) void this.switchMode()
   }
 
   /** あ・い・う・え・お の確率（「ん」の登録は ここでは 使わない：ほかの文字の判定を じゃましないため） */
@@ -442,8 +509,8 @@ export class HybridVoiceJudge {
   }
 
   private passCount = 0
-  /** 読んだのに合格しなかった発声ごとに よばれる */
-  onMiss?: () => void
+  /** 読んだのに合格しなかった発声ごとに よばれる（その ときの カード） */
+  onMiss?: (k: Kana) => void
 
   private pass(source: PassSource) {
     if (!this.target || this.paused) return
@@ -467,6 +534,7 @@ export class HybridVoiceJudge {
     if (!an) return
     an.getFloatTimeDomainData(this.time)
     an.getByteFrequencyData(this.freq)
+    this.appendSamples()
 
     let sq = 0
     for (let i = 0; i < this.time.length; i++) sq += this.time[i] * this.time[i]
@@ -517,7 +585,7 @@ export class HybridVoiceJudge {
 
     // 発声ごとに判定する（声が止まったところで、その発声全体を見て決める）
     if (listening && voiced && !inGap) {
-      if (!this.utt) this.utt = { feats: [], levels: [], silent: 0, run: 0, top: 0 }
+      if (!this.utt) this.utt = { feats: [], levels: [], silent: 0, run: 0, top: 0, startSample: this.sampleCount - this.time.length }
       const u = this.utt
       u.silent = 0
       if (feat) {
@@ -557,27 +625,25 @@ export class HybridVoiceJudge {
           }
           return
         }
-        // 登録があれば その子の声とくらべて 45%以上、なければ学習モデルで 50%以上
-        // （音声認識が動いているときの学習モデルは、より はっきりした 60%以上）
-        const thr = this.voiceprint ? 0.45 : this.asrAlive ? 0.6 : UTT_MIN_PROB
         // ながさは「いちばん大きい まとまり」で みる。ほかに おなじくらい 大きい音が ある（おしゃべり）なら 判定しない
         const lenOk = runLen >= UTT_MIN_FRAMES && runLen <= UTT_MAX_FRAMES && r.others === 0
         const nOk = this.target === 'ん' && lenOk && core.length >= 3 ? this.nMatches(core) : null
         if ((window as unknown as { __yomeDebug?: boolean }).__yomeDebug && this.voiceprint)
           console.log('UTT', this.target, u.feats.length, core.length, utteranceAvg(core.map((f) => personalProbs(f, this.voiceprint!))).map((v) => v.toFixed(2)).join(' '), nOk)
-        // スペシャルモーラの カードは ぜんぶ 子音や 小さい字が ある（が・きゃ・おかあさん など）。
-        // 周波数解析は 母音しか 聞けず「が」に「あ」で 合格してしまうので、合格は 音声認識だけで きめる（2026-11-23）
-        if (this.target && FORMANT_PASS && !isMulti(this.target) && lenOk && (nOk ?? utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', core.map((f) => this.probsOf(f)), thr, 3))) {
+        // 周波数解析での 合格（iPhone・iPad で こえの とうろく が ある とき、1つの 音の カードだけ。VOICED_ROMAJI の うえの せつめい）
+        const lenOkS = runLen >= SINGLE_MIN_FRAMES && runLen <= UTT_MAX_FRAMES && r.others === 0
+        const coreLv = runLevels.filter((v) => v >= top * RUN_CORE_RATIO)
+        if (this.target && this.iosAcoustic(this.target) && lenOkS && this.acousticMatches(this.target, core, coreLv, u.startSample)) {
           this.onFrame?.({ bands, voiced, match: true, streak: STREAK_TO_PASS })
           this.pass('formant')
           return
         }
         // 読んだのに 合格しなかった（音声認識が あとから 合格にすることもあるので 少し待ってから知らせる）
-        if (this.target && lenOk && !this.paused) {
+        if (this.target && (lenOk || (lenOkS && !isMulti(this.target))) && !this.paused) {
           const t = this.target
           const n = this.passCount
           window.setTimeout(() => {
-            if (this.target === t && this.passCount === n && !this.paused) this.onMiss?.()
+            if (this.target === t && this.passCount === n && !this.paused) this.onMiss?.(t)
           }, 1500)
         }
       }
@@ -586,6 +652,107 @@ export class HybridVoiceJudge {
     this.onFrame?.({ bands, voiced, match, streak: Math.min(this.streak, STREAK_TO_PASS) })
   }
 
+
+  /**
+   * 1つの 音の カードを 周波数解析で 合格に するか（iPhone・iPad で こえの とうろく が ある とき）。
+   *  ① 母音（singleVowelOk）
+   *  ② 濁音は 子音の にごり：「か・さ・た・は・ぱ」の ように 声帯が ふるえない 息や 強い 破裂が あれば 不合格
+   */
+  private acousticMatches(t: Kana, core: number[][], levels: number[], startSample: number) {
+    if (!this.singleVowelOk(t, core, levels)) return false
+    if (!isVoicedKana(t)) return true
+    const sr = this.analyser!.context.sampleRate
+    const from = startSample - Math.round(sr * 0.25)
+    // 音が ぬけた（tick が おくれた）ところは しらべられないので 合格に しない
+    if (this.gapAt >= from) return false
+    const v = voicingInfo(this.samples(from, this.sampleCount), sr)
+    const fric = isFricativeRomaji(KANA_INFO[t]?.romaji ?? '')
+    this.lastVoicing = v ? { prom: v.prom, unv: v.unv, voiceless: soundsVoiceless(v, fric) } : null
+    if ((window as unknown as { __yomeDebug?: boolean }).__yomeDebug) console.log('VOICING', t, JSON.stringify(this.lastVoicing))
+    return !!v && !this.lastVoicing!.voiceless
+  }
+
+  /**
+   * 1つの 音の カードの 母音。みじかい 1音（0.1〜0.2びょう）は、出だし（子音から 母音への うつりかわり）と
+   * おわり（声が よわまって「う」の ように なる）が 長さの わりに 多いので、
+   *  - 出だしの 1/3 は のぞき、のこりは 大きい フレームほど おもく（母音の まんなかを 重く）みる
+   *  - その子の「あいうえお」（とうろく）と 学習モデルの どちらかで 目標の 母音が いちばん 高く 35% いじょう なら よい
+   *    （とうろくは 別の日の ながい 母音なので ずれる ことが ある：声の 高い 子の「ぎ」は とうろくだと う、学習モデルだと い）
+   *  - 拗音（ゃ・ゅ・ょ）は「い」の くちから うつるので、あ が え に、う が い に よって きこえる。拗音の カードに
+   *    え段・い段 は ないので、え は あ に、い は う に たして みる
+   */
+  private singleVowelOk(t: Kana, core: number[][], levels: number[]) {
+    const k = VOWEL_ORDER.indexOf(KANA_INFO[t]?.vowel ?? 'あ')
+    const ok = (probOf: (f: number[]) => number[], name: string) => {
+      const avg = [0, 0, 0, 0, 0]
+      let wsum = 0
+      // 出だしの 1/3（子音から 母音への うつりかわり）は のぞく
+      const from = Math.floor(core.length * 0.34)
+      core.forEach((f, i) => {
+        if (i < from) return
+        const w = levels[i] ?? 1
+        const p = probOf(f)
+        for (let j = 0; j < 5; j++) avg[j] += w * p[j]
+        wsum += w
+      })
+      for (let j = 0; j < 5; j++) avg[j] /= Math.max(wsum, 1e-9)
+      if (isYouon(t)) {
+        avg[0] += avg[3]
+        avg[2] += avg[1]
+        avg[1] = avg[3] = 0
+      }
+      if ((window as unknown as { __yomeDebug?: boolean }).__yomeDebug) console.log('VOWEL', name, t, avg.map((v) => v.toFixed(2)).join(' '))
+      return avg.every((v, i) => i === k || v < avg[k]) && avg[k] >= 0.35
+    }
+    return ok((f) => personalProbs(f, this.voiceprint!.slice(0, 5)), 'とうろく') || ok(modelProbs, 'モデル')
+  }
+
+  /** AnalyserNode の 時間波形から、前の tick いこうの あたらしい 音だけを つなぐ（ローマ字フローラちゃんと おなじ） */
+  private appendSamples() {
+    const sr = this.analyser!.context.sampleRate
+    const N = this.time.length
+    if (this.ring.length !== Math.round(sr * 3) || this.prevTime.length !== N) {
+      this.ring = new Float32Array(Math.round(sr * 3))
+      this.prevTime = new Float32Array(N)
+      this.sampleCount = 0
+      this.lastTickAt = 0
+    }
+    const now = performance.now()
+    const want = this.lastTickAt ? Math.max(0, Math.round(((now - this.lastTickAt) * sr) / 1000)) : N
+    // 前の 波形と かさなる ところを さがして、ほんとうに すすんだ ぶんだけ つなぐ
+    // （音は 10〜20ms ずつ まとめて とどくので、時計から きめると 音が だぶったり ぬけたりして、子音の 形が こわれる）
+    let n = this.lastTickAt ? audioAdvance(this.prevTime, this.time, want) : N
+    if (n < 0) {
+      n = Math.min(N, want)
+      this.gapAt = this.sampleCount
+    }
+    this.lastTickAt = now
+    const L = this.ring.length
+    for (let i = N - n; i < N; i++) this.ring[this.sampleCount++ % L] = this.time[i]
+    this.prevTime.set(this.time)
+  }
+
+  /** ring から [a, b) の 音を とりだす */
+  private samples(a: number, b: number) {
+    const L = this.ring.length
+    a = Math.max(a, this.sampleCount - L, 0)
+    const out = new Float32Array(Math.max(0, b - a))
+    for (let i = a; i < b; i++) out[i - a] = this.ring[i % L]
+    return out
+  }
+
+  /** iPhone・iPad（音声認識だけ）：目標と ちがう ことばを きいたら、少し まって 合格しなければ「読んだのに 合格しない」と しらせる */
+  private asrMissAt = 0
+  private asrMiss() {
+    const t = this.target
+    const n = this.passCount
+    const now = performance.now()
+    if (!t || now - this.asrMissAt < 1500) return
+    this.asrMissAt = now
+    window.setTimeout(() => {
+      if (this.target === t && this.passCount === n && !this.paused) this.onMiss?.(t)
+    }, 1500)
+  }
 
   private startAsr() {
     const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor }
@@ -623,6 +790,8 @@ export class HybridVoiceJudge {
           }
         }
       }
+      // iPhone・iPad は 周波数解析が ないので、ここで「読んだのに 合格しない」を しらせる（こえの とうろく を すすめる ため）
+      if (this.asrOnly && latest?.[0] && fresh(last, latest[0].transcript).trim()) this.asrMiss()
     }
     r.onerror = (e) => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {

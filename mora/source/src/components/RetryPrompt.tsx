@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AudioLines, Play, Volume2 } from 'lucide-react'
 import { Mascot } from './Mascot'
 import { sayVoice } from '../lib/audio'
+import { isMulti, type Kana } from '../data/kana'
 import { VoiceRegister } from './VoiceRegister'
 
 /** 5回 読んでも 合格しないとき：声の登録を すすめる */
@@ -61,13 +62,38 @@ export function useRetryRegister(hooks?: { onPause?: () => void; onResume?: () =
   const h = useRef(hooks)
   h.current = hooks
 
-  const onMiss = () => {
+  // 1つの 音の カード（が・きゃ など）で 合格しなかったら「ながーく よんでね」（1かいめ・3かいめ）。
+  // みじかい 1音は 音声認識が ききとりにくく、母音も はっきり しない（2026-11-24）
+  const [hint, setHint] = useState(false)
+  const hintTimer = useRef(0)
+  const onMiss = (k?: Kana) => {
     misses.current += 1
     if (misses.current >= MISS_LIMIT && voice.current) {
       misses.current = 0
+      setHint(false)
       voice.current.pause()
       h.current?.onPause?.()
       setPrompt(true)
+      return
+    }
+    if (k && !isMulti(k) && (misses.current === 1 || misses.current === 3)) {
+      setHint(true)
+      window.clearTimeout(hintTimer.current)
+      hintTimer.current = window.setTimeout(() => setHint(false), 6000)
+      // ずんだもんが しゃべって いる あいだは 判定しない（ずんだもんの 声で 合格しない ように）
+      // （音が ならなかった ときも 6びょうで もどす）
+      // （行の テストの 時計も とめる）
+      voice.current?.pause()
+      h.current?.onPause?.()
+      let back = false
+      const resume = () => {
+        if (back) return
+        back = true
+        voice.current?.resume()
+        h.current?.onResume?.()
+      }
+      sayVoice('nagaku', resume)
+      window.setTimeout(resume, 6000)
     }
   }
   const back = () => {
@@ -79,6 +105,14 @@ export function useRetryRegister(hooks?: { onPause?: () => void; onResume?: () =
   }
   const element = (
     <>
+      {hint && !prompt && !reg && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-28 z-40 flex justify-center px-4">
+          <div className="flex items-center gap-3 rounded-full border-4 border-amber-200 bg-white/95 px-5 py-2 shadow-lg">
+            <Mascot size={44} />
+            <p className="text-xl font-bold text-stone-800">こえを ながーく のばして よんでね</p>
+          </div>
+        </div>
+      )}
       <RetryPrompt
         open={prompt}
         onRegister={() => {
@@ -98,7 +132,10 @@ export function useRetryRegister(hooks?: { onPause?: () => void; onResume?: () =
   return {
     bind: (v: VoiceCtl) => void (voice.current = v),
     onMiss,
-    reset: () => void (misses.current = 0),
+    reset: () => {
+      misses.current = 0
+      setHint(false)
+    },
     element,
     active: prompt || reg,
   }
