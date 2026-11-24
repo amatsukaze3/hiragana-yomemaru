@@ -9,7 +9,8 @@
  */
 import { KANA_INFO, type Kana, type Vowel } from '../data/kana'
 import { VOWEL_ORDER, meanShape, modelProbs, personalProbs, updateNoise, vowelFeature } from './vowelClassifier'
-import { getAudioContext, setMicActive } from './audio'
+import { getAudioContext, onFloraVoice, setMicActive } from './audio'
+import { ONSET_CLASSES, onsetClassOf, onsetFeatures, onsetProbs, onsetScore, type OnsetClass } from './onset'
 
 export type PassSource = 'asr' | 'formant'
 export type MicStatus = 'idle' | 'starting' | 'listening' | 'denied' | 'unsupported' | 'error'
@@ -43,6 +44,41 @@ const UTT_END_FRAMES = 7 // 約160ms 声が止まったら、ひとつの発声�
 const UTT_MIN_FRAMES = 5 // 約0.12秒より短い音は判定しない
 const UTT_MAX_FRAMES = 50 // 約1.15秒より長い発声（おしゃべり・文）は不合格
 const UTT_MIN_PROB = 0.5
+/** 母音と 子音で 合格したとき、音声認識の けっかを まつ じかん（ms） */
+const ASR_WAIT_MS = 500
+/**
+ * 音声認識の けっかを はやく だす：声が おわったら（または 声が はじまって この 時間が たったら）音声認識を いったん とめる。
+ * とめると、そこまでの 音の けっか（final）が すぐ かえってくる（とめないと 2〜3びょう かかる。iPad で 約3びょう）。とめたら すぐ また はじめる
+ */
+const ASR_FORCE_AFTER_SOUND_MS = 900
+/**
+ * iPhone・iPad：みじかい 1もじ（「は」「か」）だと Apple の 音声認識は とちゅうの けっかを ださず、
+ * こどもが 3かい よんで やっと「ははは」が でていた（2026-11-24）。とめれば すぐ「は」が かえってくるので、とめる きっかけを ふやす：
+ *  - 声の 知らせ（soundstart・speechstart）は 1かいの 音声認識で 1かい だけ。目標が ない とき（合格の チャイム・つぎの 文字が でる まえ）に
+ *    きた 知らせで つかいきって いた → 目標が なくても ASR_FORCE_AFTER_SOUND_MS で あたらしく し、目標が きまった とき
+ *    知らせを つかいきって いたら あたらしく する
+ *  - ききとり窓：きこえる ように なって（目標が きまって）から この時間 けっかが こなければ とめる。
+ *    声の 知らせが いちども こない ブラウザ では みじかく（_NO_EVENTS）、くる ブラウザ では 知らせが こなかった ときの ための あんぜん
+ */
+const ASR_WINDOW_NO_EVENTS_MS = 1600
+const ASR_WINDOW_MS = 5000
+const ASR_DEBOUNCE_MS = 250
+// パソコン：とちゅうの けっかが 来て この時間 あたらしい けっかが なければ とめる（声が つづいて いる あいだは まつ。さいだい ASR_DEBOUNCE_MAX_WAIT_MS）
+const ASR_DEBOUNCE_PC_MS = 300
+const ASR_DEBOUNCE_MAX_WAIT_MS = 1200
+// 音声認識が とまった まま うごいて いなければ、この時間で もう いちど はじめる
+const ASR_WATCHDOG_MS = 2500
+// iPhone・iPad：はなちゃんが しゃべる まえに マイク（音声認識）を とめて まつ 時間
+const VOICE_MUTE_WAIT_MS = 200
+// iPhone・iPad で 母音・ん の カードを こえの とうろく で きく とき：マイクを ひらいて から きける ことに する までの 時間
+// （出だしの しらべ（onset.ts）に 声の まえ 0.25びょうの 音が いるので）
+const ACOUSTIC_READY_MS = 350
+// iPhone・iPad：マイクの 音が とどきはじめた 知らせ（audiostart）から ほんとうに きこえる ように なるまでの よゆう
+const ASR_READY_MARGIN_MS = 100
+// audiostart が こない ときは、はじまった 知らせ（start）から この時間で きこえる ことに する
+const ASR_READY_AFTER_START_MS = 400
+// どちらの 知らせも こない ときは start() から この時間で きこえる ことに する
+const ASR_READY_FALLBACK_MS = 1000
 /** 発声の なかで、いちばん大きい声より これだけ（-26dB）小さい音は「すきま」とみなす */
 const UTT_GAP_RATIO = 0.05
 /** 「いちばん大きい まとまり」に いれる 大きさ（-12dB）と、その そとに あっては いけない 大きさ（-10dB） */
@@ -173,20 +209,63 @@ const HOMOPHONES: Record<string, string[]> = {
   ほ: ['帆', '歩', '穂', '保', '補', 'ho'],
   ま: ['間', '真', '魔', '馬', '麻', 'ma'],
   み: ['実', '身', '三', '見', '美', '未', '味', '巳', '3', 'me', 'mi'],
-  む: ['無', '六', '夢', '6', 'mu'],
+  む: ['無', '六', '夢', '務', '武', '鵡', '6', 'μ', 'moo', 'mu'],
   め: ['目', '芽', '女', '雌', 'me'],
   も: ['藻', '喪', '茂', 'mo'],
   や: ['矢', '屋', '夜', '八', '野', '哉', '8', 'ya'],
   ゆ: ['湯', '油', '由', 'u', 'you', 'yu'],
   よ: ['世', '夜', '四', '代', '余', '予', '与', 'yo'],
-  ら: ['等', '羅', '良', 'ra'],
-  り: ['利', '理', '里', '李', '梨', '吏', 'ri'],
-  る: ['留', '流', '瑠', 'ru'],
-  れ: ['礼', '例', '零', 're'],
-  ろ: ['炉', '路', '六', '呂', 'ro'],
+  ら: ['等', '羅', '良', '裸', '螺', '拉', 'la', 'rah', 'ra'],
+  り: ['利', '理', '里', '李', '梨', '吏', '離', '裏', '璃', '履', 'li', 'lee', 'ree', 'ri'],
+  る: ['留', '流', '瑠', 'lu', 'rue', 'ru'],
+  れ: ['礼', '例', '零', '霊', '令', '冷', '麗', '齢', 'le', 'ray', 'rei', 're'],
+  ろ: ['炉', '路', '六', '呂', '露', '櫓', '老', '労', '郎', '朗', '廊', '楼', '蝋', 'lo', 'low', 'row', 'law', 'roe', 'ro'],
   わ: ['輪', '和', '話', '環', 'は', 'wa'],
   を: ['お', '尾', '緒', '御', 'o', 'oh', 'wo'],
   ん: ['うん', 'ん', 'n', 'm'],
+}
+
+/**
+ * 前の 波形 prev から いまの 波形 cur までに 何サンプル すすんだか（cur[i] = prev[i + d] と なる d）。
+ * いくつも あう（無音など）ときは 時計から みた want に いちばん ちかい もの。みつからなければ -1
+ */
+export function audioAdvance(prev: Float32Array, cur: Float32Array, want: number) {
+  const N = cur.length
+  const K = Math.min(48, N)
+  let best = -1
+  for (let d = 0; d <= N - K; d++) {
+    if (cur[0] !== prev[d]) continue
+    let i = 1
+    while (i < K && cur[i] === prev[d + i]) i++
+    if (i === K && (best < 0 || Math.abs(d - want) < Math.abs(best - want))) best = d
+  }
+  return best
+}
+
+/**
+ * よわい 子音（ま行・な行・ら行）を、音声認識が その母音だけに ききまちがえた（「む」→「う」「ん」「うん」、「ら」→「あ」）。
+ * 出だしの 学習モデルが 子音を はっきり きいて いれば 合格に する ときに つかう
+ */
+function weakMisheard(target: Kana, heard: string, cls: OnsetClass) {
+  const v = KANA_INFO[target]?.vowel
+  if (!v || (cls !== 'N' && cls !== 'R')) return false
+  return [...heard].every((c) => c === v || c === 'ー' || (cls === 'N' && c === 'ん'))
+}
+
+/** ら行の はじきの 音は「だ」「で」「ど」に きこえやすい（こどもの「ら」は とくに） */
+const FLAP_AS_D: Record<string, string> = { ら: 'だ', れ: 'で', ろ: 'ど' }
+
+/** ら・れ・ろ を「だ・で・ど」と きいても 合格（子音は きこえて いるので、母音だけの よみでは ない） */
+export function flapMatches(kana: Kana, raw: string): boolean {
+  const d = FLAP_AS_D[toHiragana(kana)]
+  if (!d) return false
+  const whole = toHiragana(raw.normalize('NFKC').toLowerCase()).replace(/[\s、。．.,!！?？〜~ーっ「」]/g, '')
+  return oneMatches(d, whole)
+}
+
+/** みじかい かなの ことば（1もじを よんだ 音声認識の けっか：あ・ああ・か・かあ など） */
+function isShortKana(t: string) {
+  return /^[ぁ-ゖー]{1,3}$/.test(t)
 }
 
 function toHiragana(s: string) {
@@ -198,7 +277,7 @@ function oneMatches(h: string, t: string, r?: string): boolean {
   if (!t) return false
   if (t === h) return true
   if ([...t].every((c) => c === h)) return true // 「ああ」「あーあ」
-  if (t.length <= 3 && t.startsWith(h) && /^[ぁ-ゖ]+$/.test(t) && /^[あいうえおんー]*$/.test(t.slice(1))) return true // 「かあ」「かん」
+  if (t.length <= 3 && t.startsWith(h) && /^[ぁ-ゖ]+$/.test(t) && /^[あいうえおぁぃぅぇぉんー]*$/.test(t.slice(1))) return true // 「かあ」「かん」「むぅ」
   if (r && t === r) return true
   return (HOMOPHONES[h] ?? []).includes(t)
 }
@@ -232,6 +311,17 @@ interface SpeechRecognitionLike {
   onresult: ((e: { resultIndex: number; results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
   onend: (() => void) | null
   onerror: ((e: { error: string }) => void) | null
+  // 声の はじまり・おわり（Safari・Chrome。来ない ブラウザも ある）
+  onstart?: (() => void) | null
+  onaudiostart?: (() => void) | null
+  onsoundstart?: (() => void) | null
+  onspeechstart?: (() => void) | null
+  onspeechend?: (() => void) | null
+  onsoundend?: (() => void) | null
+}
+
+function isAndroid() {
+  return /Android/.test(navigator.userAgent)
 }
 
 function isIOS() {
@@ -281,7 +371,16 @@ export class HybridVoiceJudge {
   private lockUntil = 0
   private targetSetAt = 0
   // ひとつの発声（声が出はじめてから止まるまで）のまとめ
-  private utt: { feats: number[][]; levels: number[]; silent: number; run: number; top: number } | null = null
+  private utt: { feats: number[][]; levels: number[]; silent: number; run: number; top: number; startSample: number; startAt: number } | null = null
+  // 子音を しらべるための、ちょくぜん 約3びょうの 音（AnalyserNode の 時間波形を つないだもの）
+  private ring = new Float32Array(0)
+  private prevTime = new Float32Array(0)
+  private sampleCount = 0
+  private lastTickAt = 0
+  /** あ行で 合格に する まえに、音声認識が ちがう 文字を きいて いないか まつ（時間切れで 合格） */
+  private pending: { target: Kana; until: number } | null = null
+  /** さいごの 発声の 子音の なかまの 確率（テスト・ログ用） */
+  lastOnset: { probs: number[]; cls: string } | null = null
   /** 登録した その子の「あいうえお」の形（なければ学習モデルで判定） */
   private voiceprint: number[][] | null = null
   private captureCb: ((shape: number[] | null) => void) | null = null
@@ -303,15 +402,18 @@ export class HybridVoiceJudge {
     if (dw.__yomeDebug) dw.__judge = this
     this.paused = false
     if (this.running) return 'listening'
-    // iPhone/iPad：音声認識（Apple）と周波数解析が同じマイクを取りあうので、音声認識だけで判定する
+    // iPhone/iPad：音声認識（Apple）と周波数解析が同じマイクを取りあうので、音声認識だけで判定する。
+    // こえの とうろく が あっても 子音の ある 文字は 音声認識（周波数解析は 母音しか わからず「か」に「あ」で 合格して しまうため。2026-11-23）。
+    // 母音・ん の カードは、とうろく が あれば 周波数解析で きく（iosAcoustic。Apple の 音声認識は「あ」「う」「ん」だけの 声を ききとりにくい：2026-11-24）
     const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }
-    // こえの とうろく があっても 音声認識で判定する（周波数解析は母音しか聞かず「さ」に「あ」で合格してしまうため。11月6日より前の判定にもどす：2026-11-23）
-    if (isIOS() && !this.forceAnalyser && !this.iosAsrFailed && (w.SpeechRecognition || w.webkitSpeechRecognition)) {
+    if (isIOS() && !this.forceAnalyser && !this.iosAsrFailed && !this.iosAcoustic(this.target) && (w.SpeechRecognition || w.webkitSpeechRecognition)) {
       this.asrOnly = true
       this.lastError = ''
       this.running = true
       this.startAsr()
       if (this.asrAlive) {
+        this.unsubVoice?.()
+        this.unsubVoice = onFloraVoice((s) => this.floraVoice(s))
         this.onStatus?.('listening', true)
         return 'listening'
       }
@@ -325,6 +427,7 @@ export class HybridVoiceJudge {
     this.onStatus?.('starting', false)
     this.lastError = ''
     this.uttCount = 0
+    const acoustic = !this.forceAnalyser && this.iosAcoustic(this.target)
     setMicActive(true)
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
@@ -332,6 +435,11 @@ export class HybridVoiceJudge {
       })
     } catch (e) {
       setMicActive(false)
+      // iPhone・iPad：母音の カードで マイクが ひらけなかったら、こえの とうろく は つかわず 音声認識に もどす
+      if (acoustic) {
+        this.iosAcousticFailed = true
+        return this.start()
+      }
       const name = (e as { name?: string })?.name ?? 'Error'
       this.lastError = name
       const st: MicStatus = name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : name === 'NotFoundError' ? 'unsupported' : 'error'
@@ -350,6 +458,14 @@ export class HybridVoiceJudge {
     this.freq = new Uint8Array(this.analyser.frequencyBinCount)
     this.time = new Float32Array(this.analyser.fftSize)
     this.running = true
+    this.acoustic = acoustic
+    this.micOpenAt = performance.now()
+    this.lastTickAt = 0
+    this.gapAt = this.sampleCount
+    if (acoustic) {
+      this.unsubVoice?.()
+      this.unsubVoice = onFloraVoice((s) => this.floraVoice(s))
+    }
     this.timer = window.setInterval(() => this.tick(), FRAME_MS)
     // iPhone/iPad で周波数解析を使うときと、声の登録中は、音声認識を使わない
     if (!isIOS() && !this.forceAnalyser) this.startAsr()
@@ -360,6 +476,14 @@ export class HybridVoiceJudge {
   stop() {
     this.running = false
     this.asrOnly = false
+    this.acoustic = false
+    this.micMuted = false
+    this.asrDeaf()
+    window.clearTimeout(this.windowTimer)
+    this.unsubVoice?.()
+    this.unsubVoice = null
+    this.mutedForVoice = false
+    window.clearTimeout(this.unmuteTimer)
     if (this.timer) window.clearInterval(this.timer)
     this.timer = null
     try {
@@ -380,6 +504,7 @@ export class HybridVoiceJudge {
   /** 出題する文字を変える。前の声の残りで誤合格しないよう、少しの間ロックする */
   setTarget(k: Kana | null, lockMs = 300) {
     this.utt = null
+    this.pending = null
     this.target = k
     this.streak = 0
     this.armed = false
@@ -390,6 +515,16 @@ export class HybridVoiceJudge {
     // かわりに、いまある結果より前のものは この問題では使わない
     this.asrSkip = Math.max(0, this.asrLastIdx)
     this.asrSkipText = this.asrLastText
+    // iPhone・iPad：まえの 問題で きいた ことばが のこって いたら（合格いがいで つぎへ すすんだ とき）、あたらしく する。
+    // のこった ままだと、Apple の 音声認識が つぎの 文字と つなげて ことばに かきかえて しまう（pass の せつめい）
+    // iPhone・iPad：音声認識 と こえの とうろく（周波数解析）の どちらで きくかが かわる カードなら きりかえる
+    if (this.needSwitch(k)) {
+      void this.switchMode()
+      return
+    }
+    // 声の 知らせを もう つかって いた とき も（チャイムなどで。つぎに よむ 声で 知らせが こず、とめられなく なる）
+    if (k && this.asrOnly && (this.asrLastText || this.sessionSound)) this.restartAsr()
+    else this.armWindow()
   }
 
   /** あ・い・う・え・お の確率（「ん」の登録は ここでは 使わない：ほかの文字の判定を じゃましないため） */
@@ -409,6 +544,96 @@ export class HybridVoiceJudge {
   /** その子の「あいうえお」を使う（null で学習モデルにもどす） */
   setVoiceprint(C: number[][] | null) {
     this.voiceprint = C
+    // とうろく しなおした あと：きく しかたが かわる なら きりかえる
+    if (this.needSwitch(this.target)) void this.switchMode()
+  }
+
+  /**
+   * iPhone・iPad で この カードを こえの とうろく（周波数解析）で きくか：とうろく が あって、母音（あいうえお・を）の カード。
+   * ん は「ん」も とうろく して いる とき だけ（して いないと「う」と 見わけられない）。
+   * Apple の 音声認識は「あ」「い」「う」「ん」だけの みじかい 声を ききとれない ことが おおい（2026-11-24。こどもが なんども いいなおして いた）。
+   * 子音の ある 文字は これまでどおり 音声認識（「か」に「あ」で 合格させない）
+   */
+  private iosAcoustic(k: Kana | null) {
+    if (!(isIOS() || this.acousticAnywhere) || this.forceAnalyser || this.iosAcousticFailed || !this.voiceprint || !k) return false
+    if (k === 'ン') return this.voiceprint.length >= 6
+    return onsetClassOf(KANA_INFO[k]?.romaji ?? '') === 'V'
+  }
+  /** テスト用：iPhone・iPad で なくても iosAcoustic を つかう */
+  acousticAnywhere = false
+  /** マイクが ひらけなかった（もう こえの とうろく では きかない） */
+  private iosAcousticFailed = false
+  /** いま 母音・ん を こえの とうろく で きいて いる（iPhone・iPad） */
+  private acoustic = false
+  /** マイクを ひらいた 時刻 */
+  private micOpenAt = 0
+  /** はなちゃんが しゃべる あいだ マイクを とじて いる（こえの とうろく で きく とき） */
+  private micMuted = false
+
+  /** きく しかた（音声認識 ⇄ こえの とうろく）を かえる ひつようが あるか */
+  private needSwitch(k: Kana | null) {
+    return this.running && !this.switching && !!k && (this.asrOnly || this.acoustic) && this.iosAcoustic(k) !== this.acoustic
+  }
+
+  /** iPhone・iPad：カードの しゅるいが かわったら 音声認識 ⇄ 周波数解析 を きりかえる（スペシャルモーラと おなじ） */
+  private switching = false
+  private async switchMode() {
+    if (this.switching) return
+    this.switching = true
+    const onStatus = this.onStatus
+    const paused = this.paused
+    this.onStatus = null // 画面の マイクの 表示は そのまま（いったん とめて すぐ つける）
+    try {
+      this.stop()
+      await this.start()
+    } finally {
+      this.paused = paused
+      this.onStatus = onStatus
+      this.switching = false
+      this.onStatus?.(this.running ? 'listening' : 'idle', this.asrAlive)
+    }
+    // きりかえて いる あいだに カードが かわった
+    if (this.needSwitch(this.target)) void this.switchMode()
+    else if (this.asrOnly) this.armWindow()
+  }
+
+  /** こえの とうろく で きいて いる とき、はなちゃんが しゃべる あいだ マイクを とじる（声が 電話の ような 音に ならない ように） */
+  private closeMic() {
+    this.utt = null
+    this.source?.disconnect()
+    this.stream?.getTracks().forEach((t) => t.stop())
+    this.stream = null
+    this.source = null
+    this.analyser = null
+    setMicActive(false)
+  }
+  private async reopenMic() {
+    if (!this.running || !this.acoustic || this.stream) return
+    setMicActive(true)
+    try {
+      const st = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } })
+      if (!this.running || !this.acoustic || this.micMuted) {
+        st.getTracks().forEach((t) => t.stop())
+        return
+      }
+      const ctx = getAudioContext()
+      this.stream = st
+      this.source = ctx.createMediaStreamSource(st)
+      this.analyser = ctx.createAnalyser()
+      this.analyser.fftSize = 2048
+      this.analyser.smoothingTimeConstant = 0.3
+      this.analyser.minDecibels = -130
+      this.analyser.maxDecibels = 0
+      this.source.connect(this.analyser)
+      this.micOpenAt = performance.now()
+      this.lastTickAt = 0
+      this.gapAt = this.sampleCount
+    } catch {
+      // ひらけなかった：音声認識に もどす
+      setMicActive(false)
+      this.iosAcousticFailed = true
+      void this.switchMode()
+    }
   }
 
   /** 声の登録：次の1回の発声の形を受けとる（問題は出さない） */
@@ -433,6 +658,7 @@ export class HybridVoiceJudge {
   /** チャイムなどを鳴らしている間は判定しない */
   hold(ms: number) {
     this.utt = null
+    this.pending = null
     this.lockUntil = Math.max(this.lockUntil, performance.now() + ms)
     this.streak = 0
   }
@@ -442,6 +668,7 @@ export class HybridVoiceJudge {
   pause() {
     this.paused = true
     this.utt = null
+    this.pending = null
   }
   resume(lockMs = 400) {
     this.paused = false
@@ -457,7 +684,14 @@ export class HybridVoiceJudge {
     if (!this.target || this.paused) return
     this.passCount++
     this.target = null
+    window.clearTimeout(this.windowTimer)
     this.streak = 0
+    // 合格したら 音声認識を あたらしく しなおす（つぎの 文字の けっかが まえの 文字に つながらない ように）
+    //  - パソコン：つながると おそく なる
+    //  - iPhone・iPad（2026-11-24）：おなじ 音声認識の まま つぎの 文字を よむと、Apple の 音声認識が まえの 文字と
+    //    つなげて ことばに かきかえて しまう（か＋き →「柿」、す＋し →「寿司」）。すると 2もじめ いこうは 1かいめで とおらず、
+    //    いいなおすと（音声認識が あたらしく なって）とおる。合格の チャイムと つぎの 文字が でるまでの あいだに あたらしく する
+    this.restartAsr()
     this.onPass?.(source)
   }
 
@@ -475,6 +709,16 @@ export class HybridVoiceJudge {
     if (!an) return
     an.getFloatTimeDomainData(this.time)
     an.getByteFrequencyData(this.freq)
+    this.appendSamples()
+    // 音声認識が とまった ままなら もう いちど はじめる
+    if (this.recog && this.asrAlive && this.asrDownAt && performance.now() - this.asrDownAt > ASR_WATCHDOG_MS) {
+      this.asrDownAt = performance.now()
+      try {
+        this.recog.start()
+      } catch {
+        /* すでに うごいている */
+      }
+    }
 
     let sq = 0
     for (let i = 0; i < this.time.length; i++) sq += this.time[i] * this.time[i]
@@ -507,6 +751,11 @@ export class HybridVoiceJudge {
     }
 
     const now = performance.now()
+    if (this.pending && (this.pending.target !== this.target || this.paused)) this.pending = null
+    if (this.pending && now >= this.pending.until) {
+      this.pending = null
+      this.pass('formant')
+    }
     if (!this.armed) {
       // 前の声が途切れる（または一定時間たつ）まで待ってから判定を始める
       this.quietFrames = voiced ? 0 : this.quietFrames + 1
@@ -525,7 +774,7 @@ export class HybridVoiceJudge {
 
     // 発声ごとに判定する（声が止まったところで、その発声全体を見て決める）
     if (listening && voiced && !inGap) {
-      if (!this.utt) this.utt = { feats: [], levels: [], silent: 0, run: 0, top: 0 }
+      if (!this.utt) this.utt = { feats: [], levels: [], silent: 0, run: 0, top: 0, startSample: this.sampleCount - this.time.length, startAt: now }
       const u = this.utt
       u.silent = 0
       if (feat) {
@@ -573,12 +822,52 @@ export class HybridVoiceJudge {
         const nOk = this.target === 'ン' && lenOk && core.length >= 3 ? this.nMatches(core) : null
         if ((window as unknown as { __yomeDebug?: boolean }).__yomeDebug && this.voiceprint)
           console.log('UTT', this.target, u.feats.length, core.length, utteranceAvg(core.map((f) => personalProbs(f, this.voiceprint!))).map((v) => v.toFixed(2)).join(' '), nOk)
-        if (this.target && lenOk && (nOk ?? utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', core.map((f) => this.probsOf(f)), thr, 3))) {
-          this.onFrame?.({ bands, voiced, match: true, streak: STREAK_TO_PASS })
-          this.pass('formant')
-          return
+        const dump = (globalThis as unknown as { __onsetDump?: number[][] }).__onsetDump
+        if (dump && lenOk) {
+          const sr = this.analyser!.context.sampleRate
+          const o = onsetFeatures(this.samples(u.startSample - Math.round(sr * 0.25), this.sampleCount), sr)
+          if (o) dump.push([u.top, ...o.feat])
+        }
+        const vowelOk = !!this.target && lenOk && (nOk ?? utteranceMatches(KANA_INFO[this.target]?.vowel ?? 'あ', core.map((f) => this.probsOf(f)), thr, 3))
+        // はなちゃんの アプリの 判定：子音と 母音の 両方が あって はじめて 合格（母音だけの よみは 合格に しない）
+        //  - 音声認識が 目標の 文字を きいたら 合格（startAsr。子音も 母音も わかる）
+        //  - 周波数解析（ここ）は 母音しか わからないので、つぎの ときだけ 合格に する：
+        //    ・出だしの 学習モデル（onset.ts）で 目標の 子音が はっきり きこえた（母音だけの よみが こえるのは 2% いか）
+        //    ・あ行・を は、子音っぽく なく、音声認識が ちがう 文字を きいて いなければ 合格（0.7びょう まって たしかめる）
+        //    ・ん は これまでどおり
+        //  - この 発声で 音声認識が ちがう 文字（「あ」「さ」など）を きいていたら 不合格
+        if (vowelOk && this.target) {
+          const t = this.target
+          // この 発声で 音声認識が きいた ちがう 文字（なければ null）
+          const heard = this.asrAlive ? this.heardOtherText(t, u.startAt) : null
+          const cls = onsetClassOf(KANA_INFO[t]?.romaji ?? '')
+          let ok: 'now' | 'wait' | 'no'
+          if (!cls) ok = heard ? 'no' : 'now' // ん
+          else {
+            const o = this.onsetScoreOf(cls, u.startSample)
+            const fast = !!o && o.score >= o.fast
+            if (heard) {
+              // ま行・な行・ら行（m・n・r）は 音声認識が「う」「ん」「あ」と ききまちがえやすい。
+              // 出だしの 学習モデルが 子音を はっきり きいて いれば 合格（母音だけの よみが こえるのは 2% いか）
+              ok = fast && weakMisheard(t, heard, cls) ? 'now' : 'no'
+            } else if (fast) ok = 'now'
+            else if (cls === 'V' && (o ? o.score >= (this.asrAlive ? o.loose : o.strict) : !this.acoustic)) ok = this.asrAlive ? 'wait' : 'now'
+            else ok = 'no' // 子音の 文字は 音声認識が 合格に するのを まつ
+          }
+          if (ok !== 'no') {
+            this.onFrame?.({ bands, voiced, match: true, streak: STREAK_TO_PASS })
+            if (ok === 'wait') {
+              this.pending = { target: t, until: now + ASR_WAIT_MS }
+              // 音声認識の さいごの けっかを はやく もらって たしかめる
+              this.finalizeAsr()
+            } else this.pass('formant')
+            return
+          }
         }
         // 読んだのに 合格しなかった（音声認識が あとから 合格にすることもあるので 少し待ってから知らせる）
+        // 音声認識の けっかを はやく もらうため、ここで いったん とめる（パソコン：声の おわりは 周波数解析で わかる）
+        // ながすぎ・ほかの音が あった ときも とめる（とめないと 音声認識の おわりを 2〜4びょう まつ ことに なる）
+        if (this.target && runLen >= UTT_MIN_FRAMES && !this.paused) this.finalizeAsr()
         if (this.target && lenOk && !this.paused) {
           const t = this.target
           const n = this.passCount
@@ -592,6 +881,230 @@ export class HybridVoiceJudge {
     this.onFrame?.({ bands, voiced, match, streak: Math.min(this.streak, STREAK_TO_PASS) })
   }
 
+
+  /** AnalyserNode の 時間波形から、前の tick いこうの あたらしい 音だけを つなぐ */
+  private appendSamples() {
+    const sr = this.analyser!.context.sampleRate
+    const N = this.time.length
+    if (this.ring.length !== Math.round(sr * 3) || this.prevTime.length !== N) {
+      this.ring = new Float32Array(Math.round(sr * 3))
+      this.prevTime = new Float32Array(N)
+      this.sampleCount = 0
+      this.lastTickAt = 0
+    }
+    const now = performance.now()
+    const want = this.lastTickAt ? Math.max(0, Math.round(((now - this.lastTickAt) * sr) / 1000)) : N
+    // 前の 波形と かさなる ところを さがして、ほんとうに すすんだ ぶんだけ つなぐ。
+    // （音は 10〜20ms ずつ まとめて とどくので、時計から きめると 音が だぶったり ぬけたりして、子音の 形が こわれる）
+    let n = this.lastTickAt ? audioAdvance(this.prevTime, this.time, want) : N
+    if (n < 0) {
+      // かさなりが ない：tick が おくれて 音が ぬけた（その あたりの 出だしは しらべない）
+      n = Math.min(N, want)
+      this.gapAt = this.sampleCount
+    }
+    this.lastTickAt = now
+    const L = this.ring.length
+    for (let i = N - n; i < N; i++) this.ring[this.sampleCount++ % L] = this.time[i]
+    this.prevTime.set(this.time)
+  }
+
+  /** ring から [a, b) の 音を とりだす */
+  private samples(a: number, b: number) {
+    const L = this.ring.length
+    a = Math.max(a, this.sampleCount - L, 0)
+    const out = new Float32Array(Math.max(0, b - a))
+    for (let i = a; i < b; i++) out[i - a] = this.ring[i % L]
+    return out
+  }
+
+  /** 音声認識が さいごに きいた ことば（ひらがな）と その 時刻 */
+  private recentAsr: { text: string; at: number } | null = null
+
+  /** この 発声の あいだに、音声認識が 目標と ちがう 文字（みじかい かな）を きいていたか */
+  private heardOtherText(target: Kana, uttStartAt: number) {
+    const r = this.recentAsr
+    return r && r.at >= uttStartAt - 200 && isShortKana(r.text) && !this.asrMatches(target, r.text) ? r.text : null
+  }
+
+  /** 音声認識の けっかが 目標の 文字か（ら・れ・ろ は「だ・で・ど」も） */
+  private asrMatches(target: Kana, t: string) {
+    return transcriptMatches(target, t) || flapMatches(target, t)
+  }
+
+  /** 出だしの 学習モデル（onset.ts）の スコア。音が ぬけた・出だしが とれない ときは null */
+  private onsetScoreOf(want: OnsetClass, startSample: number) {
+    this.lastOnset = null
+    const sr = this.analyser!.context.sampleRate
+    const from = startSample - Math.round(sr * 0.25)
+    if (this.gapAt >= from) return null
+    const o = onsetFeatures(this.samples(from, this.sampleCount), sr)
+    if (!o) return null
+    const p = onsetProbs(o.feat)
+    this.lastOnset = { probs: p, cls: ONSET_CLASSES[p.indexOf(Math.max(...p))] }
+    return onsetScore(p, want)
+  }
+
+  /** さいごに 音が ぬけた ところ（サンプル） */
+  private gapAt = -1
+
+  /** 音声認識を いったん とめて、そこまでの けっかを すぐ もらう（とまったら onend で すぐ また はじめる） */
+  private asrFinalizing = false
+  /**
+   * iPhone・iPad：はなちゃんが しゃべる あいだは 音声認識（マイク）を とめる。
+   * マイクを つかって いる あいだの iPhone・iPad の 音は 電話のような 音質に なり、声が かすれて きこえるため。
+   * しゃべりはじめ：とめて、VOICE_MUTE_WAIT_MS まって もらう。しゃべりおわり：すぐ また はじめる
+   */
+  private unsubVoice: (() => void) | null = null
+  private mutedForVoice = false
+  private unmuteTimer = 0
+  private floraVoice(speaking: boolean): number {
+    if (this.acoustic && this.running) {
+      window.clearTimeout(this.unmuteTimer)
+      if (speaking) {
+        if (this.micMuted) return 0
+        this.micMuted = true
+        this.closeMic()
+        return VOICE_MUTE_WAIT_MS
+      }
+      this.unmuteTimer = window.setTimeout(() => {
+        this.micMuted = false
+        void this.reopenMic()
+      }, 0)
+      return 0
+    }
+    if (!this.asrOnly || !this.running || !this.recog) return 0
+    window.clearTimeout(this.unmuteTimer)
+    if (speaking) {
+      if (this.mutedForVoice) return 0
+      this.mutedForVoice = true
+      window.clearTimeout(this.forceTimer)
+      window.clearTimeout(this.debounceTimer)
+      this.asrDeaf()
+      try {
+        this.recog.abort()
+      } catch {
+        /* noop */
+      }
+      return VOICE_MUTE_WAIT_MS
+    }
+    this.unmuteTimer = window.setTimeout(() => {
+      this.mutedForVoice = false
+      if (!this.running || !this.recog) return
+      try {
+        this.recog.start()
+        this.asrStarting()
+      } catch {
+        /* まだ とまりきって いない：onend で はじめる */
+      }
+    }, 0)
+    return 0
+  }
+
+  /** 音声認識が とまった 時刻（うごいて いる ときは 0） */
+  private asrDownAt = 0
+  /** iPhone・iPad：音声認識が いま 声を きける（start の 知らせ から ASR_READY_MARGIN_MS あと） */
+  private asrHearing = false
+  private asrHearAt = 0
+  private asrReadyTimer = 0
+  /** start() を よんだ：知らせ（onstart）を まち、こなければ ASR_READY_FALLBACK_MS で きける ことに する */
+  private asrStarting() {
+    this.sessionSound = false
+    window.clearTimeout(this.asrReadyTimer)
+    this.asrReadyTimer = window.setTimeout(() => this.asrReady(0), ASR_READY_FALLBACK_MS)
+  }
+  /** audiostart が くる ブラウザか（いちど きたら、start では きこえる ことに しない） */
+  private sawAudioStart = false
+  /** exact：audiostart（マイクの 音が とどいた）。それいがい（start・じかんぎれ）は まだ きめて いない ときだけ */
+  private asrReady(margin: number, exact = false) {
+    window.clearTimeout(this.asrReadyTimer)
+    if (this.asrHearing && !exact) return
+    this.asrHearing = true
+    this.asrHearAt = performance.now() + margin
+    this.armWindow()
+  }
+  private asrDeaf() {
+    window.clearTimeout(this.asrReadyTimer)
+    window.clearTimeout(this.windowTimer)
+    this.asrHearing = false
+  }
+
+  /** ききとり窓（ASR_WINDOW_MS）：きこえる ように なった・目標が きまった ときに はじめる */
+  private windowTimer = 0
+  /**
+   * 声の 知らせが こない ブラウザの ききとり窓。シューティングは わくが ひかったら すぐ よむので みじかく
+   * （ながいと 合格が おそく なり、こどもが いいなおす）
+   */
+  listenWindowMs = ASR_WINDOW_NO_EVENTS_MS
+  /** この 音声認識で 声の 知らせ（soundstart・speechstart）を もう つかった（1かいの 音声認識で 1かい だけ くる） */
+  private sessionSound = false
+  /** 声の 知らせが いちどでも きた（この ブラウザは 知らせを だす） */
+  private sawSoundEvent = false
+  private armWindow() {
+    window.clearTimeout(this.windowTimer)
+    if (!this.asrOnly || !this.target || !this.asrHearing) return
+    const from = Math.max(this.asrHearAt, this.targetSetAt)
+    const w = this.sawSoundEvent ? ASR_WINDOW_MS : this.listenWindowMs
+    this.windowTimer = window.setTimeout(() => this.windowEnd(), Math.max(0, from + w - performance.now()))
+  }
+  private windowEnd() {
+    if (!this.asrOnly || !this.target || this.paused || this.mutedForVoice || this.asrFinalizing || !this.asrHearing) return
+    this.finalizeAsr()
+  }
+
+  /**
+   * iPhone・iPad（Apple の 音声認識だけ）は、合格・はなちゃんの 声の たびに マイク（音声認識）を とめて また はじめるので、
+   * きこえない すきま（あてて から 約1.3びょう）が ある。シューティングは その あいだ カードを とめ、きこえる ように なったら
+   * ねらう カードに わくを つけて「よんで いいよ」の 合図に する（canHear）
+   */
+  hasMicGaps() {
+    return this.switching || ((this.asrOnly || this.acoustic) && this.running)
+  }
+  /** いま よめば きこえるか（パソコン・Android は いつも true） */
+  canHear() {
+    const now = performance.now()
+    if (this.switching) return false
+    // こえの とうろく で きく とき：マイクが ひらいて、出だしを しらべられる だけ たって、判定を はじめて いる
+    if (this.acoustic) return this.running && !this.paused && !this.micMuted && !!this.analyser && now >= this.micOpenAt + ACOUSTIC_READY_MS && now >= this.lockUntil && this.armed
+    if (!this.asrOnly) return true
+    // ロック（setTarget・hold）は みない：ロックは けっかが とどいた 時刻で みるので、わくが ひかって すぐ よんでも けっかは ロックの あと に とどく
+    return this.running && !this.paused && this.asrHearing && !this.mutedForVoice && !this.asrFinalizing && now >= this.asrHearAt
+  }
+  private forceTimer = 0
+  private debounceTimer = 0
+  private finalizeAt = 0
+  private finalizeAsr() {
+    if (!this.target || this.paused) return
+    this.restartAsr()
+  }
+
+  /** 音声認識を とめて すぐ また はじめる（Android は はじめる たびに 音が なるので しない） */
+  private restartAsr() {
+    // とめたのに 2びょう たっても おわりの 知らせ（onend）が 来ない ときは、もう いちど とめられる ように する
+    if (this.asrFinalizing && performance.now() - this.finalizeAt > 2000) this.asrFinalizing = false
+    if (!this.recog || this.asrFinalizing || this.mutedForVoice || isAndroid()) return
+    window.clearTimeout(this.forceTimer)
+    window.clearTimeout(this.debounceTimer)
+    this.asrFinalizing = true
+    this.finalizeAt = performance.now()
+    this.asrDeaf()
+    try {
+      this.recog.stop()
+    } catch {
+      this.asrFinalizing = false
+    }
+  }
+
+  /** とちゅうの けっかの あと すこし まって とめる（パソコンは 声が つづいて いる あいだ まつ） */
+  private armDebounce(since: number) {
+    window.clearTimeout(this.debounceTimer)
+    this.debounceTimer = window.setTimeout(
+      () => {
+        if (!this.asrOnly && this.utt && performance.now() - since < ASR_DEBOUNCE_MAX_WAIT_MS) this.armDebounce(since)
+        else this.finalizeAsr()
+      },
+      this.asrOnly ? ASR_DEBOUNCE_MS : ASR_DEBOUNCE_PC_MS,
+    )
+  }
 
   private startAsr() {
     const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor }
@@ -623,10 +1136,27 @@ export class HybridVoiceJudge {
         const alts = e.results[i]
         for (let j = 0; j < alts.length; j++) {
           const t = fresh(i, alts[j].transcript)
-          if (this.target && t && transcriptMatches(this.target, t)) {
+          if (this.target && t && this.asrMatches(this.target, t)) {
+            this.pending = null
             this.pass('asr')
             return
           }
+        }
+      }
+      // さいごに きこえた ことば（周波数解析の 判定で、ちがう 文字を きいていないか みる）
+      if (latest?.[0]) {
+        const t = toHiragana(fresh(last, latest[0].transcript).normalize('NFKC')).replace(/[\s、。．.,!！?？〜~ー「」]/g, '')
+        if (t) this.recentAsr = { text: t, at: performance.now() }
+        // とちゅうの けっかが 来て まだ 合格で なければ、すこし まって とめ、さいごの けっかを もらう
+        if (t) {
+          window.clearTimeout(this.debounceTimer)
+          window.clearTimeout(this.windowTimer)
+          this.armDebounce(performance.now())
+        }
+        // 合格を まっているときに、ちがう 文字（「か」「あ」など）が きこえたら とりけす
+        if (this.pending && isShortKana(t) && !this.asrMatches(this.pending.target, t)) {
+          this.pending = null
+          this.onMiss?.()
         }
       }
     }
@@ -645,25 +1175,66 @@ export class HybridVoiceJudge {
         this.onStatus?.('listening', false)
       }
     }
+    // iPhone・iPad（音声認識だけ）は 周波数解析が ないので、音声認識の「声の おわり」の 知らせで とめる。
+    // 知らせが 来ない ときの ために、声が はじまって ASR_FORCE_AFTER_SOUND_MS たっても 合格して いなければ とめる
+    const onVoiceStart = () => {
+      if (!this.asrOnly || this.recog !== r) return
+      if (!this.sawSoundEvent) {
+        this.sawSoundEvent = true
+        this.armWindow() // 知らせが くる ブラウザ：窓は あんぜんの ための ながい ほうに
+      }
+      if (this.sessionSound) return
+      this.sessionSound = true
+      window.clearTimeout(this.forceTimer)
+      // 目標が なければ（チャイムなど）あたらしく する だけ（つぎの 声で また 知らせが くる ように）
+      this.forceTimer = window.setTimeout(() => (this.target ? this.finalizeAsr() : this.restartAsr()), ASR_FORCE_AFTER_SOUND_MS)
+    }
+    const onVoiceEnd = () => {
+      if (this.asrOnly) this.finalizeAsr()
+    }
+    r.onsoundstart = onVoiceStart
+    r.onspeechstart = onVoiceStart
+    r.onspeechend = onVoiceEnd
+    r.onsoundend = onVoiceEnd
+    r.onstart = () => {
+      this.asrDownAt = 0
+      if (this.recog === r && !this.sawAudioStart) this.asrReady(ASR_READY_AFTER_START_MS)
+    }
+    // マイクの 音が とどきはじめた（これが いちばん たしか）
+    r.onaudiostart = () => {
+      this.sawAudioStart = true
+      if (this.recog === r) this.asrReady(ASR_READY_MARGIN_MS, true)
+    }
     r.onend = () => {
+      if (this.recog !== r) return // とめた あとの ふるい 音声認識
+      this.asrDownAt = performance.now()
+      this.asrDeaf()
       this.asrSkip = 0
       this.asrLastIdx = -1
       this.asrLastText = ''
       this.asrSkipText = ''
-      if (this.running && !fatal) {
-        window.setTimeout(() => {
-          try {
-            if (this.running) r.start()
-          } catch {
-            /* すでに動いている */
-          }
-        }, 120)
+      window.clearTimeout(this.forceTimer)
+      window.clearTimeout(this.debounceTimer)
+      // じぶんで とめた ときは すぐ また はじめる（つぎの 声を ききのがさない ように）
+      const quick = this.asrFinalizing
+      this.asrFinalizing = false
+      // はじめられなかった ときは すこし まって なんどか やりなおす（音声認識が とまった ままに ならない ように）
+      const restart = (tries: number) => {
+        if (!this.running || fatal || this.recog !== r || this.mutedForVoice) return
+        try {
+          r.start()
+          this.asrStarting()
+        } catch {
+          if (tries < 8) window.setTimeout(() => restart(tries + 1), 150)
+        }
       }
+      if (this.running && !fatal) window.setTimeout(() => restart(0), quick ? 0 : 120)
     }
     try {
       r.start()
       this.recog = r
       this.asrAlive = true
+      this.asrStarting()
     } catch {
       this.asrAlive = false
     }

@@ -28,12 +28,13 @@ export function getAudioContext(): AudioContext {
 }
 
 let limiter: DynamicsCompressorNode | null = null
+let sfxBus: GainNode | null = null
 
 /**
  * すべての音の 出口。音が かさなっても 音われ（クリップ）しないよう、
  * スピーカーの てまえに リミッター（つよい コンプレッサー）を はさむ。
  */
-export function getOutput(): AudioNode {
+function getMaster(): AudioNode {
   const c = getAudioContext()
   if (!limiter || limiter.context !== c) {
     limiter = c.createDynamicsCompressor()
@@ -45,6 +46,61 @@ export function getOutput(): AudioNode {
     limiter.connect(c.destination)
   }
   return limiter
+}
+
+/**
+ * 効果音（チャイム・ビーム・ファンファーレ など）の 出口。
+ * はなちゃんが しゃべって いる あいだは 小さく する（ビームの「ボン」が 声に かさなると かすれて きこえるため）
+ */
+export function getOutput(): AudioNode {
+  const c = getAudioContext()
+  const master = getMaster()
+  if (!sfxBus || sfxBus.context !== c) {
+    sfxBus = c.createGain()
+    sfxBus.gain.value = speaking > 0 ? SFX_DUCK : 1
+    sfxBus.connect(master)
+  }
+  return sfxBus
+}
+
+/** はなちゃんが しゃべって いる あいだの 効果音の 大きさ */
+const SFX_DUCK = 0.2
+function duckSfx(on: boolean) {
+  if (!sfxBus) return
+  try {
+    const t = sfxBus.context.currentTime
+    sfxBus.gain.cancelScheduledValues(t)
+    sfxBus.gain.setTargetAtTime(on ? SFX_DUCK : 1, t, on ? 0.015 : 0.12)
+  } catch {
+    /* noop */
+  }
+}
+
+/**
+ * はなちゃんが しゃべりはじめる・おわる ときの 知らせ（音声判定が マイクを とめる ために つかう）。
+ * しゃべりはじめの 知らせは「声を だす まえに まって ほしい ミリびょう」を かえせる
+ */
+type VoiceListener = (speaking: boolean) => number | void
+const voiceListeners = new Set<VoiceListener>()
+export function onFloraVoice(fn: VoiceListener) {
+  voiceListeners.add(fn)
+  return () => {
+    voiceListeners.delete(fn)
+  }
+}
+let speaking = 0
+function voiceBegin(): number {
+  speaking++
+  duckSfx(true)
+  let wait = 0
+  for (const f of voiceListeners) wait = Math.max(wait, Number(f(true) || 0))
+  return wait
+}
+function voiceEnd() {
+  speaking = Math.max(0, speaking - 1)
+  if (speaking > 0) return
+  duckSfx(false)
+  for (const f of voiceListeners) f(false)
 }
 
 function pickVoice() {
@@ -134,6 +190,7 @@ function resetContext() {
   }
   ctx = null
   limiter = null
+  sfxBus = null
   try {
     const c = getAudioContext()
     if (c.state === 'suspended') void c.resume()
@@ -174,6 +231,9 @@ const buffers = new Map<string, AudioBuffer>()
 const loading = new Map<string, Promise<AudioBuffer | null>>()
 let current: AudioBufferSourceNode | null = null
 let currentEl: HTMLAudioElement | null = null
+/** いま なっている 声の「おわり」（とちゅうで とめた ときも よぶ） */
+let finishCurrent: (() => void) | null = null
+let clipGen = 0
 
 function decode(c: AudioContext, data: ArrayBuffer): Promise<AudioBuffer> {
   // 古い Safari はコールバック形式しか使えない
@@ -232,24 +292,53 @@ function stopCurrent() {
     currentEl.pause()
     currentEl = null
   }
+  const f = finishCurrent
+  finishCurrent = null
+  f?.()
 }
 
 /** 音声ファイルを鳴らす。Web Audio → <audio> → 端末の音声合成 の順に試す */
-async function playClip(key: string, onEnd?: () => void, fallbackText?: string) {
+async function playClip(key: string, onEnd0?: () => void, fallbackText?: string) {
   stopCurrent()
   setPlaybackSession()
+  const gen = ++clipGen
+  let finished = false
+  const fin = () => {
+    if (finished) return
+    finished = true
+    if (finishCurrent === fin) finishCurrent = null
+    voiceEnd()
+  }
+  const onEnd = () => {
+    fin()
+    onEnd0?.()
+  }
+  finishCurrent = fin
+  window.setTimeout(fin, 20000) // 「おわり」が こない ときの ため
+  // iPhone・iPad：マイクを とめて から しゃべる（マイクを つかって いる あいだは 電話のような 音質に なり かすれる）
+  const wait = voiceBegin()
+  if (wait > 0) await new Promise((r) => window.setTimeout(r, wait))
+  if (gen !== clipGen) {
+    // まって いる あいだに つぎの 声が はじまった
+    onEnd()
+    return
+  }
   const c = getAudioContext()
   if (c.state !== 'running') await c.resume().catch(() => {})
   const buf = await loadClip(key)
+  if (gen !== clipGen) {
+    onEnd()
+    return
+  }
   if (buf && c.state === 'running') {
     const src = c.createBufferSource()
     const gain = c.createGain()
     gain.gain.value = 1
     src.buffer = buf
-    src.connect(gain).connect(getOutput())
+    src.connect(gain).connect(getMaster())
     src.onended = () => {
       if (current === src) current = null
-      onEnd?.()
+      onEnd()
     }
     current = src
     src.start()
