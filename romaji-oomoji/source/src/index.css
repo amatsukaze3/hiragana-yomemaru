@@ -1,0 +1,90 @@
+@import "tailwindcss";
+/*
+ * ローマ字の 文字：Andika（SIL。よみかきを ならう 子むけ）。1ファイルに うめこむ
+ * おおもじ版は 大文字の I を 1本の たて線に した AndikaRoma（tools/font/mkfont.py。のばす 音の Ā Ē Ī Ō Ū も ふくむ）
+ */
+@font-face {
+  font-family: "AndikaRoma";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./assets/fonts/andika-oomoji-latin-700.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "AndikaRoma";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./assets/fonts/andika-oomoji-macron-700.woff2") format("woff2");
+  unicode-range: U+0100-0101, U+0112-0113, U+012A-012B, U+014C-014D, U+016A-016B;
+}
+
+/*
+ * カードの文字：UDデジタル教科書体 NK-B
+ *  - Windows 10/11 には標準で入っているので local() でそのまま使います。
+ *  - iPad などフォントが無い端末は、設定画面からフォントファイルを登録すると
+ *    "YomemaruCardUser" として読み込まれ、最優先で使われます（src/lib/font.ts）。
+ *  - どちらも無いときは教科書体に近い Klee One で表示します。
+ */
+@font-face {
+  font-family: "YomemaruNKB";
+  src:
+    local("UD Digi Kyokasho NK-B"),
+    local("UDDigiKyokashoNK-B"),
+    local("UD デジタル 教科書体 NK-B"),
+    local("UDデジタル教科書体 NK-B");
+  font-display: block;
+}
+
+@theme {
+  --font-ui: "BIZ UDPMincho", "BIZ UDMincho", serif;
+  --font-card: "YomemaruCardUser", "YomemaruNKB", "UD Digi Kyokasho NK-B", "Klee One", "BIZ UDMincho", serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #fafaf9; /* stone-50 */
+  color: #44403c; /* stone-700 */
+  font-family: var(--font-ui);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+}
+
+/* タブレットでの画面スクロール・ダブルタップ拡大を防ぐ */
+.no-touch-scroll {
+  touch-action: none;
+}
+
+.font-roma {
+  font-family: "AndikaRoma", "Comic Sans MS", sans-serif;
+  font-weight: 700;
+}
+
+.font-card {
+  font-family: var(--font-card);
+  font-weight: 600;
+  font-feature-settings: normal;
+}
+
+button:focus-visible {
+  outline: 3px solid #f59e0b;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
