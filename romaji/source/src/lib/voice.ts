@@ -59,6 +59,12 @@ const ASR_DEBOUNCE_MAX_WAIT_MS = 1200
 const ASR_WATCHDOG_MS = 2500
 // iPhone・iPad：フローラちゃんが しゃべる まえに マイク（音声認識）を とめて まつ 時間
 const VOICE_MUTE_WAIT_MS = 200
+// iPhone・iPad：マイクの 音が とどきはじめた 知らせ（audiostart）から ほんとうに きこえる ように なるまでの よゆう
+const ASR_READY_MARGIN_MS = 100
+// audiostart が こない ときは、はじまった 知らせ（start）から この時間で きこえる ことに する
+const ASR_READY_AFTER_START_MS = 400
+// どちらの 知らせも こない ときは start() から この時間で きこえる ことに する
+const ASR_READY_FALLBACK_MS = 1000
 /** 発声の なかで、いちばん大きい声より これだけ（-26dB）小さい音は「すきま」とみなす */
 const UTT_GAP_RATIO = 0.05
 /** 「いちばん大きい まとまり」に いれる 大きさ（-12dB）と、その そとに あっては いけない 大きさ（-10dB） */
@@ -293,6 +299,7 @@ interface SpeechRecognitionLike {
   onerror: ((e: { error: string }) => void) | null
   // 声の はじまり・おわり（Safari・Chrome。来ない ブラウザも ある）
   onstart?: (() => void) | null
+  onaudiostart?: (() => void) | null
   onsoundstart?: (() => void) | null
   onspeechstart?: (() => void) | null
   onspeechend?: (() => void) | null
@@ -440,6 +447,7 @@ export class HybridVoiceJudge {
   stop() {
     this.running = false
     this.asrOnly = false
+    this.asrDeaf()
     this.unsubVoice?.()
     this.unsubVoice = null
     this.mutedForVoice = false
@@ -827,6 +835,7 @@ export class HybridVoiceJudge {
       this.mutedForVoice = true
       window.clearTimeout(this.forceTimer)
       window.clearTimeout(this.debounceTimer)
+      this.asrDeaf()
       try {
         this.recog.abort()
       } catch {
@@ -839,6 +848,7 @@ export class HybridVoiceJudge {
       if (!this.running || !this.recog) return
       try {
         this.recog.start()
+        this.asrStarting()
       } catch {
         /* まだ とまりきって いない：onend で はじめる */
       }
@@ -848,6 +858,44 @@ export class HybridVoiceJudge {
 
   /** 音声認識が とまった 時刻（うごいて いる ときは 0） */
   private asrDownAt = 0
+  /** iPhone・iPad：音声認識が いま 声を きける（start の 知らせ から ASR_READY_MARGIN_MS あと） */
+  private asrHearing = false
+  private asrHearAt = 0
+  private asrReadyTimer = 0
+  /** start() を よんだ：知らせ（onstart）を まち、こなければ ASR_READY_FALLBACK_MS で きける ことに する */
+  private asrStarting() {
+    window.clearTimeout(this.asrReadyTimer)
+    this.asrReadyTimer = window.setTimeout(() => this.asrReady(0), ASR_READY_FALLBACK_MS)
+  }
+  /** audiostart が くる ブラウザか（いちど きたら、start では きこえる ことに しない） */
+  private sawAudioStart = false
+  /** exact：audiostart（マイクの 音が とどいた）。それいがい（start・じかんぎれ）は まだ きめて いない ときだけ */
+  private asrReady(margin: number, exact = false) {
+    window.clearTimeout(this.asrReadyTimer)
+    if (this.asrHearing && !exact) return
+    this.asrHearing = true
+    this.asrHearAt = performance.now() + margin
+  }
+  private asrDeaf() {
+    window.clearTimeout(this.asrReadyTimer)
+    this.asrHearing = false
+  }
+
+  /**
+   * iPhone・iPad（Apple の 音声認識だけ）は、合格・フローラちゃんの 声の たびに マイク（音声認識）を とめて また はじめるので、
+   * きこえない すきま（あてて から 約1.3びょう）が ある。シューティングは その あいだ カードを とめ、きこえる ように なったら
+   * ねらう カードに わくを つけて「よんで いいよ」の 合図に する（canHear）
+   */
+  hasMicGaps() {
+    return this.asrOnly && this.running
+  }
+  /** いま よめば きこえるか（パソコン・Android は いつも true） */
+  canHear() {
+    if (!this.asrOnly) return true
+    const now = performance.now()
+    // ロック（setTarget・hold）は みない：ロックは けっかが とどいた 時刻で みるので、わくが ひかって すぐ よんでも けっかは ロックの あと に とどく
+    return this.running && !this.paused && this.asrHearing && !this.mutedForVoice && !this.asrFinalizing && now >= this.asrHearAt
+  }
   private forceTimer = 0
   private debounceTimer = 0
   private finalizeAt = 0
@@ -865,6 +913,7 @@ export class HybridVoiceJudge {
     window.clearTimeout(this.debounceTimer)
     this.asrFinalizing = true
     this.finalizeAt = performance.now()
+    this.asrDeaf()
     try {
       this.recog.stop()
     } catch {
@@ -968,10 +1017,17 @@ export class HybridVoiceJudge {
     r.onsoundend = onVoiceEnd
     r.onstart = () => {
       this.asrDownAt = 0
+      if (this.recog === r && !this.sawAudioStart) this.asrReady(ASR_READY_AFTER_START_MS)
+    }
+    // マイクの 音が とどきはじめた（これが いちばん たしか）
+    r.onaudiostart = () => {
+      this.sawAudioStart = true
+      if (this.recog === r) this.asrReady(ASR_READY_MARGIN_MS, true)
     }
     r.onend = () => {
       if (this.recog !== r) return // とめた あとの ふるい 音声認識
       this.asrDownAt = performance.now()
+      this.asrDeaf()
       this.asrSkip = 0
       this.asrLastIdx = -1
       this.asrLastText = ''
@@ -986,6 +1042,7 @@ export class HybridVoiceJudge {
         if (!this.running || fatal || this.recog !== r || this.mutedForVoice) return
         try {
           r.start()
+          this.asrStarting()
         } catch {
           if (tries < 8) window.setTimeout(() => restart(tries + 1), 150)
         }
@@ -996,6 +1053,7 @@ export class HybridVoiceJudge {
       r.start()
       this.recog = r
       this.asrAlive = true
+      this.asrStarting()
     } catch {
       this.asrAlive = false
     }
