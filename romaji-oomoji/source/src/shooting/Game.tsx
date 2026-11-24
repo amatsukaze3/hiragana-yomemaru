@@ -78,6 +78,8 @@ function playMiss() {
 
 /** iPhone・iPad：マイクが もどるのを まって カードを とめる いちばん ながい 時間（もどらない ときは うごかす） */
 const MIC_WAIT_MAX_MS = 3000
+/** iPhone・iPad：わくが ひかって から この時間で 音声認識を とめて けっかを もらう（声の 知らせが こない とき） */
+const SHOOT_LISTEN_WINDOW_MS = 1100
 
 export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: SaveData | null; onHome: () => void; onZukan: () => void }) {
   const [phase, setPhaseState] = useState<Phase>('ready')
@@ -193,6 +195,8 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
   const [hearing, setHearing] = useState(true)
   const hearingRef = useRef(true)
   const micWaitSince = useRef(0)
+  // わくが ひかったら すぐ よむので、ききとり窓は みじかく（iPhone・iPad で 声の 知らせが こない とき）
+  useEffect(() => voice.setListenWindow(SHOOT_LISTEN_WINDOW_MS), [voice.setListenWindow])
 
   /* ---------- ことばと カード ---------- */
   const newWord = () => {
