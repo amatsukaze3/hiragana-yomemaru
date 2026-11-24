@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Kana } from '../data/kana'
 import { voiceprintRows } from './voiceprint'
-import { HybridVoiceJudge, type FrameInfo, type MicStatus, type MissInfo, type PassSource } from './voice'
+import { HybridVoiceJudge, passMode, type FrameInfo, type MicStatus, type MissInfo, type PassMode, type PassSource } from './voice'
 
 /**
  * 画面からハイブリッド判定エンジンを使うためのフック。
@@ -33,7 +33,13 @@ export function useVoiceJudge(target: Kana | null, onPass: (src: PassSource, kan
     e.onFrame = (f) => {
       frame.current = f
     }
-    return () => e.stop()
+    // 合格の きじゅん（せんせいメニューの しおん ごうかく／ぼおん ごうかく）。かえたら すぐ うつす
+    e.setVowelMode(passMode.get() === 'vowel')
+    const unsub = passMode.subscribe((m) => e.setVowelMode(m === 'vowel'))
+    return () => {
+      unsub()
+      e.stop()
+    }
   }, [])
 
   useEffect(() => {
@@ -70,4 +76,14 @@ export function useVoiceJudge(target: Kana | null, onPass: (src: PassSource, kan
   const resume = useCallback(() => engine.current!.resume(), [])
   const lastError = () => engine.current!.lastError
   return { status, asr, start, stop, hold, frame, lastError, heard, capture, cancelCapture, refreshVoiceprint, pause, resume, hasMicGaps, canHear, judging, setExtraTargets, setListenWindow }
+}
+
+/** 合格の きじゅん（しおん ごうかく／ぼおん ごうかく）。せんせいメニューで かわると 画面も かきなおす */
+export function usePassMode(): PassMode {
+  const [m, setM] = useState<PassMode>(passMode.get)
+  useEffect(() => {
+    setM(passMode.get())
+    return passMode.subscribe(setM)
+  }, [])
+  return m
 }

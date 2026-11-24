@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { CircleHelp, Mic, MicOff, RotateCcw } from 'lucide-react'
 import { motion } from 'motion/react'
 import type { FrameInfo, MicStatus } from '../lib/voice'
+import { usePassMode } from '../lib/useVoiceJudge'
 
 const LABELS: Record<keyof FrameInfo['bands'], string> = {
   low: 'Low',
@@ -18,6 +19,8 @@ const LABELS: Record<keyof FrameInfo['bands'], string> = {
  */
 export function MicBadge({ status, frame, onRetry, error, heard, canHear }: { status: MicStatus; frame: React.RefObject<FrameInfo | null>; onRetry?: () => void; error?: string; heard?: string; canHear?: () => boolean }) {
   const [help, setHelp] = useState(false)
+  // せんせいメニューで「ぼおん ごうかく」に して いる ときは、わかる ように しるしを だす（もどし わすれ ない ように）
+  const vowelMode = usePassMode() === 'vowel'
   const ring = useRef<HTMLSpanElement>(null)
   const [ready, setReady] = useState(true)
   const readyRef = useRef(true)
@@ -61,6 +64,7 @@ export function MicBadge({ status, frame, onRetry, error, heard, canHear }: { st
       <span className="flex flex-col leading-tight">
         <span className="text-lg text-stone-600">{text}</span>
         {listening && heard ? <span className="font-card max-w-[12em] truncate text-sm text-stone-400">きこえた：{heard}</span> : null}
+        {vowelMode && <span className="mt-0.5 w-fit whitespace-nowrap rounded-full bg-sky-100 px-2 py-0.5 text-xs font-bold text-sky-700">ぼおん ごうかく</span>}
       </span>
       {(status === 'denied' || status === 'error' || status === 'unsupported') && (
         <>

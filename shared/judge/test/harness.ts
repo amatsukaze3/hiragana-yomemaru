@@ -106,6 +106,8 @@ export interface RunOpts {
   voiceprint?: number[][] | null; noiseDb?: number; asr?: boolean; gain?: number; seed?: number; acoustic?: boolean
   /** 音声認識の けっかを まねる：目標を きめて から この ミリびょう あとに asrAlts を とどける（パソコンの Google の おくれ） */
   asrAt?: number; asrAlts?: string[]
+  /** ぼおん ごうかく（先生が きりかえる） */
+  vowelMode?: boolean
 }
 
 function run(key: string, sig: Float32Array, opts: RunOpts, begin: (j: any) => void) {
@@ -118,6 +120,7 @@ function run(key: string, sig: Float32Array, opts: RunOpts, begin: (j: any) => v
   j.running = true
   j.asrAlive = !!opts.asr
   j.setVoiceprint(opts.voiceprint ?? null)
+  if (opts.vowelMode) j.setVowelMode(true)
   j.onsetCheck = !(globalThis as any).__noOnset
   // iPhone・iPad で 母音・ん を こえの とうろく で きく とき（音声認識なし・出だしの しらべは きびしい 線）
   j.acoustic = !!opts.acoustic

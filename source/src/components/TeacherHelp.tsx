@@ -1,11 +1,21 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CircleCheck, Delete, House, KeyRound, Pause, Play } from 'lucide-react'
 import { lsGet, lsSet } from '../lib/storage'
+import { passMode } from '../lib/voice'
+import { usePassMode } from '../lib/useVoiceJudge'
 
 const PIN_KEY = 'yomemaru:teacherPin'
 
 export const hasTeacherPin = () => /^\d{4}$/.test(lsGet(PIN_KEY) ?? '')
 export const clearTeacherPin = () => lsSet(PIN_KEY, '')
+
+/**
+ * 声の とうろく の 案内（RetryPrompt）の「ヘルプ」から、いま 画面に ある せんせいボタンの メニューを ひらく
+ * （暗証番号を いれると、合格の きじゅんを 子どもに あわせて かえられる）
+ */
+let opener: (() => void) | null = null
+export const canOpenTeacherHelp = () => !!opener
+export const openTeacherHelp = () => opener?.()
 
 /**
  * せんせい ヘルプ（一時停止・強制合格）
@@ -25,6 +35,15 @@ export function TeacherHelp({ onPause, onResume, onPass, onHome, passLabel = '�
     onResume()
     fn?.()
   }
+  const openRef = useRef(open)
+  openRef.current = open
+  useEffect(() => {
+    const fn = () => openRef.current()
+    opener = fn
+    return () => {
+      if (opener === fn) opener = null
+    }
+  }, [])
 
   return (
     <>
@@ -38,7 +57,7 @@ export function TeacherHelp({ onPause, onResume, onPass, onHome, passLabel = '�
       </button>
       {mode && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-900/40 p-4">
-          <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-[28px] border-4 border-stone-200 bg-stone-50 px-5 py-6 text-center shadow-xl">
+          <div className="flex max-h-full w-full max-w-sm flex-col items-center gap-4 overflow-y-auto rounded-[28px] border-4 border-stone-200 bg-stone-50 px-5 py-6 text-center shadow-xl">
             {mode === 'setup' && (
               <PinPad
                 title="先生用の暗証番号を決めてください"
@@ -87,6 +106,7 @@ export function TeacherHelp({ onPause, onResume, onPass, onHome, passLabel = '�
                     </button>
                   )}
                 </div>
+                <PassModeSwitch />
                 <p className="text-xs text-stone-400">暗証番号を忘れたときは、ホームの「カード とうろく」の中で 消せます。</p>
               </>
             )}
@@ -94,6 +114,34 @@ export function TeacherHelp({ onPause, onResume, onPass, onHome, passLabel = '�
         </div>
       )}
     </>
+  )
+}
+
+/**
+ * 合格の きじゅん：しおん ごうかく（ふだん。子音まで よめて 合格）／ぼおん ごうかく（構音が 育ちとちゅうの 子むけ。母音が あえば 合格）。
+ * おすと すぐ かわり、先生が もう いちど きりかえるまで そのまま（この 端末に おぼえる）
+ */
+function PassModeSwitch() {
+  const m = usePassMode()
+  const btn = (on: boolean) =>
+    `flex-1 rounded-full py-2.5 text-lg font-bold ${on ? 'bg-orange-500 text-white shadow-[0_4px_0_#c2410c]' : 'border-2 border-stone-200 bg-white text-stone-500'}`
+  return (
+    <div className="flex w-full flex-col gap-2 rounded-2xl border-2 border-stone-200 bg-white px-3 py-3">
+      <p className="text-sm font-bold text-stone-500">ごうかくの きじゅん</p>
+      <div className="flex gap-2" role="radiogroup" aria-label="ごうかくの きじゅん">
+        <button type="button" role="radio" aria-checked={m === 'consonant'} onClick={() => passMode.set('consonant')} className={btn(m === 'consonant')}>
+          しおん ごうかく
+        </button>
+        <button type="button" role="radio" aria-checked={m === 'vowel'} onClick={() => passMode.set('vowel')} className={btn(m === 'vowel')}>
+          ぼおん ごうかく
+        </button>
+      </div>
+      <p className="text-left text-xs leading-relaxed text-stone-500">
+        {m === 'vowel'
+          ? '母音が 合っていれば 合格です（「か」を「あ」「た」と 読んでも 合格）。あ行・を・ん は いつもと 同じです。「しおん ごうかく」を 押すまで このままです。'
+          : '子音まで 正しく 読めたら 合格です（ふだんの 判定）。構音が 育ちとちゅうの 子には「ぼおん ごうかく」に できます。'}
+      </p>
+    </div>
   )
 }
 

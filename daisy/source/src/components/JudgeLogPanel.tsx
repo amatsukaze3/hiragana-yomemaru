@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ClipboardCopy, ScrollText, Trash2 } from 'lucide-react'
-import { clearJudgeLog, formatLog, loadJudgeLog } from '../lib/voice'
+import { clearJudgeLog, formatLog, loadJudgeLog, passMode } from '../lib/voice'
 
 /**
  * 判定の きろく（せんせい用）：音声認識が なんと きいたか・どの みちで 合格したか を のこす。
@@ -10,7 +10,7 @@ export function JudgeLogPanel() {
   const [items, setItems] = useState(loadJudgeLog)
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
-  const env = () => `${navigator.userAgent}\n${new Date().toLocaleString('ja-JP')}`
+  const env = () => `${navigator.userAgent}\n${new Date().toLocaleString('ja-JP')}\nごうかくの きじゅん：${passMode.get() === 'vowel' ? 'ぼおん ごうかく' : 'しおん ごうかく'}`
   const copy = async () => {
     const text = formatLog(items, env())
     try {

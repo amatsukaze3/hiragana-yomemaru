@@ -5,11 +5,16 @@
  */
 import { JudgeEngine } from '../../../../shared/judge/engine.ts'
 import type { JudgeLogEntry } from '../../../../shared/judge/log.ts'
+import { createPassModeStore } from '../../../../shared/judge/passMode.ts'
 import { getAudioContext, onFloraVoice, setMicActive } from './audio'
 
 export type { Bands, FrameInfo, MicStatus, MissInfo, PassSource } from '../../../../shared/judge/engine.ts'
 export { formatLog } from '../../../../shared/judge/log.ts'
 export type { JudgeLogEntry }
+export type { PassMode } from '../../../../shared/judge/passMode.ts'
+
+/** 合格の きじゅん（しおん ごうかく／ぼおん ごうかく）。せんせいメニューで きりかえ、もどすまで そのまま */
+export const passMode = createPassModeStore('daisy:passMode')
 
 /** 判定の きろくの 保存キー（せってい の「判定の きろく」で みる） */
 const LOG_KEY = 'daisy:judgeLog'

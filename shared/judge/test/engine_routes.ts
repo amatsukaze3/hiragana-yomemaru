@@ -39,9 +39,10 @@ import { HybridVoiceJudge } from './engine_stub'
 let fail = 0, n = 0
 function check(name: string, ok: boolean) { n++; if (!ok) { fail++; console.log('NG', name) } }
 
-function scenario(script: any, target: string, alts: string[], extras: string[] = []) {
+function scenario(script: any, target: string, alts: string[], extras: string[] = [], vowel = false) {
   simT += 10000; evs = []
   const j = new HybridVoiceJudge(script) as any
+  if (vowel) j.setVowelMode(true)
   const passes: string[] = []
   const misses: any[] = []
   j.onPass = (_s: string, k: string) => passes.push(k)
@@ -56,9 +57,9 @@ function scenario(script: any, target: string, alts: string[], extras: string[] 
   j.stop()
   return { passes, misses, j }
 }
-const pass = (script: any, t: string, alts: string[], want: string | null, extras: string[] = []) => {
-  const r = scenario(script, t, alts, extras)
-  check(`[${script}] ${t} ← ${JSON.stringify(alts)} → ${r.passes[0] ?? '×'}（のぞみ ${want ?? '×'}）`, (r.passes[0] ?? null) === want)
+const pass = (script: any, t: string, alts: string[], want: string | null, extras: string[] = [], vowel = false) => {
+  const r = scenario(script, t, alts, extras, vowel)
+  check(`[${script}]${vowel ? '（ぼおん）' : ''} ${t} ← ${JSON.stringify(alts)} → ${r.passes[0] ?? '×'}（のぞみ ${want ?? '×'}）`, (r.passes[0] ?? null) === want)
   return r
 }
 for (const s of ['hira', 'kata', 'roma', 'ROMA']) {
@@ -91,5 +92,46 @@ const m = scenario('hira', 'ら', ['あ'])
 check('iPad ら ← あ：しらせ 1かい', m.misses.length === 1 && m.misses[0].vpHelps === false && m.misses[0].kind === 'vowel')
 const m2 = scenario('hira', 'ら', ['ら'])
 check('iPad ら ← ら：しらせ なし', m2.misses.length === 0)
+// ぼおん ごうかく（先生が きりかえる）：子音の ある 文字は 母音が あえば 合格。あ行・を・ん は かわらない
+for (const s of ['hira', 'kata', 'roma', 'ROMA']) {
+  const K = (h: string) => (s === 'hira' ? h : String.fromCharCode(h.charCodeAt(0) + 0x60))
+  pass(s, K('か'), ['あ'], K('か'), [], true)
+  pass(s, K('か'), ['た'], K('か'), [], true)
+  pass(s, K('か'), ['か'], K('か'), [], true)
+  pass(s, K('か'), ['き'], null, [], true)
+  pass(s, K('か'), ['き', 'た'], null, [], true) // いちばんが ちがう 母音
+  pass(s, K('ら'), ['あ'], K('ら'), [], true)
+  pass(s, K('ら'), ['や'], K('ら'), [], true)
+  pass(s, K('り'), ['い'], K('り'), [], true)
+  pass(s, K('し'), ['ち'], K('し'), [], true)
+  pass(s, K('す'), ['う'], K('す'), [], true)
+  pass(s, K('あ'), ['か'], null, [], true)
+  pass(s, K('あ'), ['あ'], K('あ'), [], true)
+  pass(s, K('ん'), ['う'], null, [], true)
+  // シューティング：ぴったりの 文字が さき、つぎに いちばんめの 目標、ほかの カード の じゅん
+  pass(s, K('か'), ['さ'], K('さ'), [K('さ'), K('き')], true)
+  pass(s, K('か'), ['た'], K('か'), [K('さ'), K('き')], true)
+  pass(s, K('か'), ['ち'], K('き'), [K('さ'), K('き')], true)
+}
+// ぼおん ごうかく の iPad：ちがう 母音の ときの しらせは とうろく が やくに たつ（とうろく すると どの カードも 周波数解析で きく）
+const mv = scenario('hira', 'か', ['き'], [], true)
+check('iPad（ぼおん）か ← き：しらせ 1かい vpHelps', mv.misses.length === 1 && mv.misses[0].vpHelps === true)
+// もどすと（しおん ごうかく）これまでどおり
+{
+  simT += 10000; evs = []
+  const j = new HybridVoiceJudge('hira') as any
+  const passes: string[] = []
+  j.onPass = (_s: string, k: string) => passes.push(k)
+  j.setVowelMode(true)
+  j.setVowelMode(false)
+  void j.start()
+  runUntil(simT + 800)
+  j.setTarget('か')
+  runUntil(simT + 900)
+  MockRecog.cur!.say(['あ'])
+  runUntil(simT + 2500)
+  j.stop()
+  check('しおん に もどすと か ← あ は 合格しない', passes.length === 0)
+}
 console.log(fail ? `${fail}/${n} NG` : `ぜんぶ OK（${n}）`)
 process.exit(fail ? 1 : 0)
