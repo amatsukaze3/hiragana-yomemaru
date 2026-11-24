@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useAnimate } from 'motion/react'
-import { AudioLines, BookOpen, Heart, House, Mic, Pause, Play, Save, Star } from 'lucide-react'
+import { AudioLines, BookOpen, Heart, House, Mic, Pause, Play, Save, Star, Volume2 } from 'lucide-react'
 import { Confetti } from '../components/Celebrate'
 import { MicBadge } from '../components/MicStatus'
 import { Mascot } from '../components/Mascot'
@@ -8,6 +8,7 @@ import { VoiceRegister } from '../components/VoiceRegister'
 import type { Kana } from '../data/kana'
 import { getAudioContext, getOutput, playBeam } from '../lib/audio'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
+import type { MissInfo } from '../lib/voice'
 import { TeacherHelp } from '../components/TeacherHelp'
 import { useRetryRegister } from '../components/RetryPrompt'
 import { loadVoiceprint, voiceprintUseful } from '../lib/voiceprint'
@@ -27,6 +28,12 @@ interface Falling {
   slot: number
   x: number // 0〜1（よこ）
   y: number // 0〜1（1 で じめんに つく）
+  /** じめんに ついた 時刻（すぐには おとさず GROUND_GRACE_MS まって くれる。その あいだも よめば GET） */
+  groundAt?: number
+  /** この カードを よんだのに 合格しなかった かず */
+  misses?: number
+  /** マスコットが よみかたを おしえた（ヒント） */
+  hinted?: boolean
 }
 
 interface ActiveWord {
@@ -79,6 +86,16 @@ function playMiss() {
 const MIC_WAIT_MAX_MS = 3000
 /** iPhone・iPad：わくが ひかって から この時間で 音声認識を とめて けっかを もらう（声の 知らせが こない とき） */
 const SHOOT_LISTEN_WINDOW_MS = 1100
+/** カードが じめんに ついても、この時間 まって くれる（ピンチ！ その あいだに よめば GET）。はやい モードは みじかく */
+const GROUND_GRACE_MS: Record<string, number> = { normal: 4000, fast: 1600 }
+/** 1まいの カードで この かいすう よんでも 合格しなかったら、マスコットが よみかたを おしえる */
+const HINT_AFTER_MISSES = 2
+/** よんで いる あいだ（判定の けっかを まつ あいだ）カードを とめる いちばん ながい 時間 */
+const JUDGE_FREEZE_MAX_MS = 2500
+/** ヒントの 声の あいだ カードを とめる 時間 */
+const HINT_FREEZE_MS = 1500
+/** ハートが へったら、はやさを この秒数ぶん もどす（すこし ゆっくりに なる） */
+const SLOWDOWN_ON_MISS_SEC = 45
 
 export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: SaveData | null; onHome: () => void; onZukan: () => void }) {
   const [phase, setPhaseState] = useState<Phase>('ready')
@@ -166,19 +183,30 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
   const retry = useRetryRegister({ onPause: () => setPhase('paused'), onResume: () => setPhase('playing') })
   const voice = useVoiceJudge(
     targetKana,
-    () => {
+    (_src, kana) => {
       if (targetRef.current == null) return
+      // ねらって いた カード。ほかの カードを よんだ ときは、その 文字の いちばん 下の カード（どの カードを よんでも GET）
+      const t = cards.current.find((x) => x.id === targetRef.current)
+      let c = t && t.kana === kana ? t : undefined
+      if (!c) for (const x of cards.current) if (x.kana === kana && (!c || x.y > c.y)) c = x
+      if (!c) c = t
+      if (!c) return
       // マイクで ただしく よめた → いまの にがて度を へらす
-      const c = cards.current.find((x) => x.id === targetRef.current)
-      if (c) logCorrect(c.kana)
-      collect(targetRef.current)
+      logCorrect(c.kana)
+      collect(c.id)
     },
     targetId ?? 0,
-    () => {
+    (info?: MissInfo) => {
       // よんだけど ちがう よみだった → まちがいログ
       const c = cards.current.find((x) => x.id === targetRef.current)
-      if (c) wrongOnce.current(`${c.id}`, () => logError(c.kana, 'wrong', 'shoot'))
-      retry.onMiss()
+      if (c) {
+        wrongOnce.current(`${c.id}`, () => logError(c.kana, 'wrong', 'shoot'))
+        c.misses = (c.misses ?? 0) + 1
+        // 2かい とおらなかったら マスコットが よみかたを おしえる（その あいだ カードは とまる）。それまでは カードを ゆらして「もういちど」
+        if (c.misses >= HINT_AFTER_MISSES && !c.hinted) giveHint(c)
+        else nudge(c)
+      }
+      retry.onMiss(info)
     },
   )
   retry.bind(voice)
@@ -194,6 +222,30 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
   const [hearing, setHearing] = useState(true)
   const hearingRef = useRef(true)
   const micWaitSince = useRef(0)
+  /** 判定まちで カードを とめはじめた 時刻 */
+  const judgeSince = useRef(0)
+  /** ヒントの 声の あいだ カードを とめる（この 時刻まで） */
+  const hintUntil = useRef(0)
+  /** ヒントを だして いる カード（🔊 を だす） */
+  const [hintId, setHintId] = useState<number | null>(null)
+  /** はやさの もとに する 時間（ハートが へると もどる。elapsed は あそんだ 時間） */
+  const speedT = useRef(0)
+
+  /** マスコットが よみかたを おしえる（2かい よんでも とおらなかった カード） */
+  const giveHint = (c: Falling) => {
+    c.hinted = true
+    setHintId(c.id)
+    hintUntil.current = performance.now() + HINT_FREEZE_MS
+    // マスコットの 声を マイクが ひろって 合格に ならない ように
+    voiceRef.current.hold(1100)
+    window.setTimeout(() => sayKana(c.kana), 120)
+    window.setTimeout(() => setHintId((h) => (h === c.id ? null : h)), 3500)
+  }
+  /** 「もういちど」：カードを ちょっと ゆらす */
+  const nudge = (c: Falling) => {
+    const el = els.current.get(c.id)?.firstElementChild as HTMLElement | null | undefined
+    el?.animate?.([{ rotate: '0deg' }, { rotate: '-10deg' }, { rotate: '10deg' }, { rotate: '-6deg' }, { rotate: '0deg' }], { duration: 420 })
+  }
   // わくが ひかったら すぐ よむので、ききとり窓は みじかく（iPhone・iPad で 声の 知らせが こない とき）
   useEffect(() => voice.setListenWindow(SHOOT_LISTEN_WINDOW_MS), [voice.setListenWindow])
 
@@ -309,6 +361,9 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
     if (shakeScope.current) void animateShake(shakeScope.current, { x: [0, -12, 12, -6, 6, 0] }, { duration: 0.35 })
     livesRef.current -= 1
     setLives(livesRef.current)
+    // ハートが へったら すこし ゆっくりに（あせらず よめる ように）
+    speedT.current = Math.max(0, speedT.current - SLOWDOWN_ON_MISS_SEC)
+    setLevel(speedLevel(mode, speedT.current))
     if (livesRef.current <= 0) gameOver()
   }
 
@@ -383,15 +438,34 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
         hearingRef.current = !gap
         setHearing(!gap)
       }
-      if (phaseRef.current !== 'playing' || now < freezeUntil.current || micWait) return
+      // こどもが よんで いて 判定の けっかを まって いる あいだ・ヒントの 声の あいだ は カードを とめる（あせらず よめる ように）
+      const judging = phaseRef.current === 'playing' && v.status === 'listening' && v.judging()
+      if (judging) {
+        if (!judgeSince.current) judgeSince.current = now
+      } else judgeSince.current = 0
+      const hold = (judging && now - judgeSince.current < JUDGE_FREEZE_MAX_MS) || now < hintUntil.current
+      if (phaseRef.current !== 'playing' || now < freezeUntil.current || micWait || hold) {
+        // とめて いる あいだは、じめんで まって いる カードの 時計も とめる
+        if (phaseRef.current === 'playing') for (const c of cards.current) if (c.groundAt) c.groundAt += dt * 1000
+        return
+      }
       elapsed.current += dt
-      const sec = fallSecAt(mode, elapsed.current)
+      speedT.current += dt
+      const sec = fallSecAt(mode, speedT.current)
       if (elapsed.current >= nextSpawn.current) spawn(sec)
+      let landed = false
       for (const c of cards.current) {
+        if (c.groundAt) continue // じめんで まって いる（ピンチ）
         c.y += dt / sec
+        if (c.y >= 1) {
+          c.y = 1
+          c.groundAt = now
+          landed = true
+        }
         place(c)
       }
-      const fallen = cards.current.find((c) => c.y >= 1)
+      if (landed) syncCards()
+      const fallen = cards.current.find((c) => c.groundAt && now - c.groundAt >= (GROUND_GRACE_MS[mode.id] ?? 3000))
       if (fallen) {
         miss(fallen)
         if (phaseRef.current !== 'playing') return
@@ -407,10 +481,12 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
         targetRef.current = tid
         setTargetId(tid)
       }
+      // ほかの カードも よんで よい（音声認識で きいた とき）
+      v.setExtraTargets(cards.current.filter((c) => c.id !== tid).map((c) => c.kana))
       lvlTimer += dt
       if (lvlTimer > 1) {
         lvlTimer = 0
-        setLevel(speedLevel(mode, elapsed.current))
+        setLevel(speedLevel(mode, speedT.current))
       }
     }
     raf = requestAnimationFrame(loop)
@@ -440,6 +516,10 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
     roundRef.current = from?.round ?? []
     stamps.current = loadStamps()
     elapsed.current = from?.elapsed ?? 0
+    speedT.current = elapsed.current
+    judgeSince.current = 0
+    hintUntil.current = 0
+    setHintId(null)
     // とちゅうの ことばを もどして、まだ とれていない もじを もういちど ながす
     for (const sw of from?.words ?? []) {
       const task = wordOf(sw.id)
@@ -456,7 +536,7 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
     setTargetId(null)
     setScore(scoreRef.current)
     setLives(livesRef.current)
-    setLevel(speedLevel(mode, elapsed.current))
+    setLevel(speedLevel(mode, speedT.current))
     setStampCount(stamps.current.size)
     setRoundStamps(roundRef.current)
     setResult(null)
@@ -580,6 +660,8 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
             const isTarget = c.id === targetId
             // わくは マイクが きこえる ときだけ（iPhone・iPad の すきまでは うすい わくで「つぎは これ」）
             const lit = isTarget && hearing
+            // じめんに ついて まって いる（ピンチ）
+            const ground = !!c.groundAt
             return (
               <div
                 key={c.id}
@@ -603,6 +685,22 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
                   <span className="font-card leading-none text-stone-900" style={{ fontSize: '0.62em' }}>
                     {c.kana}
                   </span>
+                  {ground && (
+                    <motion.span
+                      className="pointer-events-none absolute -inset-2 rounded-[26%] border-[6px] border-rose-400"
+                      animate={{ opacity: [1, 0.35, 1], scale: [1, 1.1, 1] }}
+                      transition={{ duration: 0.55, repeat: Infinity }}
+                    />
+                  )}
+                  {hintId === c.id && (
+                    <motion.span
+                      className="pointer-events-none absolute -right-3 -top-3 flex h-9 w-9 items-center justify-center rounded-full bg-amber-400 text-white shadow"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: [0, 1.25, 1] }}
+                    >
+                      <Volume2 size={20} />
+                    </motion.span>
+                  )}
                   {lit && (
                     <motion.span
                       className="pointer-events-none absolute -inset-4 rounded-full border-4 border-dashed border-orange-400"
@@ -681,8 +779,9 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
               <li>
                 <span className="font-bold text-orange-500">オレンジの わく</span>の カードを よむと GET！
               </li>
+              <li>ほかの カードを さきに よんでも GET できるよ</li>
               <li>ことばの カードを ぜんぶ あつめると スタンプが もらえるよ</li>
-              <li>カードが したまで おちると ハートが へるよ</li>
+              <li>したまで おちても すこし まって くれるよ。それでも よめないと ハートが へるよ</li>
             </ul>
             {resume && (
               <p className="rounded-2xl bg-white px-4 py-2 text-lg font-bold text-stone-700 shadow-sm">
@@ -704,7 +803,7 @@ export function Game({ mode, resume, onHome, onZukan }: { mode: Mode; resume?: S
 
       {/* じめん：よめ丸くん と マイク */}
       <footer className="relative flex min-h-[64px] items-end justify-between gap-2 border-t-4 border-lime-300 bg-lime-100 px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-1">
-        <div className="min-w-0 max-w-[calc(50%-52px)] text-sm">{(phase === 'playing' || phase === 'paused' || phase === 'countdown') && <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} heard={voice.heard} />}</div>
+        <div className="min-w-0 max-w-[calc(50%-52px)] text-sm">{(phase === 'playing' || phase === 'paused' || phase === 'countdown') && <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} heard={voice.heard} canHear={voice.canHear} />}</div>
         <div className="pointer-events-none absolute bottom-[max(6px,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2">
           <Mascot size={84} mood={hits.length ? 'cheer' : 'happy'} />
         </div>

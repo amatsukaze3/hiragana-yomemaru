@@ -389,7 +389,7 @@ export function Batchiri({ pick, onExit }: { pick: WeakPick; onExit: () => void 
                 }}
               />
             )}
-            {micStep && <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} heard={voice.heard} />}
+            {micStep && <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} heard={voice.heard} canHear={voice.canHear} />}
             {/* マイクが つかえないとき・こえで うまく いかないときの 「できた」 */}
             {micStep && !micOk && voice.status !== 'starting' && (!isTest || boss === 'ready') && <ActionButton label="できた" onClick={passOne} strong />}
             {!micStep && (

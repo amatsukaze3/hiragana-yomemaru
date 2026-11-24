@@ -9,6 +9,7 @@ import { TraceCanvas } from '../components/TraceCanvas'
 import { KANA_INFO, smartShuffle, type Kana, type Row } from '../data/kana'
 import { playChime, sayVoice, speak } from '../lib/audio'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
+import type { MissInfo } from '../lib/voice'
 import { markMastered } from '../lib/progress'
 import { TeacherHelp } from '../components/TeacherHelp'
 import { useRetryRegister } from '../components/RetryPrompt'
@@ -80,7 +81,20 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
     }, 700)
   }
   const retry = useRetryRegister()
-  const voice = useVoiceJudge(voiceTarget, () => passOne(true), idx, retry.onMiss)
+  // ステップ5：おなじ 文字で 2かい よんでも とおらなかったら、よみかたを きかせる（ヒント。そのあと まねして よめば 合格）
+  const misses = useRef(0)
+  useEffect(() => {
+    misses.current = 0
+  }, [voiceTarget, idx])
+  const onMiss5 = (info?: MissInfo) => {
+    misses.current += 1
+    if (misses.current === 2 && voiceTarget) {
+      voice.hold(1100)
+      window.setTimeout(() => speak(voiceTarget), 150)
+    }
+    retry.onMiss(info)
+  }
+  const voice = useVoiceJudge(voiceTarget, () => passOne(true), idx, onMiss5)
   retry.bind(voice)
 
   // ステップ5を出たらマイクを止める
@@ -181,7 +195,7 @@ export function Learn({ row, onHome }: { row: Row; onHome: () => void }) {
               {voice.status === 'idle' ? (
                 <ActionButton icon={<Mic />} label="マイクで よむ" onClick={() => void voice.start()} />
               ) : (
-                <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} heard={voice.heard} />
+                <MicBadge status={voice.status} frame={voice.frame} error={voice.lastError()} onRetry={() => void voice.start()} heard={voice.heard} canHear={voice.canHear} />
               )}
               <ActionButton label="できた" onClick={() => passOne(false)} strong />
             </>

@@ -5,7 +5,7 @@
  * 2) ないとき：VOICEVOX の10の声と、子どもの声に近づけた声から学習した線形モデルを使う
  */
 import M from './vowelModel.json'
-import type { Vowel } from '../data/kana'
+import type { Vowel } from './kana46.ts'
 
 export const VOWEL_ORDER: Vowel[] = ['あ', 'い', 'う', 'え', 'お']
 const GRID: number[] = M.grid

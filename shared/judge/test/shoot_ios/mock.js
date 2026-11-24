@@ -20,13 +20,13 @@
       if (NOISE) setTimeout(() => this.sound(), START_MS + 50)
     }
     text() { let s = this.heard.join(''); for (const k in MERGE) s = s.replace(k, MERGE[k]); return s }
-    emit() { const t = this.text(); if (!t) return; const r = [{ transcript: t }]; this.onresult && this.onresult({ resultIndex: 0, results: [r] }) }
+    emit(final) { const t = this.text(); if (!t) return; const r = [{ transcript: t }]; r.isFinal = !!final; this.onresult && this.onresult({ resultIndex: 0, results: [r] }) }
     stop() {
       if (!this.running || this.stopping) return
       this.stopping = true
       const at = performance.now()
       this.heard = this.audio.filter((a) => a.end <= at).map((a) => a.kana)
-      setTimeout(() => { this.emit(); this.end() }, 120)
+      setTimeout(() => { this.emit(true); this.end() }, 120)
     }
     abort() { if (!this.running) return; this.stopping = true; setTimeout(() => this.end(), 30) }
     end() { if (!this.running) return; this.running = false; this.stopping = false; this.onend && this.onend() }

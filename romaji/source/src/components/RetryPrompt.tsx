@@ -3,6 +3,7 @@ import { AudioLines, Play, Volume2 } from 'lucide-react'
 import { Mascot } from './Mascot'
 import { sayVoice } from '../lib/audio'
 import { VoiceRegister } from './VoiceRegister'
+import type { MissInfo } from '../lib/voice'
 
 /** 5回 読んでも 合格しないとき：声の登録を すすめる */
 export const MISS_LIMIT = 5
@@ -61,7 +62,9 @@ export function useRetryRegister(hooks?: { onPause?: () => void; onResume?: () =
   const h = useRef(hooks)
   h.current = hooks
 
-  const onMiss = () => {
+  /** info.vpHelps が false（iPad の 子音の カード：こえの とうろく では よく ならない）なら かぞえない */
+  const onMiss = (info?: MissInfo) => {
+    if (info && !info.vpHelps) return
     misses.current += 1
     if (misses.current >= MISS_LIMIT && voice.current) {
       misses.current = 0
