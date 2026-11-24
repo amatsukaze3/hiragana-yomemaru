@@ -8,6 +8,7 @@ import { KanaProgress } from '../components/KanaProgress'
 import { Modal } from '../components/Celebrate'
 import { allMastered, loadMastered, setShootSeen, shootSeen } from '../lib/progress'
 import { getBestScore } from '../shooting/words'
+import { batchiriForced } from '../lib/loginDays'
 import { playChime } from '../lib/audio'
 import { formatTime, getBest } from './Challenge'
 
@@ -24,10 +25,12 @@ interface Props {
 export function Home({ row, onRow, onLearn, onChallenge, onSettings, onAssess, onShoot }: Props) {
   const best = getBest(row.id)
   const [mastered] = useState(loadMastered)
-  const unlocked = allMastered(mastered)
+  const done = allMastered(mastered)
+  // せんせいが アセスメントの「すぐに だす（せんせい用）」に チェックしたときも、シューティングを 出す
+  const unlocked = done || batchiriForced()
   // 95まい ぜんぶ よめたら、はじめての ときだけ お知らせを 出す
   const [announce, setAnnounce] = useState(() => {
-    if (unlocked && !shootSeen()) {
+    if (done && !shootSeen()) {
       setShootSeen()
       window.setTimeout(playChime, 400)
       return true

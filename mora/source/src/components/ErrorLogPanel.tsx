@@ -81,7 +81,7 @@ export function ErrorLogPanel() {
             }}
             className="h-4 w-4 accent-violet-600"
           />
-          すぐに だす（せんせい用）
+          すぐに だす（シューティングと ばっちりモード・せんせい用）
         </label>
         <span className="text-xs text-stone-400">ログの きろく開始：{formatDate(new Date(log.since).toISOString())}</span>
       </div>

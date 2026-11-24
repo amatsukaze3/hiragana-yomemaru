@@ -194,7 +194,7 @@ function Menu({ onPlay, onZukan, onBatchiri, onExit }: { onPlay: (m: ModeId, res
             </span>
             <span className="font-card hidden shrink-0 gap-1 sm:flex" aria-hidden>
               {weak.kana.map((k) => (
-                <span key={k} className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-3xl text-violet-700">
+                <span key={k} className={`flex h-12 min-w-12 items-center justify-center whitespace-nowrap rounded-xl bg-white px-1.5 text-violet-700 ${k.length > 2 ? 'text-base' : k.length > 1 ? 'text-2xl' : 'text-3xl'}`}>
                   {k}
                 </span>
               ))}
