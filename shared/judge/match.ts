@@ -11,7 +11,7 @@
  *   other      … ちがう みじかい かな（ほかの 文字を よんだ）
  *   long / empty … ながい ことば・なにも ない
  */
-import { KANA46, specOf, toHiragana } from './kana46.ts'
+import { KANA46, hasConsonant, specOf, toHiragana, type Vowel } from './kana46.ts'
 
 /** アプリの 文字の しゅるい（形の にた 文字が ちがう） */
 export type Script = 'hira' | 'kata' | 'roma' | 'ROMA'
@@ -342,6 +342,73 @@ export function matchTargets(targets: string[], alts: string[], script: Script =
         if (top === 'confusable' || top === 'other') continue
       }
       return { kana: k, kind: h.kind, alt: j }
+    }
+  }
+  return null
+}
+
+/* ---------- ぼおん ごうかく（先生が せんせいメニューで きりかえる） ---------- */
+
+/** かなの 母音（あ段・い段 …）。きゃ・でぃ・どぅ の ような 音は さいごの 小さい かなの 母音。ん・っ は null */
+const VOWEL_OF_KANA: Record<string, Vowel> = {}
+for (const [v, s] of [
+  ['あ', 'あかさたなはまやらわがざだばぱぁゃゎ'],
+  ['い', 'いきしちにひみりゐぎじぢびぴぃ'],
+  ['う', 'うくすつぬふむゆるぐずづぶぷぅゅゔ'],
+  ['え', 'えけせてねへめれゑげぜでべぺぇ'],
+  ['お', 'おこそとのほもよろをごぞどぼぽぉょ'],
+] as [Vowel, string][])
+  for (const c of s) VOWEL_OF_KANA[c] = v
+
+export function moraVowel(m: string): Vowel | null {
+  return VOWEL_OF_KANA[m[m.length - 1]] ?? null
+}
+
+/**
+ * みじかい よみ（1〜3つの 音）の 母音：さいしょの 音の 母音。あとに つづいて よいのは おなじ 音の くりかえし・母音・ん だけ
+ * （「た」「たー」「たた」「たあ」「たん」）。ちがう 音が まじる（「たき」）・ながい ときは null
+ */
+export function readingVowel(r: string): Vowel | null {
+  const s = r.replace(/[ーっ]/g, '')
+  if (!s || !/^[ぁ-ゖ]+$/.test(s)) return null
+  const ms = morae(s)
+  if (ms.length > 3) return null
+  const v = moraVowel(ms[0])
+  if (!v) return null
+  for (const m of ms.slice(1)) if (m !== ms[0] && !/^[あいうえおぁぃぅぇぉん]$/.test(m)) return null
+  return v
+}
+
+/**
+ * ぼおん ごうかく：音声認識の けっか raw が、目標 target と おなじ 母音の みじかい よみか（子音は みない）。
+ * 「か」に「あ」「た」「かー」「たた」「田」「ta」など。構音が 育ちとちゅうの 子は 子音が ぬけたり（か→あ）
+ * ほかの 子音に かわったり（か→た、さ→た・しゃ、ら→だ・や）するので、母音だけで きめる。
+ * あ行・を・ん の 目標には つかわない（これまでどおり）
+ */
+export function vowelFits(target: string, raw: string): boolean {
+  if (!hasConsonant(target)) return false
+  const v = specOf(target)!.vowel
+  const { compact, words } = normalize(raw)
+  if (!compact) return false
+  const cands = [...readingsOfWord(compact), ...(words.length > 1 ? readingsOfWord(words[words.length - 1]) : [])]
+  return cands.some((r) => readingVowel(r) === v)
+}
+
+/**
+ * ぼおん ごうかく の matchTargets：おなじ 母音の よみで あう 目標（子音の ある 文字だけ。いちばんめの 目標から じゅんに）。
+ * 2ばんめ いこうの こうほは、いちばんの こうほが「ちがう 文字」「形の にた 文字」の ときは みない（matchTargets と おなじ）
+ */
+export function matchVowelTargets(targets: string[], alts: string[], script: Script = 'hira'): { kana: string; alt: number } | null {
+  for (let j = 0; j < alts.length; j++) {
+    const t = alts[j]
+    if (!t) continue
+    for (const k of targets) {
+      if (!vowelFits(k, t)) continue
+      if (j > 0) {
+        const top = classify(k, alts[0], script).kind
+        if (top === 'confusable' || top === 'other') continue
+      }
+      return { kana: k, alt: j }
     }
   }
   return null

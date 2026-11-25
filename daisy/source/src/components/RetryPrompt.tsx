@@ -1,14 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
-import { AudioLines, Play, Volume2 } from 'lucide-react'
+import { AudioLines, KeyRound, Play, Volume2 } from 'lucide-react'
 import { Mascot } from './Mascot'
 import { sayVoice } from '../lib/audio'
 import { VoiceRegister } from './VoiceRegister'
+import { canOpenTeacherHelp, openTeacherHelp } from './TeacherHelp'
 import type { MissInfo } from '../lib/voice'
 
 /** 5回 読んでも 合格しないとき：声の登録を すすめる */
 export const MISS_LIMIT = 5
 
-export function RetryPrompt({ open, onRegister, onContinue }: { open: boolean; onRegister: () => void; onContinue: () => void }) {
+/**
+ * onHelp：「ヘルプ」ボタン（おとな むけ）。せんせいメニュー（暗証番号）を ひらいて、合格の きじゅん（しおん／ぼおん ごうかく）を
+ * その子に あわせて かえられる ように する
+ */
+export function RetryPrompt({ open, onRegister, onContinue, onHelp }: { open: boolean; onRegister: () => void; onContinue: () => void; onHelp?: () => void }) {
   useEffect(() => {
     if (open) sayVoice('retry_register')
   }, [open])
@@ -42,6 +47,11 @@ export function RetryPrompt({ open, onRegister, onContinue }: { open: boolean; o
           <button type="button" onClick={onContinue} className="flex items-center justify-center gap-2 rounded-full border-2 border-amber-300 bg-white py-2.5 text-lg font-bold text-stone-700">
             <Play size={20} /> Keep going
           </button>
+          {onHelp && (
+            <button type="button" onClick={onHelp} className="flex items-center justify-center gap-1.5 self-center rounded-full border-2 border-stone-200 bg-white px-5 py-2 text-base font-bold text-stone-500">
+              <KeyRound size={18} /> Help
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -94,6 +104,17 @@ export function useRetryRegister(hooks?: { onPause?: () => void; onResume?: () =
           voice.current?.resume()
           h.current?.onResume?.()
         }}
+        onHelp={
+          canOpenTeacherHelp()
+            ? () => {
+                // ここの 一時停止は とき、せんせいメニューが あらためて とめる（「つづける」で もどる）
+                setPrompt(false)
+                voice.current?.resume()
+                h.current?.onResume?.()
+                openTeacherHelp()
+              }
+            : undefined
+        }
       />
       {reg && <VoiceRegister onCancel={back} onDone={back} />}
     </>

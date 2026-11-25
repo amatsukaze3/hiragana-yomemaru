@@ -11,6 +11,7 @@ export interface AssessRecord {
   missed: string[] // よめなかった文字
   manual: number // 先生が「よめた」ボタンで○にした数
   helped?: string[] // せんせいヘルプで合格にした文字（よめなかった文字として（ ）つきで記録）
+  vowelMode?: boolean // せんせいメニューの「ぼおん ごうかく」（母音が あえば 合格）で しらべた
 }
 
 /** よめなかった文字の表示：せんせいヘルプで合格にした文字は（ ）でかこむ（50音順） */

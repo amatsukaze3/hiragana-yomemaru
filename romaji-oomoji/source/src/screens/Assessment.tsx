@@ -11,6 +11,7 @@ import { logCorrect, logError, onceper } from '../lib/errorLog'
 import { addRecord, clearRecords, formatDate, loadRecords, remark, type AssessRecord, missedLabel } from '../lib/assessRecords'
 import { playChime, sayVoice } from '../lib/audio'
 import { useVoiceJudge } from '../lib/useVoiceJudge'
+import { passMode } from '../lib/voice'
 import { voiceprintUseful } from '../lib/voiceprint'
 import { VoiceRegister } from '../components/VoiceRegister'
 import { TeacherHelp } from '../components/TeacherHelp'
@@ -35,12 +36,15 @@ export function Assessment({ onHome }: { onHome: () => void }) {
   const [starting, setStarting] = useState(false)
   const [registering, setRegistering] = useState(false)
   const busy = useRef(false)
+  // このアセスメントの とちゅうで「ぼおん ごうかく」だった（きろくに しるしを つける）
+  const vowelUsed = useRef(false)
 
   const target = phase === 'test' && order.length ? order[idx] : null
 
   const answer = (ok: boolean, how: 'voice' | 'manual' | 'skip' | 'help') => {
     if (busy.current || phase !== 'test') return
     busy.current = true
+    if (passMode.get() === 'vowel') vowelUsed.current = true
     const k = order[idx]
     // まちがいログ：「よめない」・せんせいヘルプ は よめなかった、マイクで よめたら にがて度を へらす
     if (how === 'skip' || how === 'help') logError(k, 'unread', 'assess')
@@ -84,6 +88,7 @@ export function Assessment({ onHome }: { onHome: () => void }) {
       missed,
       helped,
       manual: manualCount,
+      ...(vowelUsed.current ? { vowelMode: true } : {}),
     }
     addRecord(rec)
     setRecords(loadRecords())
@@ -117,6 +122,7 @@ export function Assessment({ onHome }: { onHome: () => void }) {
     setIdx(0)
     setResults({})
     setManual(0)
+    vowelUsed.current = false
     busy.current = false
     await voice.start()
     // フローラちゃんが話しているあいだは きかない（声を まちがえて合格にしないため）
@@ -215,6 +221,7 @@ export function Assessment({ onHome }: { onHome: () => void }) {
                         <td className="font-card py-1.5 pr-3">{r.name}</td>
                         <td className="py-1.5 pr-3 text-right">
                           {r.correct} / {r.total}
+                          {r.vowelMode && <span className="ml-1 whitespace-nowrap rounded bg-sky-100 px-1 text-xs font-bold text-sky-700">ぼおん</span>}
                         </td>
                         <td className="py-1.5 pr-3 text-right font-bold">{Math.round((r.correct / r.total) * 100)}%</td>
                         <td className="font-roma py-1.5 tracking-wider">{missedLabel(r, KANA)}</td>
@@ -224,6 +231,7 @@ export function Assessment({ onHome }: { onHome: () => void }) {
                 </table>
               </div>
             )}
+            {records.some((r) => r.vowelMode) && <p className="text-xs text-stone-400">「ぼおん」…「ぼおん ごうかく」（母音が 合えば 合格）で しらべた きろくです。</p>}
             <p className="text-xs text-stone-400">きろくは この端末の ブラウザの中だけに のこり、外には おくられません。</p>
           </section>
 
@@ -296,6 +304,7 @@ export function Assessment({ onHome }: { onHome: () => void }) {
             </p>
           )}
           {(last.helped?.length ?? 0) > 0 && <p className="text-xs text-stone-400">（ ）は せんせいヘルプで ごうかくにした文字です（よめなかった文字として きろく）</p>}
+          {last.vowelMode && <p className="text-xs text-stone-400">「ぼおん ごうかく」（母音が 合えば 合格）で しらべました</p>}
           {last.manual > 0 && <p className="text-xs text-stone-400">先生の「よめた」ボタンで○にした文字：{last.manual}こ</p>}
           <div className="mt-2 flex flex-wrap justify-center gap-3">
             <ActionButton label="きろくを みる" onClick={() => setPhase('menu')} />

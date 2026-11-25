@@ -17,11 +17,15 @@
  *
  *  iPhone・iPad は 音声認識（Apple）と 周波数解析が おなじ マイクを とりあうので、音声認識だけで きく
  *  （こえの とうろく が あれば 母音・ん の カードだけ 周波数解析に きりかえる）。
+ *
+ *  ぼおん ごうかく（setVowelMode。先生が せんせいメニューで きりかえる。構音が 育ちとちゅうの 子むけ）：
+ *  子音の ある 文字も 母音が あえば 合格（音声認識が「あ」「た」と きいた・周波数解析で 母音が あった）。
+ *  あ行・を・ん は これまでどおり。iPhone・iPad は こえの とうろく が あれば どの カードも 周波数解析で きく。
  */
-import { specOf, type OnsetClass, type Vowel } from './kana46.ts'
+import { hasConsonant, specOf, type OnsetClass, type Vowel } from './kana46.ts'
 import { VOWEL_ORDER, meanShape, modelProbs, personalProbs, updateNoise, vowelFeature } from './vowelClassifier.ts'
 import { ONSET_CLASSES, onsetFeatures, onsetProbs, onsetScore } from './onset.ts'
-import { classify, matchTargets, normalize, type Heard, type HeardKind, type Script } from './match.ts'
+import { classify, matchTargets, matchVowelTargets, normalize, readingVowel, type Heard, type HeardKind, type Script } from './match.ts'
 import { JudgeLog } from './log.ts'
 
 export type PassSource = 'asr' | 'formant'
@@ -310,8 +314,8 @@ export class JudgeEngine {
   private prevTime = new Float32Array(0)
   private sampleCount = 0
   private lastTickAt = 0
-  /** あ行で 合格に する まえに、音声認識が ちがう 文字を きいて いないか まつ（時間切れで 合格） */
-  private pending: { target: string; until: number } | null = null
+  /** あ行（と ぼおん ごうかく）で 合格に する まえに、音声認識が ちがう 文字を きいて いないか まつ（時間切れで 合格） */
+  private pending: { target: string; until: number; route: string } | null = null
   /** みち④：さいごの 発声で 周波数解析が よわい 子音を きいた */
   private fuseUtt: UttEvidence | null = null
   /** さいごの 発声の 子音の なかまの 確率（テスト・ログ用） */
@@ -366,7 +370,7 @@ export class JudgeEngine {
       if (this.asrAlive) {
         this.unsubVoice?.()
         this.unsubVoice = this.platform.onMascotVoice((s) => this.mascotVoice(s))
-        this.log.add({ type: 'info', target: this.target, note: 'start: iPad・iPhone 音声認識' })
+        this.log.add({ type: 'info', target: this.target, note: `start: iPad・iPhone 音声認識${this.vowelMode ? '・ぼおん ごうかく' : ''}` })
         this.onStatus?.('listening', true)
         return 'listening'
       }
@@ -423,7 +427,7 @@ export class JudgeEngine {
     // iPhone/iPad で周波数解析を使うときと、声の登録中は、音声認識を使わない
     if (!isIOS() && !this.forceAnalyser) this.startAsr()
     if (!this.forceAnalyser)
-      this.log.add({ type: 'info', target: this.target, note: `start: ${acoustic ? 'iPad・iPhone こえの とうろく（周波数解析）' : `周波数解析${this.asrAlive ? '＋音声認識' : 'だけ'}`}${this.voiceprint ? '・とうろく あり' : ''} ${Math.round(ctx.sampleRate / 100) / 10}kHz` })
+      this.log.add({ type: 'info', target: this.target, note: `start: ${acoustic ? 'iPad・iPhone こえの とうろく（周波数解析）' : `周波数解析${this.asrAlive ? '＋音声認識' : 'だけ'}`}${this.voiceprint ? '・とうろく あり' : ''}${this.vowelMode ? '・ぼおん ごうかく' : ''} ${Math.round(ctx.sampleRate / 100) / 10}kHz` })
     this.onStatus?.('listening', this.asrAlive)
     return 'listening'
   }
@@ -515,6 +519,29 @@ export class JudgeEngine {
     return (top === 5 && avg[5] >= 0.45) || ((top === 5 || top === 2) && avg[5] + avg[2] >= 0.6)
   }
 
+  /**
+   * ぼおん ごうかく（先生が せんせいメニューで きりかえる。構音が 育ちとちゅうの 子むけ）：
+   * 子音の ある 文字も、母音が あえば 合格に する（子音は みない。「か」に「あ」「た」で 合格）。
+   * あ行・を・ん は これまでどおり。先生が もどす（false）まで そのまま
+   */
+  private vowelMode = false
+  setVowelMode(on: boolean) {
+    if (this.vowelMode === on) return
+    this.vowelMode = on
+    this.pending = null
+    this.fuseUtt = null
+    this.log.add({ type: 'info', target: this.target, note: on ? 'ぼおん ごうかく に した' : 'しおん ごうかく に した' })
+    // iPhone・iPad：こえの とうろく で きく カードが かわる
+    if (this.needSwitch(this.target)) void this.switchMode()
+  }
+  get vowelModeOn() {
+    return this.vowelMode
+  }
+  /** この 文字を ぼおん ごうかく で きくか（子音の ある 文字だけ） */
+  private vowelRule(k: string | null) {
+    return this.vowelMode && hasConsonant(k)
+  }
+
   /** その子の「あいうえお」を使う（null で学習モデルにもどす） */
   setVoiceprint(C: number[][] | null) {
     this.voiceprint = C
@@ -526,14 +553,15 @@ export class JudgeEngine {
    * iPhone・iPad で この カードを こえの とうろく（周波数解析）で きくか：とうろく が あって、母音（あいうえお・を）の カード。
    * ん は「ん」も とうろく して いる とき だけ（して いないと「う」と 見わけられない）。
    * Apple の 音声認識は「あ」「い」「う」「ん」だけの みじかい 声を ききとれない ことが おおい（2026-11-24。こどもが なんども いいなおして いた）。
-   * 子音の ある 文字は これまでどおり 音声認識（「か」に「あ」で 合格させない）
+   * 子音の ある 文字は これまでどおり 音声認識（「か」に「あ」で 合格させない）。
+   * ぼおん ごうかく の ときは 子音の ある 文字も（母音で きめるので。Apple の 音声認識は 母音だけの 声を ききとりにくい）
    */
   private iosAcoustic(k: string | null) {
     if (!(isIOS() || this.acousticAnywhere) || this.forceAnalyser || this.iosAcousticFailed || !this.voiceprint || !k) return false
     const sp = specOf(k)
     if (!sp) return false
     if (sp.hira === 'ん') return this.voiceprint.length >= 6
-    return sp.cls === 'V'
+    return sp.cls === 'V' || this.vowelMode
   }
   /** テスト用：iPhone・iPad で なくても iosAcoustic を つかう */
   acousticAnywhere = false
@@ -749,9 +777,9 @@ export class JudgeEngine {
     const now = performance.now()
     if (this.pending && (this.pending.target !== this.target || this.paused)) this.pending = null
     if (this.pending && now >= this.pending.until) {
-      const t = this.pending.target
+      const { target: t, route } = this.pending
       this.pending = null
-      this.pass('formant', t, 'vowel')
+      this.pass('formant', t, route)
     }
     if (!this.armed) {
       // 前の声が途切れる（または一定時間たつ）まで待ってから判定を始める
@@ -851,14 +879,24 @@ export class JudgeEngine {
     //    ・ん は これまでどおり
     //  - この 発声で 音声認識が ちがう 文字（「あ」「さ」など）を きいていたら 不合格
     let onsetNote = ''
+    // ぼおん ごうかく（子音の ある 文字）：母音が あえば 合格（子音は みない）
+    const vr = this.vowelRule(t)
     // みち④（くみあわせ）は 母音を 音声認識が たしかめるので、周波数解析の 母音の しらべは いらない（ながさ だけ みる）
-    const fuseable = !!t && !!sp && lenOk && this.asrAlive && (sp.cls === 'R' || sp.cls === 'N')
+    const fuseable = !vr && !!t && !!sp && lenOk && this.asrAlive && (sp.cls === 'R' || sp.cls === 'N')
     if ((vowelOk || fuseable) && t && sp) {
       const heard = this.asrAlive ? this.heardDuring(t, u.startAt) : null
       const cls = sp.cls
       let ok: 'now' | 'wait' | 'fuse' | 'no'
       let route = 'onset'
-      if (!cls) ok = heard ? 'no' : 'now' // ん
+      if (vr && cls) {
+        // ぼおん ごうかく：音声認識が ちがう 母音（「か」に「き」）を きいて いたら 合格に しない。
+        // 出だしの モデルが 子音を はっきり きいた・音声認識が ない ときは すぐ、それいがいは 音声認識の けっかを すこし まつ（あ行と おなじ）
+        route = 'vowelmode'
+        const o = this.onsetScoreOf(cls, u.startSample)
+        if (o) onsetNote = `${cls}:${o.score.toFixed(2)}${this.lastOnset ? `(${this.lastOnset.cls})` : ''}`
+        const otherVowel = !!heard && readingVowel(heard.reading ?? '') !== sp.vowel
+        ok = otherVowel ? 'no' : (o && o.score >= o.fast) || !this.asrAlive ? 'now' : 'wait'
+      } else if (!cls) ok = heard ? 'no' : 'now' // ん
       else {
         const o = this.onsetScoreOf(cls, u.startSample)
         if (o) onsetNote = `${cls}:${o.score.toFixed(2)}${this.lastOnset ? `(${this.lastOnset.cls})` : ''}`
@@ -882,7 +920,7 @@ export class JudgeEngine {
       } else if (ok !== 'no') {
         this.onFrame?.({ bands, voiced: false, match: true, streak: STREAK_TO_PASS })
         if (ok === 'wait') {
-          this.pending = { target: t, until: now + ASR_WAIT_MS }
+          this.pending = { target: t, until: now + ASR_WAIT_MS, route }
           // 音声認識の さいごの けっかを はやく もらって たしかめる
           this.finalizeAsr()
         } else this.pass('formant', t, route)
@@ -1162,18 +1200,33 @@ export class JudgeEngine {
     )
   }
 
+  private lastAsrLog = ''
   /** 音声認識の 1つの けっか（こうほ ぜんぶ）を みる */
   private onAsrResult(alts: string[], final: boolean) {
     const t = this.target
     if (!t) return
     const all = this.targetsAll()
     const hit = matchTargets(all, alts, this.config.script)
+    // ぼおん ごうかく：おなじ 母音の よみ（「か」に「あ」「た」）でも 合格（子音の ある 文字だけ）
+    const vhit = !hit && this.vowelMode ? matchVowelTargets(all, alts, this.config.script) : null
     const top = alts[0] ?? ''
     const heard = classify(t, top, this.config.script)
-    this.log.add({ type: 'asr', target: t, alts: alts.slice(0, 5), final, kind: hit ? `${hit.kind}${hit.kana !== t ? `:${hit.kana}` : ''}${hit.alt ? `#${hit.alt + 1}` : ''}` : heard.kind })
+    // おなじ とちゅうの けっかが なんども くる（パソコン）ので、かわった ときだけ きろくする
+    const sig = `${t}|${final}|${alts.slice(0, 5).join('／')}`
+    const h = hit ?? vhit
+    if (sig !== this.lastAsrLog || h) {
+      this.lastAsrLog = sig
+      const kind = hit ? hit.kind : vhit ? 'vowelmode' : heard.kind
+      this.log.add({ type: 'asr', target: t, alts: alts.slice(0, 5), final, kind: h ? `${kind}${h.kana !== t ? `:${h.kana}` : ''}${h.alt ? `#${h.alt + 1}` : ''}` : kind })
+    }
     if (hit) {
       this.pending = null
       this.pass('asr', hit.kana, hit.kind === 'variant' ? 'variant' : 'asr')
+      return
+    }
+    if (vhit) {
+      this.pending = null
+      this.pass('asr', vhit.kana, 'vowelmode')
       return
     }
     if (!top) return
@@ -1193,7 +1246,8 @@ export class JudgeEngine {
       this.onMiss?.({ heard: top, kind: heard.kind, vpHelps: true })
     }
     // iPhone・iPad（音声認識だけ）：さいごの けっかが ちがう 文字 → 「合格しなかった」を しらせる（ヒント・きろくの ため）。
-    // 子音の カードは こえの とうろく では よく ならないので vpHelps は false
+    // 子音の カードは こえの とうろく では よく ならないので vpHelps は false（ぼおん ごうかく では とうろく すると
+    // どの カードも 周波数解析で きくので true）
     if (this.asrOnly && final && short && (heard.kind === 'vowel' || heard.kind === 'other' || heard.kind === 'confusable')) {
       const n = this.passCount
       const attempt = ++this.missAttempt
@@ -1201,7 +1255,7 @@ export class JudgeEngine {
       this.missTimer = window.setTimeout(() => {
         if (this.target === t && this.passCount === n && this.missAttempt === attempt && !this.paused) {
           this.log.add({ type: 'miss', target: t, alts: [top], kind: heard.kind })
-          this.onMiss?.({ heard: top, kind: heard.kind, vpHelps: specOf(t)?.cls === 'V' || specOf(t)?.hira === 'ん' })
+          this.onMiss?.({ heard: top, kind: heard.kind, vpHelps: specOf(t)?.cls === 'V' || specOf(t)?.hira === 'ん' || this.vowelMode })
         }
       }, IOS_MISS_DELAY_MS)
     }

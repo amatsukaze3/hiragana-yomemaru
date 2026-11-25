@@ -68,3 +68,9 @@ export function specOf(k: string | null | undefined): KanaSpec | null {
 }
 
 export const VOWEL_KANA = VOWELS
+
+/** 子音の ある 文字か（か行〜わ。あ行・を・ん は ちがう） */
+export function hasConsonant(k: string | null | undefined) {
+  const sp = specOf(k)
+  return !!sp && !!sp.cls && sp.cls !== 'V'
+}
